@@ -14,11 +14,10 @@ See [this summary][summarypdf] for a quick, highlevel overview.
 
 ### Obtaining
 
-* Version 0.10.0 is the latest release of moxi, and it became available
-  on the 16th of October, 2009.  We plan for packages of this release in
-  both .deb and .rpm to be available soon.  Right now, the release is
-  available via github as listed below.  See the [changelog][changelog]
-  for some clues on what has changed.
+* Version 0.10.0 is the latest release of moxi, and it became
+  available on the 16th of October, 2009. Right now, the release is
+  available via github as listed below.  See the
+  [changelog][changelog] for some clues on what has changed.
 
 ### The basics
 
