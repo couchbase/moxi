@@ -132,7 +132,8 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
         if (uc != NULL) {
             assert(uc->next == NULL);
 
-            if (protocol_stats_merge_line(d->merger, line) == false) {
+            if (protocol_stats_merge_line(d->merger, line,
+                                          d->downstream_used_start) == false) {
                 // Forward the line as-is if we couldn't merge it.
                 //
                 int nline = strlen(line);

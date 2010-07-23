@@ -650,7 +650,8 @@ void noop_free(void *v);
 
 // Stats handling.
 //
-bool protocol_stats_merge_line(genhash_t *merger, char *line);
+bool protocol_stats_merge_line(genhash_t *merger, char *line,
+                               int num_servers);
 
 bool protocol_stats_merge_name_val(genhash_t *merger,
                                    char *prefix,
@@ -658,7 +659,8 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
                                    char *name,
                                    int   name_len,
                                    char *val,
-                                   int   val_len);
+                                   int   val_len,
+                                   int   num_servers);
 
 void protocol_stats_foreach_free(const void *key,
                                  const void *value,

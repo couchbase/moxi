@@ -16,11 +16,12 @@
 // Special STATS value merging rules, instead of the
 // default to just sum the values.  Note the trailing space.
 //
-char *protocol_stats_keys_first = "pid ";
+char *protocol_stats_keys_one = // These stats only make sense with one server.
+    "pid version libevent "
+    "ep_version ep_dbname ep_storage_type ep_flusher_state ep_warmup_thread ";
 char *protocol_stats_keys_smallest =
     "uptime "
     "time "
-    "version "
     "pointer_size "
     "limit_maxbytes "
     "accepting_conns "
@@ -70,7 +71,7 @@ mcache_funcs mcache_key_stats_funcs = {
 #define VALUE_TOKEN    2
 #define MERGE_BUF_SIZE 300
 
-bool protocol_stats_merge_line(genhash_t *merger, char *line) {
+bool protocol_stats_merge_line(genhash_t *merger, char *line, int num_servers) {
     assert(merger != NULL);
     assert(line != NULL);
 
@@ -102,7 +103,8 @@ bool protocol_stats_merge_line(genhash_t *merger, char *line) {
                                          tokens[PREFIX_TOKEN].length,
                                          name, name_len,
                                          tokens[VALUE_TOKEN].value,
-                                         tokens[VALUE_TOKEN].length);
+                                         tokens[VALUE_TOKEN].length,
+                                         num_servers);
 }
 
 // TODO: The stats merge assumes an ascii upstream.
@@ -113,7 +115,8 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
                                    char *name,
                                    int   name_len,
                                    char *val,
-                                   int   val_len) {
+                                   int   val_len,
+                                   int   num_servers) {
     assert(merger);
     assert(name);
     assert(val);
@@ -134,6 +137,10 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
 
         strncpy(buf_name, name, name_len);
         buf_name[name_len] = '\0';
+
+        if (strstr(protocol_stats_keys_first, buf_key) != NULL) {
+            return true;
+        }
 
         char *prev = (char *) genhash_find(merger, buf_name);
         if (prev == NULL) {
@@ -158,10 +165,6 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
 
         strncpy(buf_key, key, key_len);
         buf_key[key_len] = '\0';
-
-        if (strstr(protocol_stats_keys_first, buf_key) != NULL) {
-            return true;
-        }
 
         token_t prev_tokens[MAX_TOKENS];
         size_t  prev_ntokens = scan_tokens(prev, prev_tokens,

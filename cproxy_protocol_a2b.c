@@ -1034,7 +1034,8 @@ void a2b_process_downstream_response(conn *c) {
                 protocol_stats_merge_name_val(d->merger,
                                               "STAT", 4,
                                               ITEM_key(it), it->nkey,
-                                              ITEM_data(it), it->nbytes - 2);
+                                              ITEM_data(it), it->nbytes - 2,
+                                              d->downstream_used_start);
             }
 
             item_remove(it);

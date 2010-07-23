@@ -421,7 +421,8 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
 
                         protocol_stats_merge_name_val(d->merger, "STAT", 4,
                                                       key, keylen,
-                                                      val, bodylen - keylen - extlen);
+                                                      val, bodylen - keylen - extlen,
+                                                      d-downstream_used_start);
                     }
 
                     conn_set_state(c, conn_new_cmd); // Get next STATS response.
