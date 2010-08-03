@@ -3773,6 +3773,7 @@ static int new_socket_unix(void) {
     return sfd;
 }
 
+#ifndef WIN32
 static int server_socket_unix(const char *path, int access_mask) {
     int sfd;
     struct linger ling = {0, 0};
@@ -3833,6 +3834,7 @@ static int server_socket_unix(const char *path, int access_mask) {
 
     return 0;
 }
+#endif
 
 /*
  * We keep the current time of day in a global variable that's updated by a
@@ -3888,9 +3890,11 @@ static void usage(int argc, char **argv) {
            "-p <num>      TCP port number to listen on (default: 11211)\n"
            "              to have moxi be a memcached server\n"
            "-U <num>      UDP port number to listen on (default: 11211, 0 is off)\n"
-           "              to have moxi be a memcached server\n"
-           "-s <file>     UNIX socket path to listen on (disables network support)\n"
-           "-a <mask>     access mask for UNIX socket, in octal (default: 0700)\n"
+           "              to have moxi be a memcached server\n");
+#ifndef WIN32
+    printf("-s <file>     UNIX socket path to listen on (disables network support)\n");
+#endif
+    printf("-a <mask>     access mask for UNIX socket, in octal (default: 0700)\n"
            "-l <ip_addr>  interface to listen on (default: INADDR_ANY, all addresses)\n"
            "-d            run as a daemon\n"
            "-r            maximize core file limit\n"
@@ -4180,7 +4184,9 @@ int main (int argc, char **argv) {
     while (-1 != (c = getopt(argc, argv,
           "a:"  /* access mask for unix socket */
           "p:"  /* TCP port number to listen on */
+#ifndef WIN32
           "s:"  /* unix socket path to listen on */
+#endif
           "U:"  /* UDP port number to listen on */
           "m:"  /* max memory to use for items in megabytes */
           "M"   /* return error on memory exhausted */
@@ -4217,9 +4223,11 @@ int main (int argc, char **argv) {
         case 'p':
             settings.port = atoi(optarg);
             break;
+#ifndef WIN32
         case 's':
             settings.socketpath = optarg;
             break;
+#endif
         case 'm':
             settings.maxbytes = ((size_t)atoi(optarg)) * 1024 * 1024;
             break;
@@ -4460,6 +4468,7 @@ int main (int argc, char **argv) {
     /* initialise clock event */
     clock_handler(0, 0, 0);
 
+#ifndef WIN32
     /* create unix mode sockets after dropping privileges */
     if (settings.socketpath != NULL) {
         errno = 0;
@@ -4468,6 +4477,7 @@ int main (int argc, char **argv) {
             exit(EX_OSERR);
         }
     }
+#endif
 
     /* create the listening socket, bind it, and init */
     if (settings.socketpath == NULL) {
