@@ -1,5 +1,5 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -41,11 +41,11 @@ static void agent_logger(void *userdata,
     bool v = false;
 
     switch(lvl) {
-    case FATAL: n = "FATAL"; v = settings.verbose > 0; break;
-    case ERROR: n = "ERROR"; v = settings.verbose > 0; break;
-    case WARN:  n = "WARN";  v = settings.verbose > 1; break;
-    case INFO:  n = "INFO";  v = settings.verbose > 1; break;
-    case DEBUG: n = "DEBUG"; v = settings.verbose > 2; break;
+    case LOG_LVL_FATAL: n = "FATAL"; v = settings.verbose > 0; break;
+    case LOG_LVL_ERROR: n = "ERROR"; v = settings.verbose > 0; break;
+    case LOG_LVL_WARN:  n = "WARN";  v = settings.verbose > 1; break;
+    case LOG_LVL_INFO:  n = "INFO";  v = settings.verbose > 1; break;
+    case LOG_LVL_DEBUG: n = "DEBUG"; v = settings.verbose > 2; break;
     }
     if (!v) {
         return;

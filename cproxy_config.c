@@ -1,14 +1,15 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <sysexits.h>
 #include <pthread.h>
 #include <assert.h>
 #include <math.h>
+#include <libhashkit/hashkit.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -86,7 +87,7 @@ int skey_hash(const void *v) {
     const char *key = v;
     size_t      len = skey_len(key);
 
-    return murmur_hash(key, len);
+    return libhashkit_murmur(key, len);
 }
 
 /** Returns true if two keys are equal, where the

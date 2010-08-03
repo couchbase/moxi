@@ -45,7 +45,7 @@ moxi-*.tar.gz
 doc/protocol-binary-range.txt
 doc/protocol-binary.txt
 /sizes
-/version.m4
+/m4/version.m4
 /version.num
 /testapp
 /timedrun
@@ -63,3 +63,8 @@ libmemcached-*/libmemcached/libmemcached_config.h
 .buildbot/*
 /t/check_moxi_agent.cfg
 /memcached.spec
+/m4/libtool.m4
+/m4/ltoptions.m4
+/m4/ltsugar.m4
+/m4/ltversion.m4
+/m4/lt~obsolete.m4
