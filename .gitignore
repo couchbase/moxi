@@ -1,4 +1,5 @@
 *.[ao]
+*.exe
 *.gcov
 *.gcda
 *.gcno
