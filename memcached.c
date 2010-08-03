@@ -4164,7 +4164,9 @@ int main (int argc, char **argv) {
 #ifndef MAIN_CHECK
     struct passwd *pw;
 #endif
+#ifndef WIN32
     struct rlimit rlim;
+#endif
     /* listening sockets */
     static int *l_socket = NULL;
 
@@ -4347,6 +4349,7 @@ int main (int argc, char **argv) {
         settings.port = 11210;
     }
 
+#ifndef WIN32
     if (maxcore != 0) {
         struct rlimit rlim_new;
         /*
@@ -4409,6 +4412,7 @@ int main (int argc, char **argv) {
             exit(EX_OSERR);
         }
     }
+#endif
 #endif
 
     /* daemonize if requested */
