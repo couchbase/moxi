@@ -4176,6 +4176,9 @@ int main (int argc, char **argv) {
     /* handle SIGINT */
     signal(SIGINT, sig_handler);
 
+    initialize_sockets();
+
+
     /* init settings */
     settings_init();
 
