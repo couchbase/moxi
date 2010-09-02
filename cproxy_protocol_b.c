@@ -15,9 +15,7 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes);
 
 static proxy *cproxy_find_proxy_by_plain_auth(proxy_main *m,
                                               const char *usr,
-                                              int usrlen,
-                                              const char *pwd,
-                                              int pwdlen);
+                                              const char *pwd);
 
 void cproxy_process_upstream_binary(conn *c) {
     assert(c != NULL);
@@ -405,8 +403,7 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
             password[pwlen] = '\0';
 
             proxy *p = cproxy_find_proxy_by_plain_auth(ptd->proxy->main,
-                                                       username, uslen,
-                                                       password, pwlen);
+                                                       username, password);
             if (p != NULL) {
                 proxy_td *ptd_target = cproxy_find_thread_data(p, pthread_self());
                 if (ptd_target != NULL) {
@@ -456,17 +453,15 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
 //
 static proxy *cproxy_find_proxy_by_plain_auth(proxy_main *m,
                                               const char *usr,
-                                              int usrlen,
-                                              const char *pwd,
-                                              int pwdlen) {
+                                              const char *pwd) {
     proxy *found = NULL;
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
     for (proxy *p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
-        if (strncmp(p->behavior_pool.base.usr, usr, usrlen) == 0 &&
-            strncmp(p->behavior_pool.base.pwd, pwd, pwdlen) == 0) {
+        if (strcmp(p->behavior_pool.base.usr, usr) == 0 &&
+            strcmp(p->behavior_pool.base.pwd, pwd) == 0) {
             found = p;
         }
         pthread_mutex_unlock(&p->proxy_lock);
