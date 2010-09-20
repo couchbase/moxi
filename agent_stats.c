@@ -1569,35 +1569,17 @@ enum conflate_mgmt_cb_result on_conflate_reset_stats(void *userdata,
     assert(m);
     assert(m->nthreads > 1);
 
+    proxy_stats_reset(m);
+
+    return RV_OK;
+}
+
+void proxy_stats_reset(proxy_main *m) {
     LIBEVENT_THREAD *mthread = thread_by_index(0);
     assert(mthread);
     assert(mthread->work_queue);
 
-    // Alloc here so the main listener thread has less work.
-    //
-    work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
-    if (ca != NULL) {
-        int i;
-
-        for (i = 1; i < m->nthreads; i++) {
-            work_collect_init(&ca[i], -1, NULL);
-        }
-
-        // Continue on the main listener thread.
-        //
-        if (i >= m->nthreads &&
-            work_send(mthread->work_queue, main_stats_reset, m, ca)) {
-            // Wait for all resets to finish.
-            //
-            for (i = 1; i < m->nthreads; i++) {
-                work_collect_wait(&ca[i]);
-            }
-        }
-
-        free(ca);
-    }
-
-    return RV_OK;
+    work_send(mthread->work_queue, main_stats_reset, m, NULL);
 }
 
 /* Must be invoked on the main listener thread.
@@ -1608,9 +1590,6 @@ static void main_stats_reset(void *data0, void *data1) {
     proxy_main *m = data0;
     assert(m);
     assert(m->nthreads > 1);
-
-    work_collect *ca = data1;
-    assert(ca);
 
     assert(is_listen_thread());
 
@@ -1639,35 +1618,43 @@ static void main_stats_reset(void *data0, void *data1) {
 
     pthread_mutex_unlock(&m->proxy_main_lock);
 
-    // Starting at 1 because 0 is the main listen thread.
-    //
-    for (int i = 1; i < m->nthreads; i++) {
-        work_collect *c = &ca[i];
+    if (nproxy > 0) {
+        work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
+        if (ca != NULL) {
+            // Starting at 1 because 0 is the main listen thread.
+            //
+            for (int i = 1; i < m->nthreads; i++) {
+                work_collect *c = &ca[i];
 
-        work_collect_count(c, nproxy);
+                work_collect_init(c, nproxy, NULL);
 
-        if (nproxy > 0) {
-            LIBEVENT_THREAD *t = thread_by_index(i);
-            assert(t);
-            assert(t->work_queue);
+                LIBEVENT_THREAD *t = thread_by_index(i);
+                assert(t);
+                assert(t->work_queue);
 
-            pthread_mutex_lock(&m->proxy_main_lock);
+                pthread_mutex_lock(&m->proxy_main_lock);
 
-            for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
-                proxy_td *ptd = &p->thread_data[i];
-                if (ptd != NULL &&
-                    work_send(t->work_queue, work_stats_reset, ptd, c)) {
-                    sent++;
+                for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+                    proxy_td *ptd = &p->thread_data[i];
+                    if (ptd != NULL &&
+                        work_send(t->work_queue, work_stats_reset, ptd, c)) {
+                        sent++;
+                    }
                 }
+
+                pthread_mutex_unlock(&m->proxy_main_lock);
             }
 
-            pthread_mutex_unlock(&m->proxy_main_lock);
+            // Wait for all resets to finish.
+            //
+            for (int i = 1; i < m->nthreads; i++) {
+                work_collect_wait(&ca[i]);
+            }
+
+            free(ca);
         }
     }
 
-    // Normally, no need to wait for the worker threads to finish,
-    // as the workers will signal using work_collect_one().
-    //
     // TODO: If sent is too small, then some proxies were disabled?
     //       Need to decrement count?
     //
@@ -1727,6 +1714,8 @@ struct htgram_dump_callback_data {
 };
 
 static void htgram_dump_callback(HTGRAM_HANDLE h, const char *dump_line, void *cbdata) {
+    (void) h;
+
     ADD_STAT add_stats = ((struct htgram_dump_callback_data *) cbdata)->add_stats;
     char *prefix       = ((struct htgram_dump_callback_data *) cbdata)->prefix;
     conn *c            = ((struct htgram_dump_callback_data *) cbdata)->conn;
