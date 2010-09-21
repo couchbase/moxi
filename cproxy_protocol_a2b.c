@@ -624,6 +624,9 @@ static void a2b_out_error(conn *uc, uint16_t status) {
     case PROTOCOL_BINARY_RESPONSE_EBUSY:
         out_string(uc, "SERVER_ERROR a2b ebusy");
         break;
+    case PROTOCOL_BINARY_RESPONSE_ETMPFAIL:
+        out_string(uc, "SERVER_ERROR temporary failure");
+        break;
     default:
         out_string(uc, "SERVER_ERROR a2b error");
         break;
