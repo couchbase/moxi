@@ -346,6 +346,12 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
     //
     bool self = false;
 
+    if (!strcmp(command, "version")) {
+        /* fake key for version command handling */
+        key = "v";
+        key_len = 1;
+    }
+
     conn *c = cproxy_find_downstream_conn(d, key, key_len,
                                           &self);
     if (c != NULL) {

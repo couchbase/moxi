@@ -489,7 +489,7 @@ struct conn {
     char *host_ident; // Uniquely identifies a memcached server, including
                       // address:port and possibly optional bucket/usr/pwd info.
     char *peer_host;    // this and the following two paramters are used for mcmux
-    int peer_protocol;  // compatiblity mode
+    unsigned int peer_protocol;  // compatiblity mode
     int peer_port;
 };
 
