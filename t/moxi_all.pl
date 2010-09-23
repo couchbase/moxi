@@ -11,6 +11,9 @@ croak("moxi binary doesn't exist.  Haven't run 'make' ?\n") unless -e $exe;
 croak("moxi binary not executable\n") unless -x _;
 
 sub go {
+  if ($ARGV[0] eq 'mock_only') {
+    return;
+  }
   my ($topology, $protocol) = @_;
   print "------------------------------------\n";
   print "testing $topology $protocol\n";
@@ -33,10 +36,49 @@ go('fanoutin', 'ascii');
 go('simple', 'binary');
 go('fanout', 'binary');
 
-print "------------------------------------\n";
+print "------------------------------------ ascii\n";
 
 my $res = system("./t/moxi_mock.pl ascii");
+if ($res != 0) {
+  print "exit: $res\n";
+  exit($res);
+}
 
-exit $res;
+print "------------------------------------ auth\n";
+
+my $res = system("./t/moxi_mock.pl moxi_mock_auth binary \"\"" .
+                 " url=http://127.0.0.1:4567/pools/default/buckets/default" .
+                 " usr=TheUser,pwd=ThePassword,port_listen=11333," .
+                 " ./t/rest_mock.rb");
+if ($res != 0) {
+  print "exit: $res\n";
+  exit($res);
+}
+
+sleep(1);
+
+print "------------------------------------ multitenancy\n";
+
+my $res = system("./t/moxi_mock.pl moxi_multitenancy binary \"\"" .
+                 " url=http://127.0.0.1:4567/pools/default/buckets/default" .
+                 " default_bucket_name=,port_listen=11333," .
+                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest.cfg\"");
+if ($res != 0) {
+  print "exit: $res\n";
+  exit($res);
+}
+
+sleep(1);
+
+print "------------------------------------ multitenancy_default\n";
+
+my $res = system("./t/moxi_mock.pl moxi_multitenancy_default binary \"\"" .
+                 " url=http://127.0.0.1:4567/pools/default/buckets/default" .
+                 " default_bucket_name=default,port_listen=11333," .
+                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest_default.cfg\"");
+if ($res != 0) {
+  print "exit: $res\n";
+  exit($res);
+}
 
 
