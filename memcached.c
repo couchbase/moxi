@@ -4022,22 +4022,29 @@ static void clock_handler(const int fd, const short which, void *arg) {
 }
 
 static void usage(char **argv) {
+    (void) argv;
+
+    char *m = "moxi";
+
     printf(PACKAGE " " VERSION "\n");
     printf("\n");
     printf("Usage:\n");
 #ifdef MOXI_USE_LIBVBUCKET
-    printf("  %s [FLAGS] URL1[,URL2[,URLn]]\n", argv[0]);
-    printf("  %s [FLAGS] -z url=URL1[,URL2[,URLn]]\n", argv[0]);
+    printf("  %s [FLAGS] URL1[,URL2[,URLn]]\n", m);
+    printf("  %s [FLAGS] -z url=URL1[,URL2[,URLn]]\n", m);
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
-    printf("  %s [FLAGS] -z LOCAL_PORT=MCHOST[:MCPORT][,MCHOST2[:MCPORT2][,*]]\n", argv[0]);
+    printf("  %s [FLAGS] -z LOCAL_PORT=MCHOST[:MCPORT][,MCHOST2[:MCPORT2][,*]]\n", m);
 #endif
 #ifdef MOXI_USE_LIBVBUCKET
     printf("\n");
     printf("The URL's provide REST/JSON vbucket-server-map(s) for dynamic\n"
            "REST-based cluster (re-)configurability, using libvbucket hashing.\n"
-           "Example:\n"
-           "  %s http://127.0.0.1:8080/pools/default/bucketsStreaming/default\n", argv[0]);
+           "\nExample:\n"
+           "  %s http://127.0.0.1:8080/pools/default/bucketsStreaming/default\n", m);
+    printf("\nExample, multiple comma-separated URL's (without whitespace):\n"
+           "  moxi http://membase1:8080/pools/default/bucketsStreaming/default,\\\n"
+           "       http://membase2:8080/pools/default/bucketsStreaming/default\n");
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("\n");
@@ -4045,12 +4052,12 @@ static void usage(char **argv) {
            "moxi listens on the given LOCAL_PORT and forwards to downstream memcached\n"
            "servers running at MCHOST:MCPORT.  More than one MCHOST:MCPORT\n"
            "can be listed, separated by commas.  Example:\n"
-           "  %s -z 11211=mc_server1:11211,mc_server2:11211\n", argv[0]);
+           "  %s -z 11211=mc_server1:11211,mc_server2:11211\n", m);
 #endif
     printf("\n");
     printf("The -z information can be instead supplied in a config file:\n");
-    printf("  %s [FLAGS] -z /path/to/absolute/configFile\n", argv[0]);
-    printf("  %s [FLAGS] -z ./path/to/relative/configFile\n", argv[0]);
+    printf("  %s [FLAGS] -z /path/to/absolute/configFile\n", m);
+    printf("  %s [FLAGS] -z ./path/to/relative/configFile\n", m);
     printf("\n");
     printf("The optional FLAGS are...\n\n");
     printf("-Z <key=val*> optional comma-separated key=value proxy behaviors, including:\n");
