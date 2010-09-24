@@ -4575,7 +4575,9 @@ int main (int argc, char **argv) {
      * logger initialized, from now on we should use moxi_log_write
      * instead of fprintfs/perror
      */
-    moxi_log_write("moxi log, mode=%d, file=%s\n", ml->log_mode, ml->log_file);
+    if (settings.verbose > 0) {
+        moxi_log_write("moxi log, mode=%d, file=%s\n", ml->log_mode, ml->log_file);
+    }
 
     if (ml->log_mode == ERRORLOG_FILE) {
         /*
