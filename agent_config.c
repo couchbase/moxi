@@ -414,6 +414,8 @@ bool cproxy_on_config_json(proxy_main *m, uint32_t new_config_ver, char *config)
         }
 
         cJSON_Delete(c);
+    } else {
+        moxi_log_write("ERROR: could not parse JSON from REST server: %s\n", config);
     }
 
     return rv;
@@ -812,13 +814,17 @@ void cproxy_on_config(void *data0, void *data1) {
     if (contents != NULL &&
         contents[0] != NULL) {
         char *config = trimstrdup(contents[0]);
-        if (config != NULL) {
+        if (config != NULL &&
+            strlen(config) > 0) {
             cproxy_on_config_json(m, new_config_ver, config);
 
             free(config);
         } else {
+            moxi_log_write("ERROR: invalid config from REST server\n");
             goto fail;
         }
+    } else {
+        moxi_log_write("ERROR: invalid response from REST server\n");
     }
 #else // !MOXI_USE_LIBVBUCKET
     if (cproxy_on_config_kvs(m, new_config_ver, kvs) == false) {
