@@ -1772,6 +1772,13 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
                 entry = entry->next;
                 free(curr);
             }
+        } else {
+            if (settings.verbose > 2) {
+                moxi_log_write("<%d a2b_not_my_vbucket no dedupe map, "
+                               "cmd: %x get/getk '%s' %d retry: %d, vbucket %d\n",
+                               c->sfd, header->response.opcode, key_buf, key_len,
+                               d->upstream_retry + 1, vbucket);
+            }
         }
 
         // Signal that we need to retry, where this counter is
