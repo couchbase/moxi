@@ -1587,6 +1587,8 @@ void proxy_stats_reset(proxy_main *m) {
  * Puts stats reset work on every worker thread's work_queue.
  */
 static void main_stats_reset(void *data0, void *data1) {
+    (void) data1;
+
     proxy_main *m = data0;
     assert(m);
     assert(m->nthreads > 1);
