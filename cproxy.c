@@ -1338,7 +1338,8 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                            &cproxy_downstream_funcs, d);
         if (c != NULL ) {
             c->protocol = d->upstream_conn->peer_protocol ?
-                d->upstream_conn->peer_protocol : behavior->downstream_protocol;
+                d->upstream_conn->peer_protocol :
+                behavior->downstream_protocol;
             c->thread = thread;
             c->cmd_start_time = start;
 
@@ -1696,8 +1697,8 @@ bool cproxy_forward(downstream *d) {
     if (IS_ASCII(d->upstream_conn->protocol)) {
         // ASCII upstream.
         //
-        if (IS_ASCII(d->ptd->behavior_pool.base.downstream_protocol) ||
-            IS_ASCII(d->upstream_conn->peer_protocol)) {
+        if (IS_ASCII(d->upstream_conn->peer_protocol) ||
+            IS_ASCII(d->ptd->behavior_pool.base.downstream_protocol)) {
             return cproxy_forward_a2a_downstream(d);
         } else {
             return cproxy_forward_a2b_downstream(d);
@@ -2932,7 +2933,8 @@ conn *zstored_acquire_downstream_conn(downstream *d,
     char host_ident_buf[300];
     format_host_ident(host_ident_buf, sizeof(host_ident_buf), msst,
                       (d->upstream_conn->peer_protocol ?
-                       d->upstream_conn->peer_protocol : behavior->downstream_protocol));
+                       d->upstream_conn->peer_protocol :
+                       behavior->downstream_protocol));
 
     conn *dc;
 
