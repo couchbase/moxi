@@ -1679,6 +1679,14 @@ static void work_stats_reset(void *data0, void *data1) {
 
     mcache_flush_all(&ptd->key_stats, 0);
 
+    if (ptd->stats.downstream_reserved_time_htgram != NULL) {
+        htgram_reset(ptd->stats.downstream_reserved_time_htgram);
+    }
+
+    if (ptd->stats.downstream_connect_time_htgram != NULL) {
+        htgram_reset(ptd->stats.downstream_connect_time_htgram);
+    }
+
     work_collect_one(c);
 }
 
