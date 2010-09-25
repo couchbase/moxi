@@ -54,9 +54,11 @@ if ($restargs ne '...NONE...') {
 # Fork moxi for moxi-specific testing.
 #
 my $childargs =
-      " -z ". $little_z .
-      " -p 0 -U 0 -v -t 1".
-      " -Z \"". $big_Z ."downstream_max=1,downstream_protocol=" . $downstream_protocol . "\"";
+      " -z " . $little_z .
+      " -p 0 -U 0 -v -t 1" .
+      " -Z \"" . $big_Z .
+            "downstream_max=1,downstream_conn_max=0," .
+            "downstream_protocol=" . $downstream_protocol . "\"";
 if ($< == 0) {
    $childargs .= " -u root";
 }

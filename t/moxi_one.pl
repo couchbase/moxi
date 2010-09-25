@@ -5,7 +5,10 @@ my $topology_name = $ARGV[1] || 'simple';
 my $protocol_name = $ARGV[2] || 'ascii';
 my $hashlib_name  = $ARGV[3] || 'libvbucket';
 
-print "moxi_one.pl: " . $test_name . " " . $topology_name . " " . $protocol_name . " " . $hashlib_name . "\n";
+print "moxi_one.pl: " . $test_name . " " .
+                        $topology_name . " " .
+                        $protocol_name . " " .
+                        $hashlib_name . "\n";
 
 my $prefix = <<'PREFIX';
 
@@ -259,7 +262,8 @@ if ($hashlib_name eq 'libmemcached') {
 
 # ------------------------------------------------------
 
-$topology .= "\$args .= \" -Z downstream_protocol=$protocol_name,downstream_max=1\";";
+$topology .= ("\$args .= \" -Z downstream_protocol=$protocol_name," .
+              "downstream_max=1,downstream_conn_max=0\";");
 
 # Tack on ./t/ directory prefix if needed.
 if ($test_name !~ /^\.\/t/) {

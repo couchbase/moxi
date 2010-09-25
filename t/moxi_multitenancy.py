@@ -22,7 +22,8 @@ import moxi_mock_server
 #
 #   ./moxi -z url=http://127.0.0.1:4567/pools/default/buckets/default \
 #          -p 0 -U 0 -vvv -t 1 -O stderr \
-#          -Z default_bucket_name=,port_listen=11333,downstream_max=1,downstream_protocol=binary
+#          -Z default_bucket_name=,port_listen=11333, \
+#             downstream_max=1,downstream_conn_max=0,downstream_protocol=binary
 #
 # Then...
 #
