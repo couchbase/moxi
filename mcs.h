@@ -38,6 +38,7 @@ typedef struct {
     int fd;
     char *usr;
     char *pwd;
+    char ident[300]; // A string suitable as a hash key.
 } mcs_server_st;
 
 typedef struct {
@@ -74,6 +75,8 @@ int mcs_server_st_port(mcs_server_st *ptr);
 int mcs_server_st_fd(mcs_server_st *ptr);
 const char *mcs_server_st_usr(mcs_server_st *ptr);
 const char *mcs_server_st_pwd(mcs_server_st *ptr);
+char *mcs_server_st_ident(mcs_server_st *msst,
+                          enum protocol host_protocol);
 
 mcs_return mcs_set_sock_opt(int sock);
 

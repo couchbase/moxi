@@ -88,10 +88,6 @@ typedef struct {
 zstored_downstream_conns *zstored_get_downstream_conns(LIBEVENT_THREAD *thread,
                                                        const char *host_ident);
 
-void format_host_ident(char *buf, int buf_len,
-                       mcs_server_st *msst,
-                       enum protocol host_protocol);
-
 bool cproxy_forward_or_error(downstream *d);
 
 int delink_from_downstream_conns(conn *c);
@@ -1380,12 +1376,11 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
 
     d->ptd->stats.stats.tot_downstream_connect++;
 
-    char host_ident_buf[300];
     char *host_ident = c->host_ident;
     if (host_ident == NULL) {
-        host_ident = host_ident_buf;
-        format_host_ident(host_ident_buf, sizeof(host_ident_buf), msst,
-                          behavior->downstream_protocol);
+        host_ident =
+            mcs_server_st_ident(msst,
+                                behavior->downstream_protocol);
     }
 
     zstored_error_count(c->thread, host_ident, false);
@@ -2763,7 +2758,8 @@ bool cproxy_on_connect_downstream_conn(conn *c) {
                                     &d->behaviors_arr[k], c)) {
             /* We are connected to the server now */
             if (settings.verbose > 2) {
-                moxi_log_write("%d: connected to: %s\n", c->sfd, c->host_ident);
+                moxi_log_write("%d: connected to: %s\n",
+                               c->sfd, c->host_ident);
             }
 
             conn_set_state(c, conn_pause);
@@ -2930,21 +2926,21 @@ conn *zstored_acquire_downstream_conn(downstream *d,
 
     d->ptd->stats.stats.tot_downstream_conn_acquired++;
 
-    char host_ident_buf[300];
-    format_host_ident(host_ident_buf, sizeof(host_ident_buf), msst,
-                      (d->upstream_conn->peer_protocol ?
-                       d->upstream_conn->peer_protocol :
-                       behavior->downstream_protocol));
+    char *host_ident =
+        mcs_server_st_ident(msst,
+                            (d->upstream_conn->peer_protocol ?
+                             d->upstream_conn->peer_protocol :
+                             behavior->downstream_protocol));
 
     conn *dc;
 
     zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(thread, host_ident_buf);
+        zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
         dc = conns->dc;
         if (dc != NULL) {
             assert(dc->thread == thread);
-            assert(strcmp(host_ident_buf, dc->host_ident) == 0);
+            assert(strcmp(host_ident, dc->host_ident) == 0);
 
             conns->dc_acquired++;
             conns->dc = dc->next;
@@ -2963,7 +2959,7 @@ conn *zstored_acquire_downstream_conn(downstream *d,
 
             if (settings.verbose > 2) {
                 moxi_log_write("zacquire_dc, %s, %d, %d, (%d)\n",
-                               host_ident_buf,
+                               host_ident,
                                conns->error_count,
                                conns->error_time,
                                msecs_since_error);
@@ -2993,7 +2989,7 @@ conn *zstored_acquire_downstream_conn(downstream *d,
     dc = cproxy_connect_downstream_conn(d, thread, msst, behavior);
     if (dc != NULL) {
         assert(dc->host_ident == NULL);
-        dc->host_ident = strdup(host_ident_buf);
+        dc->host_ident = strdup(host_ident);
         if (conns != NULL) {
             conns->dc_acquired++;
 
@@ -3088,12 +3084,12 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
     assert(d != NULL);
     assert(d->next_waiting == NULL);
 
-    char host_ident_buf[300];
-    format_host_ident(host_ident_buf, sizeof(host_ident_buf), msst,
-                      behavior->downstream_protocol);
+    char *host_ident =
+        mcs_server_st_ident(msst,
+                            behavior->downstream_protocol);
 
     zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(thread, host_ident_buf);
+        zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
         assert(conns->dc == NULL);
 
@@ -3111,18 +3107,5 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
     }
 
     return false;
-}
-
-void format_host_ident(char *buf, int buf_len,
-                       mcs_server_st *msst,
-                       enum protocol host_protocol) {
-    assert(msst != NULL);
-
-    snprintf(buf, buf_len - 1, "%s:%d:%s:%s:%d",
-             mcs_server_st_hostname(msst),
-             mcs_server_st_port(msst),
-             mcs_server_st_usr(msst),
-             mcs_server_st_pwd(msst),
-             (int) host_protocol);
 }
 

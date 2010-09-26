@@ -602,3 +602,20 @@ const char *mcs_server_st_pwd(mcs_server_st *ptr) {
     return ptr->pwd;
 }
 
+char *mcs_server_st_ident(mcs_server_st *msst,
+                          enum protocol host_protocol) {
+    assert(msst != NULL);
+
+    if (msst->ident[0] == '\0') {
+        snprintf(msst->ident, sizeof(msst->ident) - 1,
+                 "%s:%d:%s:%s:%d",
+                 mcs_server_st_hostname(msst),
+                 mcs_server_st_port(msst),
+                 mcs_server_st_usr(msst),
+                 mcs_server_st_pwd(msst),
+                 (int) host_protocol);
+    }
+
+    return msst->ident;
+}
+
