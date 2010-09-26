@@ -4065,10 +4065,12 @@ static void usage(char **argv) {
     printf("\n");
     printf("The optional FLAGS are...\n\n");
     printf("-Z <key=val*> optional comma-separated key=value proxy behaviors, including:\n");
-    printf("              port_listen=11211,downstream_max=1,downstream_protocol=binary\n");
-    printf("-l <ip_addr>  interface to listen on (default: INADDR_ANY, all addresses)\n"
-           "-d            run as a daemon\n"
-           "-r            maximize core file limit\n");
+    printf("              port_listen=11211,\n");
+#ifdef MOXI_USE_LIBVBUCKET
+    printf("              usr=REST_USER,pwd=REST_PWD,\n");
+#endif
+    printf("              downstream_max=4,downstream_conn_max=8,\n");
+    printf("              downstream_protocol=binary\n");
 #ifdef HAVE_GETPWNAM
     printf("-u <username> assume identity of <username> (only when run as root)\n");
 #endif
