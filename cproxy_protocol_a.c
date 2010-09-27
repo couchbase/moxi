@@ -433,6 +433,10 @@ void cproxy_del_front_cache_key_ascii(downstream *d,
     assert(d->ptd);
     assert(d->ptd->proxy);
 
+    if (d->ptd->behavior_pool.base.front_cache_lifespan == 0) {
+        return;
+    }
+
     if (mcache_started(&d->ptd->proxy->front_cache)) {
         char *spc = strchr(command, ' ');
         if (spc != NULL) {
@@ -463,6 +467,10 @@ bool cproxy_optimize_set_ascii(downstream *d, conn *uc,
     assert(d->ptd->proxy);
     assert(uc);
     assert(uc->next == NULL);
+
+    if (d->ptd->behavior_pool.base.optimize_set[0] == '\0') {
+        return false;
+    }
 
     if (matcher_check(&d->ptd->proxy->optimize_set_matcher,
                       key, key_len, false)) {
