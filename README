@@ -1,38 +1,19 @@
-moxi - a memcached/membase proxy with energy and pep
 
-Dependencies:
+                                moxi
+           a memcached/membase proxy with energy and pep
 
-   -- libevent, http://www.monkey.org/~provos/libevent/ (libevent-dev)
+What is it?
+-----------
 
-   -- libconflate, http://github.com/northscale/libconflate
+moxi is a proxy capable of handling many connections for client
+applications, providing those clients simplified management and
+increased performance.  It can be used with memcached servers or
+a Membase Cluster hosting both membase and memcached type buckets.
 
-   -- libvbucket, http://github.com/northscale/libvbucket
+For more information see http://membase.org
 
-As a backwards-compatible (ketama/consistent-hashing) alternative to
-libvbucket, you may instead use libmemcached instead of libvbucket...
-
-   -- libmemcached, http://tangent.org/552/libmemcached.html
-
-To use moxi against membase, however, you'll want libvbucket.
-
-----------
-
-To compile moxi (assuming you want libvbucket), after you got the
-dependencies built and installed:
-
-  ./config/autorun.sh
-  ./configure
-  make
-
-For example, if libevent is installed in /opt/local, you'd do...
-
-  ./config/autorun.sh
-  ./configure --with-libevent=/opt/local
-  make
-
-----------
-
-Using moxi:
+Running
+-------
 
 To have moxi load a "vBucket" json configuration from a REST/HTTP
 server, try...
@@ -48,17 +29,35 @@ specified), for the following explicit command-line...
 
   moxi -z url=http://host:8080/url/of/vBucketServerMap.json
 
+To provide reliability when running with multiple servers, moxi will 
+accept multiple URLs.  For example...
+
+  moxi \ 
+  http://host:8080/pools/default/bucketsStreamingConfig/default,http://host2:8080/pools/default/bucketsStreamingConfig/default
+
+When used with particular buckets, authentication may be required.
+This can be done with the additional arguments to the -z flag...
+
+  moxi -z auth=USER%PASSWD,url=http://host:8080...
+
 To get more command line usage info:
 
   moxi -h
 
-----------
+  Keeping moxi Running
+  --------------------
 
-File-based configuration:
+On UNIX and UNIX-like systems, moxi may be started with an external
+service management system.  This will vary from system to system
+but many have BSD or SysV style init systems.  Other, more advanced
+service systems may be used too. 
+
+  File-based configuration:
+  -------------------------
 
 You may also provide a configuration file to moxi that holds a static
-vBucket server map.  The file (such as vbucket1.cfg) would look
-like...
+vBucket server map.  This is most often used during development and
+testing.  The file (such as vbucket1.cfg) would look like...
 
   11211 = {
     "hashAlgorithm": "CRC",
@@ -80,9 +79,41 @@ you would start moxi like...
 The "./" path prefix is required so that moxi knows you're passing in
 a config file.
 
+Developing
 ----------
 
-Tests:
+Dependencies:
+
+   -- libevent, http://www.monkey.org/~provos/libevent/ (libevent-dev)
+
+   -- libconflate, http://github.com/northscale/libconflate
+
+   -- libvbucket, http://github.com/northscale/libvbucket
+
+As a backwards-compatible (ketama/consistent-hashing) alternative to
+libvbucket, you may instead use libmemcached instead of libvbucket...
+
+   -- libmemcached, http://tangent.org/552/libmemcached.html
+
+To use moxi against membase, however, you'll want libvbucket.
+
+                     -   -   -
+
+To compile moxi (assuming you want libvbucket), after you got the
+dependencies built and installed:
+
+  ./config/autorun.sh
+  ./configure
+  make
+
+For example, if libevent is installed in /opt/local, you'd do...
+
+  ./config/autorun.sh
+  ./configure --with-libevent=/opt/local
+  make
+
+  Testing:
+  --------
 
   # To test that moxi still behaves like memcached
   # and passes all the tests that memcached passes...
@@ -120,7 +151,7 @@ Tests:
   ./moxi -z 11333=localhost:11311 -t 1
   python t/moxi_mock.py
 
-----------
+                     -   -   -
 
 For vbucket development, start the following...
 
@@ -138,8 +169,7 @@ Then...
 
   telnet localhost 11211
 
-----------
-
+                     -   -   -
 More notes:
 
 If using Linux, you need a kernel with epoll (it's better than select()).
@@ -160,14 +190,16 @@ should never go to disk, or you've lost the whole point of it)
 
 The memcached website is at:
 
-    http://www.danga.com/memcached/
+    http://memcached.org
 
-----------
+                     -   -   -
 
-Using moxi with libmemcached (instead of libvbucket)...
+Building moxi for use with libmemcached
+---------------------------------------
 
 If you want to use moxi explicitly using ketama / consistent-hashing,
-you'll need to compile moxi with libmemcached.
+instead of libvbucket with membase, you'll need to compile moxi with
+libmemcached.
 
 First, you would configure moxi differently at build-time...
 
