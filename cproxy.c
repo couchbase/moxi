@@ -2459,9 +2459,9 @@ bool cproxy_auth_downstream(mcs_server_st *server,
 
     int usr_len = strlen(usr);
     int pwd_len = strlen(pwd);
-    if (usr_len <= 0 &&
-        pwd_len <= 0) {
-        return true; // When no usr & no pwd.
+
+    if (usr_len <= 0) {
+        return true;
     }
 
     if (settings.verbose > 2) {
