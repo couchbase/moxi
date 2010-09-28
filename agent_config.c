@@ -304,8 +304,8 @@ proxy_main *cproxy_init_agent_start(char *jid,
                             // "Administrator"
         config.pass = jpw;  // "password"
         config.host = host; // "localhost" or
-                            // "http://x.com:8080"
-                            // "http://x.com:8080/pools/default/buckets/default"
+                            // "http://x.com:8091"
+                            // "http://x.com:8091/pools/default/buckets/default"
         config.software   = PACKAGE;
         config.version    = VERSION;
         config.save_path  = dbpath;

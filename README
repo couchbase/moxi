@@ -22,23 +22,23 @@ server, try...
 
 Against a NorthScale server, for example, this would look like...
 
-  moxi http://host:8080/pools/default/bucketsStreamingConfig/default
+  moxi http://host:8091/pools/default/bucketsStreamingConfig/default
 
 The above, also, is just shorthand (assuming you have no other flags
 specified), for the following explicit command-line...
 
-  moxi -z url=http://host:8080/url/of/vBucketServerMap.json
+  moxi -z url=http://host:8091/url/of/vBucketServerMap.json
 
 To provide reliability when running with multiple servers, moxi will 
 accept multiple URLs.  For example...
 
   moxi \ 
-  http://host:8080/pools/default/bucketsStreamingConfig/default,http://host2:8080/pools/default/bucketsStreamingConfig/default
+  http://host:8091/pools/default/bucketsStreamingConfig/default,http://host2:8091/pools/default/bucketsStreamingConfig/default
 
 When used with particular buckets, authentication may be required.
 This can be done with the additional arguments to the -z flag...
 
-  moxi -z auth=USER%PASSWD,url=http://host:8080...
+  moxi -z auth=USER%PASSWD,url=http://host:8091...
 
 To get more command line usage info:
 

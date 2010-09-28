@@ -4045,10 +4045,10 @@ static void usage(char **argv) {
     printf("The URL's provide REST/JSON vbucket-server-map(s) for dynamic\n"
            "REST-based cluster (re-)configurability, using libvbucket hashing.\n"
            "\nExample:\n"
-           "  %s http://127.0.0.1:8080/pools/default/bucketsStreaming/default\n", m);
+           "  %s http://127.0.0.1:8091/pools/default/bucketsStreaming/default\n", m);
     printf("\nExample, multiple comma-separated URL's (without whitespace):\n"
-           "  moxi http://membase1:8080/pools/default/bucketsStreaming/default,\\\n"
-           "       http://membase2:8080/pools/default/bucketsStreaming/default\n");
+           "  moxi http://membase1:8091/pools/default/bucketsStreaming/default,\\\n"
+           "       http://membase2:8091/pools/default/bucketsStreaming/default\n");
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("\n");
