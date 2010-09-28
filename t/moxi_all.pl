@@ -46,10 +46,12 @@ if ($res != 0) {
 
 print "------------------------------------ auth\n";
 
-my $res = system("./t/moxi_mock.pl moxi_mock_auth binary \"\"" .
+my $cmd = "./t/moxi_mock.pl moxi_mock_auth binary \"\"" .
                  " url=http://127.0.0.1:4567/pools/default/buckets/default" .
                  " usr=TheUser,pwd=ThePassword,port_listen=11333," .
-                 " ./t/rest_mock.rb");
+                 " ./t/rest_mock.rb";
+print($cmd . "\n");
+my $res = system($cmd);
 if ($res != 0) {
   print "exit: $res\n";
   exit($res);
@@ -59,10 +61,12 @@ sleep(1);
 
 print "------------------------------------ multitenancy\n";
 
-my $res = system("./t/moxi_mock.pl moxi_multitenancy binary \"\"" .
+my $cmd = "./t/moxi_mock.pl moxi_multitenancy binary \"\"" .
                  " url=http://127.0.0.1:4567/pools/default/buckets/default" .
                  " default_bucket_name=,port_listen=11333," .
-                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest.cfg\"");
+                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest.cfg\"";
+print($cmd . "\n");
+my $res = system($cmd);
 if ($res != 0) {
   print "exit: $res\n";
   exit($res);
@@ -72,10 +76,12 @@ sleep(1);
 
 print "------------------------------------ multitenancy_default\n";
 
-my $res = system("./t/moxi_mock.pl moxi_multitenancy_default binary \"\"" .
+my $cmd = "./t/moxi_mock.pl moxi_multitenancy_default binary \"\"" .
                  " url=http://127.0.0.1:4567/pools/default/buckets/default" .
                  " default_bucket_name=default,port_listen=11333," .
-                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest_default.cfg\"");
+                 " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest_default.cfg\"";
+print($cmd . "\n");
+my $res = system($cmd);
 if ($res != 0) {
   print "exit: $res\n";
   exit($res);
