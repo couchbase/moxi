@@ -32,13 +32,16 @@ typedef enum {
     MCS_KIND_MAX
 } mcs_kind;
 
+#define MCS_IDENT_SIZE 300
+
 typedef struct {
     char hostname[200];
     int port;
     int fd;
     char *usr;
     char *pwd;
-    char ident[300]; // A string suitable as a hash key.
+    char ident_a[MCS_IDENT_SIZE]; // A string suitable as a hash key, ascii protocol.
+    char ident_b[MCS_IDENT_SIZE]; // A string suitable as a hash key, binary protocol.
 } mcs_server_st;
 
 typedef struct {
@@ -75,8 +78,7 @@ int mcs_server_st_port(mcs_server_st *ptr);
 int mcs_server_st_fd(mcs_server_st *ptr);
 const char *mcs_server_st_usr(mcs_server_st *ptr);
 const char *mcs_server_st_pwd(mcs_server_st *ptr);
-char *mcs_server_st_ident(mcs_server_st *msst,
-                          enum protocol host_protocol);
+char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii);
 
 mcs_return mcs_set_sock_opt(int sock);
 

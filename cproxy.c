@@ -1333,9 +1333,9 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                            thread->base,
                            &cproxy_downstream_funcs, d);
         if (c != NULL ) {
-            c->protocol = d->upstream_conn->peer_protocol ?
-                d->upstream_conn->peer_protocol :
-                behavior->downstream_protocol;
+            c->protocol = (d->upstream_conn->peer_protocol ?
+                           d->upstream_conn->peer_protocol :
+                           behavior->downstream_protocol);
             c->thread = thread;
             c->cmd_start_time = start;
 
@@ -1378,9 +1378,7 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
 
     char *host_ident = c->host_ident;
     if (host_ident == NULL) {
-        host_ident =
-            mcs_server_st_ident(msst,
-                                behavior->downstream_protocol);
+        host_ident = mcs_server_st_ident(msst, IS_ASCII(c->protocol));
     }
 
     zstored_error_count(c->thread, host_ident, false);
@@ -2926,11 +2924,13 @@ conn *zstored_acquire_downstream_conn(downstream *d,
 
     d->ptd->stats.stats.tot_downstream_conn_acquired++;
 
+    enum protocol downstream_protocol =
+        d->upstream_conn->peer_protocol ?
+        d->upstream_conn->peer_protocol :
+        behavior->downstream_protocol;
+
     char *host_ident =
-        mcs_server_st_ident(msst,
-                            (d->upstream_conn->peer_protocol ?
-                             d->upstream_conn->peer_protocol :
-                             behavior->downstream_protocol));
+        mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
 
     conn *dc;
 
@@ -3082,11 +3082,16 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
                                     proxy_behavior *behavior) {
     assert(thread != NULL);
     assert(d != NULL);
+    assert(d->upstream_conn != NULL);
     assert(d->next_waiting == NULL);
 
+    enum protocol downstream_protocol =
+        d->upstream_conn->peer_protocol ?
+        d->upstream_conn->peer_protocol :
+        behavior->downstream_protocol;
+
     char *host_ident =
-        mcs_server_st_ident(msst,
-                            behavior->downstream_protocol);
+        mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
 
     zstored_downstream_conns *conns =
         zstored_get_downstream_conns(thread, host_ident);
