@@ -1779,6 +1779,12 @@ void upstream_error(conn *uc) {
     if (IS_ASCII(uc->protocol)) {
         char *msg = "SERVER_ERROR proxy write to downstream\r\n";
 
+        pthread_mutex_lock(&ptd->proxy->main->proxy_main_lock);
+        if (strcmp(ptd->proxy->name, NULL_BUCKET) == 0) {
+            msg = "SERVER_ERROR unauthorized, null bucket\r\n";
+        }
+        pthread_mutex_unlock(&ptd->proxy->main->proxy_main_lock);
+
         // Send an END on get/gets instead of generic SERVER_ERROR.
         //
         if (uc->cmd == -1 &&
