@@ -452,6 +452,53 @@ void cproxy_init_upstream_conn(conn *c) {
     proxy_td *ptd = cproxy_find_thread_data(p, pthread_self());
     assert(ptd != NULL);
 
+    // Reassign the client/upstream conn to a different bucket
+    // if the default_bucket_name isn't the special FIRST_BUCKET
+    // value.
+    //
+    char *default_name = ptd->behavior_pool.base.default_bucket_name;
+    if (strcmp(default_name, FIRST_BUCKET) != 0) {
+        if (settings.verbose > 2) {
+            moxi_log_write("<%d assigning to default bucket: %s\n",
+                           c->sfd, default_name);
+        }
+
+        proxy *default_proxy =
+            cproxy_find_proxy_by_auth(p->main, default_name, "");
+
+        // If the ostensible default bucket is missing (possibly deleted),
+        // assign the client/upstream conn to the NULL BUCKET.
+        //
+        if (default_proxy == NULL) {
+            default_proxy =
+                cproxy_find_proxy_by_auth(p->main, NULL_BUCKET, "");
+
+            if (settings.verbose > 2) {
+                moxi_log_write("<%d assigning to null bucket, "
+                               "default bucket missing: %s\n",
+                               c->sfd, default_name);
+            }
+        }
+
+        if (default_proxy != NULL) {
+            proxy_td *default_ptd =
+                cproxy_find_thread_data(default_proxy, pthread_self());
+            if (default_ptd != NULL) {
+                ptd = default_ptd;
+            }
+        } else {
+            if (settings.verbose > 2) {
+                moxi_log_write("<%d assigning to first bucket, "
+                               "missing default/null bucket: %s\n",
+                               c->sfd, default_name);
+            }
+        }
+    } else {
+        if (settings.verbose > 2) {
+            moxi_log_write("<%d assigning to first bucket\n", c->sfd);
+        }
+    }
+
     ptd->stats.stats.num_upstream++;
     ptd->stats.stats.tot_upstream++;
 
@@ -3114,3 +3161,25 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
     return false;
 }
 
+// Find an appropriate proxy struct or NULL.
+//
+proxy *cproxy_find_proxy_by_auth(proxy_main *m,
+                                 const char *usr,
+                                 const char *pwd) {
+    proxy *found = NULL;
+
+    pthread_mutex_lock(&m->proxy_main_lock);
+
+    for (proxy *p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
+        pthread_mutex_lock(&p->proxy_lock);
+        if (strcmp(p->behavior_pool.base.usr, usr) == 0 &&
+            strcmp(p->behavior_pool.base.pwd, pwd) == 0) {
+            found = p;
+        }
+        pthread_mutex_unlock(&p->proxy_lock);
+    }
+
+    pthread_mutex_unlock(&m->proxy_main_lock);
+
+    return found;
+}

@@ -13,10 +13,6 @@
 
 static void cproxy_sasl_plain_auth(conn *c, char *req_bytes);
 
-static proxy *cproxy_find_proxy_by_plain_auth(proxy_main *m,
-                                              const char *usr,
-                                              const char *pwd);
-
 void cproxy_process_upstream_binary(conn *c) {
     assert(c != NULL);
     assert(c->cmd >= 0);
@@ -397,8 +393,8 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
             memcpy(password, clientin + 2 + uslen, pwlen);
             password[pwlen] = '\0';
 
-            proxy *p = cproxy_find_proxy_by_plain_auth(ptd->proxy->main,
-                                                       username, password);
+            proxy *p = cproxy_find_proxy_by_auth(ptd->proxy->main,
+                                                 username, password);
             if (p != NULL) {
                 proxy_td *ptd_target = cproxy_find_thread_data(p, pthread_self());
                 if (ptd_target != NULL) {
@@ -444,25 +440,3 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     write_bin_error(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, 0);
 }
 
-// Find an appropriate proxy struct or NULL.
-//
-static proxy *cproxy_find_proxy_by_plain_auth(proxy_main *m,
-                                              const char *usr,
-                                              const char *pwd) {
-    proxy *found = NULL;
-
-    pthread_mutex_lock(&m->proxy_main_lock);
-
-    for (proxy *p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
-        if (strcmp(p->behavior_pool.base.usr, usr) == 0 &&
-            strcmp(p->behavior_pool.base.pwd, pwd) == 0) {
-            found = p;
-        }
-        pthread_mutex_unlock(&p->proxy_lock);
-    }
-
-    pthread_mutex_unlock(&m->proxy_main_lock);
-
-    return found;
-}

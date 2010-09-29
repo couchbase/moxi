@@ -73,7 +73,7 @@ proxy_behavior behavior_default_g = {
     .usr = {0},
     .pwd = {0},
     .port_listen = MOXI_DEFAULT_LISTEN_PORT,
-    .default_bucket_name = "default"
+    .default_bucket_name = FIRST_BUCKET
 };
 
 /** Length of key that may be zero or space terminated.

@@ -32,6 +32,18 @@ extern char cproxy_hostname[300]; // Immutable after init.
 
 // -------------------------------
 
+// Special bucket name for the null bucket.
+//
+#define NULL_BUCKET "[ <NULL_BUCKET> ]"
+
+// Special bucket name that signifies that
+// upstream connections start on the first
+// configured bucket.
+//
+#define FIRST_BUCKET "[ <FIRST_BUCKET> ]"
+
+// -------------------------------
+
 typedef struct {
     char *(*item_key)(void *it);
     int   (*item_key_len)(void *it);
@@ -495,6 +507,10 @@ conn *cproxy_connect_downstream_conn(downstream *d,
 
 void  cproxy_wait_any_downstream(proxy_td *ptd, conn *c);
 void  cproxy_assign_downstream(proxy_td *ptd);
+
+proxy *cproxy_find_proxy_by_auth(proxy_main *m,
+                                 const char *usr,
+                                 const char *pwd);
 
 bool  cproxy_auth_downstream(mcs_server_st *server,
                              proxy_behavior *behavior, int fd);

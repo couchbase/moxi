@@ -37,8 +37,6 @@ char **parse_kvs_behavior(kvpair_t *kvs,
                           char *name,
                           proxy_behavior *behavior);
 
-static char *NULL_BUCKET = "[<NULL_BUCKET>]";
-
 static void cproxy_init_null_bucket(proxy_main *m);
 
 static void cproxy_on_config(void *data0, void *data1);
@@ -289,8 +287,30 @@ proxy_main *cproxy_init_agent_start(char *jid,
     proxy_main *m = cproxy_gen_proxy_main(behavior, nthreads,
                                           PROXY_CONF_TYPE_DYNAMIC);
     if (m != NULL) {
-        if (behavior.default_bucket_name[0] == '\0') {
+        // Create a NULL_BUCKET when we're not in "FIRST_BUCKET" mode.
+        //
+        // FIRST_BUCKET mode means clients start off in the first
+        // configured bucket (and this is usually the case for
+        // standalone moxi).
+        //
+        // Otherwise (when not in FIRST_BUCKET mode)...
+        // -- new clients start off in a configured, named default
+        // bucket (whose name is usually configured to be "default"),
+        // if it exists.
+        // -- if the named default bucket doesn't exist, new
+        // clients then start off in the NULL_BUCKET.
+        //
+        if (strcmp(behavior.default_bucket_name, FIRST_BUCKET) != 0) {
+            if (settings.verbose > 2) {
+                moxi_log_write("initializing null bucket, default is: %s\n",
+                               behavior.default_bucket_name);
+            }
+
             cproxy_init_null_bucket(m);
+        } else {
+            if (settings.verbose > 2) {
+                moxi_log_write("using first bucket\n");
+            }
         }
 
         conflate_config_t config;
@@ -347,6 +367,7 @@ static void cproxy_init_null_bucket(proxy_main *m) {
         if (behavior_pool.arr != NULL) {
             cproxy_on_config_pool(m, NULL_BUCKET, pool_port,
                                   "", 0, &behavior_pool);
+            free(behavior_pool.arr);
         }
     }
 }
