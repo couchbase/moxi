@@ -145,17 +145,17 @@ proxy *cproxy_create(proxy_main *main,
                      uint32_t config_ver,
                      proxy_behavior_pool *behavior_pool,
                      int nthreads) {
+    if (settings.verbose > 1) {
+        moxi_log_write("cproxy_create on port %d, name %s, config %s\n",
+                       port, name, config);
+    }
+
     assert(name != NULL);
     assert(port > 0 || settings.socketpath != NULL);
     assert(config != NULL);
     assert(behavior_pool);
     assert(nthreads > 1); // Main thread + at least one worker.
     assert(nthreads == settings.num_threads);
-
-    if (settings.verbose > 1) {
-        moxi_log_write("cproxy_create on port %d, name %s, config %s\n",
-                       port, name, config);
-    }
 
     proxy *p = (proxy *) calloc(1, sizeof(proxy));
     if (p != NULL) {

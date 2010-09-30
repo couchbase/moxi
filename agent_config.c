@@ -710,16 +710,33 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
             };
 
             if (behavior_pool.arr != NULL) {
-                cJSON *jUser = cJSON_GetObjectItem(jConfig, "user");
-                if (jUser != NULL &&
-                    jUser->type == cJSON_String &&
-                    jUser->valuestring != NULL) {
-                    strncpy(behavior_pool.base.usr,
-                            jUser->valuestring,
-                            sizeof(behavior_pool.base.usr) - 1);
-                    behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
+                strncpy(behavior_pool.base.usr,
+                        name,
+                        sizeof(behavior_pool.base.usr) - 1);
+                behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
 
-                    cJSON *jPassword = cJSON_GetObjectItem(jConfig, "password");
+                if (jVBSM != NULL) {
+                    cJSON *jUser = cJSON_GetObjectItem(jVBSM, "user");
+                    if (jUser != NULL &&
+                        jUser->type == cJSON_String &&
+                        jUser->valuestring != NULL) {
+                        strncpy(behavior_pool.base.usr,
+                                jUser->valuestring,
+                                sizeof(behavior_pool.base.usr) - 1);
+                        behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
+
+                        cJSON *jPassword = cJSON_GetObjectItem(jVBSM, "password");
+                        if (jPassword != NULL &&
+                            jPassword->type == cJSON_String &&
+                            jPassword->valuestring != NULL) {
+                            strncpy(behavior_pool.base.pwd,
+                                    jPassword->valuestring,
+                                    sizeof(behavior_pool.base.pwd) - 1);
+                            behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
+                        }
+                    }
+                } else {
+                    cJSON *jPassword = cJSON_GetObjectItem(jConfig, "saslPassword");
                     if (jPassword != NULL &&
                         jPassword->type == cJSON_String &&
                         jPassword->valuestring != NULL) {
