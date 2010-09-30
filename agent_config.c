@@ -747,11 +747,13 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                     }
                 }
 
+                int curr = 0; // Moves slower than j so we can skip unhealthy nodes.
+
                 int j = 0;
                 for (; j < nodes_num; j++) {
                     // Inherit default behavior.
                     //
-                    behavior_pool.arr[j] = behavior_pool.base;
+                    behavior_pool.arr[curr] = behavior_pool.base;
 
                     cJSON *jNode = cJSON_GetArrayItem(jArr, j);
                     if (jNode != NULL) {
@@ -762,17 +764,19 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                             char *hostport = jNode->valuestring;
 
                             if (strlen(hostport) > 0 &&
-                                strlen(hostport) < sizeof(behavior_pool.arr[j].host) - 1) {
-                                strncpy(behavior_pool.arr[j].host,
+                                strlen(hostport) < sizeof(behavior_pool.arr[curr].host) - 1) {
+                                strncpy(behavior_pool.arr[curr].host,
                                         hostport,
-                                        sizeof(behavior_pool.arr[j].host) - 1);
-                                behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+                                        sizeof(behavior_pool.arr[curr].host) - 1);
+                                behavior_pool.arr[curr].host[sizeof(behavior_pool.arr[curr].host) - 1] = '\0';
 
-                                char *colon = strchr(behavior_pool.arr[j].host, ':');
+                                char *colon = strchr(behavior_pool.arr[curr].host, ':');
                                 if (colon != NULL) {
                                     *colon = '\0';
-                                    behavior_pool.arr[j].port = atoi(colon + 1);
-                                    if (behavior_pool.arr[j].port <= 0) {
+                                    behavior_pool.arr[curr].port = atoi(colon + 1);
+                                    if (behavior_pool.arr[curr].port > 0) {
+                                        curr++;
+                                    } else {
                                         break;
                                     }
                                 } else {
@@ -783,15 +787,26 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                             }
                         } else if (jNode->type == cJSON_Object) {
                             // Should look like... {
+                            //   status: "healthy",
                             //   hostname: "host",
                             //   ports: { direct: port }
                             // }
                             //
+                            cJSON *jStatus = cJSON_GetObjectItem(jNode, "status");
+                            if (jStatus != NULL &&
+                                jStatus->type == cJSON_String &&
+                                jStatus->valuestring != NULL &&
+                                strcmp(jStatus->valuestring, "healthy") != 0) {
+                                // Skip non-healthy node.
+                                //
+                                continue;
+                            }
+
                             cJSON *jHostname = cJSON_GetObjectItem(jNode, "hostname");
                             if (jHostname != NULL &&
                                 jHostname->type == cJSON_String &&
                                 jHostname->valuestring != NULL &&
-                                strlen(jHostname->valuestring) < sizeof(behavior_pool.arr[j].host) - 1) {
+                                strlen(jHostname->valuestring) < sizeof(behavior_pool.arr[curr].host) - 1) {
                                 cJSON *jPorts = cJSON_GetObjectItem(jNode, "ports");
                                 if (jPorts != NULL &&
                                     jPorts->type == cJSON_Object) {
@@ -799,19 +814,22 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                     if (jDirect != NULL &&
                                         jDirect->type == cJSON_Number &&
                                         jDirect->valueint > 0) {
-                                        strncpy(behavior_pool.arr[j].host,
+                                        strncpy(behavior_pool.arr[curr].host,
                                                 jHostname->valuestring,
-                                                sizeof(behavior_pool.arr[j].host) - 1);
-                                        behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+                                                sizeof(behavior_pool.arr[curr].host) - 1);
+                                        behavior_pool.arr[curr].host[sizeof(behavior_pool.arr[curr].host) - 1] = '\0';
 
-                                        // The JSON might return a hostname that looks like "HOST:REST_PORT".
+                                        // The JSON might return a hostname that looks
+                                        // like "HOST:REST_PORT", so strip off the ":REST_PORT".
                                         //
-                                        char *colon = strchr(behavior_pool.arr[j].host, ':');
+                                        char *colon = strchr(behavior_pool.arr[curr].host, ':');
                                         if (colon != NULL) {
                                             *colon = '\0';
                                         }
 
-                                        behavior_pool.arr[j].port = jDirect->valueint;
+                                        behavior_pool.arr[curr].port = jDirect->valueint;
+
+                                        curr++;
                                     } else {
                                         break;
                                     }
@@ -829,7 +847,12 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                     }
                 }
 
-                if (j >= nodes_num) {
+                if (j >= nodes_num && curr > 0) {
+                    // Some unhealthy nodes might have been skipped,
+                    // so curr might be <= behavior_pool.num.
+                    //
+                    behavior_pool.num = curr;
+
                     // Create a config string that libmemcached likes,
                     // such as "HOST:PORT,HOST:PORT,HOST:PORT".
                     //
@@ -837,7 +860,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                     char *config_str = calloc(config_len, 1);
 
                     if (config_str != NULL) {
-                        for (j = 0; j < nodes_num; j++) {
+                        for (j = 0; j < behavior_pool.num; j++) {
                             // Grow config string for libmemcached.
                             //
                             int x = 40 + // For port and weight.
@@ -879,14 +902,14 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                             }
                         }
 
-                        if (j >= nodes_num) {
-                            cproxy_on_config_pool(m, name, proxyb.port_listen,
-                                                  config_str, new_config_ver,
-                                                  &behavior_pool);
-                            rv = true;
-                        }
-
                         if (config_str != NULL) {
+                            if (j >= behavior_pool.num) {
+                                cproxy_on_config_pool(m, name, proxyb.port_listen,
+                                                      config_str, new_config_ver,
+                                                      &behavior_pool);
+                                rv = true;
+                            }
+
                             free(config_str);
                         }
                     } else {
