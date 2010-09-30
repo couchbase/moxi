@@ -402,7 +402,7 @@ int cproxy_init_mcmux_mode(int proxy_port,
                 }
             } else {
                 moxi_log_write("moxi error -- port %d unavailable?\n",
-                        proxy_port);
+                               proxy_port);
                 exit(EXIT_FAILURE);
             }
         } else {

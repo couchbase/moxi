@@ -310,6 +310,18 @@ int cproxy_listen(proxy *p) {
         } else {
             p->listening_failed++;
 
+            if (settings.enable_mcmux_mode && settings.socketpath) {
+#ifdef HAVE_SYS_UN_H
+                moxi_log_write("error: could not access UNIX socket: %s\n",
+                               settings.socketpath);
+                if (ml->log_mode != ERRORLOG_STDERR) {
+                    fprintf(stderr, "error: could not access UNIX socket: %s\n",
+                            settings.socketpath);
+                }
+                exit(EXIT_FAILURE);
+#endif
+            }
+
             moxi_log_write("ERROR: could not listen on port %d. "
                            "Please use -Z port_listen=PORT_NUM "
                            "to specify a different port number.\n", p->port);
