@@ -408,6 +408,16 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
 static bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                                       char *config, char *name);
 
+static bool cproxy_on_config_json_one_vbucket(proxy_main *m,
+                                              uint32_t new_config_ver,
+                                              char *config,
+                                              char *name);
+
+static bool cproxy_on_config_json_one_ketama(proxy_main *m,
+                                             uint32_t new_config_ver,
+                                             char *config,
+                                             char *name);
+
 static bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
                                           cJSON *jBuckets, bool want_default);
 
@@ -466,7 +476,7 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
                 char *jBucketStr = cJSON_Print(jBucket);
                 if (jBucketStr != NULL) {
                     rv = cproxy_on_config_json_one(m, new_config_ver,
-                                                       jBucketStr, name) || rv;
+                                                   jBucketStr, name) || rv;
                     free(jBucketStr);
                 }
             }
@@ -485,18 +495,17 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
 
     // Handle reconfiguration of a single proxy.
     //
-    bool rv = false;
-
     if (m != NULL &&
         config != NULL &&
         strlen(config) > 0) {
         if (settings.verbose > 2) {
-            moxi_log_write("conc contents config %s\n", config);
+            moxi_log_write("conjo contents config %s\n", config);
         }
 
         // The config should be JSON that should look like...
         //
         // {"name":"default",                // The bucket name.
+        //  "nodeLocator":"ketama",          // Optional.
         //  "nodes":[{"hostname":"10.17.1.46","status":"healthy",
         //            "version":"0.3.0_114_g31859fe","os":"i386-apple-darwin9.8.0",
         //            "ports":{"proxy":11213,"direct":11212}}],
@@ -505,70 +514,291 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
         //  "testWorkload":{"uri":"/pools/default/controller/testWorkload"}},
         //  "stats":{"uri":"/pools/default/stats"},
         //  "vBucketServerMap":{
-        //     "hashAlgorithm": "CRC",
+        //     "hashAlgorithm":"CRC",
         //     "user":"optionalSASLUsr",     // Optional.
         //     "password":"optionalSASLPwd", // Optional.
+        //     "serverList":["10.17.1.46:11212"],
         //     ...more json here...}}
         //
-        VBUCKET_CONFIG_HANDLE vch = vbucket_config_parse_string(config);
-        if (vch) {
-            if (settings.verbose > 2) {
-                moxi_log_write("conc vbucket_config_parse_string: %d\n", (vch != NULL));
+        cJSON *jConfig = cJSON_Parse(config);
+        if (jConfig != NULL) {
+            cJSON *jNodeLocator = cJSON_GetObjectItem(jConfig, "nodeLocator");
+            if (jNodeLocator != NULL &&
+                jNodeLocator->type == cJSON_String &&
+                jNodeLocator->valuestring != NULL) {
+                if (strcmp(jNodeLocator->valuestring, "ketama") == 0) {
+                    bool rv = cproxy_on_config_json_one_ketama(m, new_config_ver,
+                                                               config, name);
+                    cJSON_Delete(jConfig);
+                    return rv;
+                }
             }
 
+            cJSON_Delete(jConfig);
+        }
+
+        return cproxy_on_config_json_one_vbucket(m, new_config_ver,
+                                                 config, name);
+    } else {
+        if (settings.verbose > 1) {
+            moxi_log_write("ERROR: skipping empty config\n");
+        }
+    }
+
+    return false;
+}
+
+static
+bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
+                                       char *config, char *name) {
+    assert(m != NULL);
+
+    bool rv = false;
+
+    if (settings.verbose > 2) {
+        moxi_log_write("parsing config nodeLocator:vbucket\n");
+    }
+
+    VBUCKET_CONFIG_HANDLE vch = vbucket_config_parse_string(config);
+    if (vch) {
+        if (settings.verbose > 2) {
+            moxi_log_write("conc vbucket_config_parse_string: %d\n", (vch != NULL));
+        }
+
+        proxy_behavior proxyb = m->behavior;
+
+        int pool_port = proxyb.port_listen;
+        int nodes_num = vbucket_config_get_num_servers(vch);
+
+        if (settings.verbose > 2) {
+            moxi_log_write("conc pool_port: %d nodes_num: %d\n",
+                           pool_port, nodes_num);
+        }
+
+        if (pool_port > 0 &&
+            nodes_num > 0) {
+            proxy_behavior_pool behavior_pool = {
+                .base = proxyb,
+                .num  = nodes_num,
+                .arr  = calloc(nodes_num, sizeof(proxy_behavior))
+            };
+
+            if (behavior_pool.arr != NULL) {
+                const char *usr = vbucket_config_get_user(vch);
+                if (usr != NULL) {
+                    strncpy(behavior_pool.base.usr, usr,
+                            sizeof(behavior_pool.base.usr) - 1);
+                    behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
+
+                    const char *pwd = vbucket_config_get_password(vch);
+                    if (pwd != NULL) {
+                        strncpy(behavior_pool.base.pwd,
+                                pwd, sizeof(behavior_pool.base.pwd) - 1);
+                        behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
+                    }
+                }
+
+                int j = 0;
+                for (; j < nodes_num; j++) {
+                    // Inherit default behavior.
+                    //
+                    behavior_pool.arr[j] = behavior_pool.base;
+
+                    const char *hostport = vbucket_config_get_server(vch, j);
+                    if (hostport != NULL &&
+                        strlen(hostport) > 0 &&
+                        strlen(hostport) < sizeof(behavior_pool.arr[j].host) - 1) {
+                        strncpy(behavior_pool.arr[j].host,
+                                hostport,
+                                sizeof(behavior_pool.arr[j].host) - 1);
+                        behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+
+                        char *colon = strchr(behavior_pool.arr[j].host, ':');
+                        if (colon != NULL) {
+                            *colon = '\0';
+                            behavior_pool.arr[j].port = atoi(colon + 1);
+                            if (behavior_pool.arr[j].port <= 0) {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if (j >= nodes_num) {
+                    cproxy_on_config_pool(m, name, pool_port,
+                                          config, new_config_ver,
+                                          &behavior_pool);
+                    rv = true;
+                } else {
+                    if (settings.verbose > 1) {
+                        moxi_log_write("ERROR: error receiving host:port"
+                                       " for server config %d in %s\n",
+                                       j, config);
+                    }
+                }
+
+                free(behavior_pool.arr);
+            }
+        }
+
+        vbucket_config_destroy(vch);
+    } else {
+        moxi_log_write("ERROR: bad JSON configuration: %s\n", config);
+        if (ml->log_mode != ERRORLOG_STDERR) {
+            fprintf(stderr, "ERROR: bad JSON configuration: %s\n", config);
+        }
+
+        // Bug 1961 - don't exit() as we might be in a multitenant use case.
+        //
+        // exit(EXIT_FAILURE);
+    }
+
+    return rv;
+}
+
+static
+bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
+                                      char *config, char *name) {
+    assert(m != NULL);
+
+    bool rv = false;
+
+#ifdef MOXI_USE_LIBMEMCACHED
+
+    if (settings.verbose > 2) {
+        moxi_log_write("parsing config nodeLocator:ketama\n");
+    }
+
+    // First, try to iterate through jConfig.vBucketServerMap.serverList
+    // if it exists, otherwise iterate through jConfig.nodes.
+    //
+    cJSON *jConfig = cJSON_Parse(config);
+    if (jConfig == NULL) {
+        return false;
+    }
+
+    cJSON *jArr = NULL;
+
+    cJSON *jVBSM = cJSON_GetObjectItem(jConfig, "vBucketServerMap");
+    if (jVBSM != NULL) {
+        jArr = cJSON_GetObjectItem(jVBSM, "serverList");
+    }
+
+    if (jArr == NULL ||
+        jArr->type != cJSON_Array) {
+        jArr = cJSON_GetObjectItem(jConfig, "nodes");
+    }
+
+    if (jArr != NULL &&
+        jArr->type == cJSON_Array) {
+        int nodes_num = cJSON_GetArraySize(jArr);
+        if (nodes_num > 0) {
             proxy_behavior proxyb = m->behavior;
 
-            int pool_port = proxyb.port_listen;
-            int nodes_num = vbucket_config_get_num_servers(vch);
-
             if (settings.verbose > 2) {
-                moxi_log_write("conc pool_port: %d nodes_num: %d\n",
-                        pool_port, nodes_num);
+                moxi_log_write("conjk nodes_num: %d\n", nodes_num);
             }
 
-            if (pool_port > 0 &&
-                nodes_num > 0) {
-                proxy_behavior_pool behavior_pool = {
-                    .base = proxyb,
-                    .num  = nodes_num,
-                    .arr  = calloc(nodes_num, sizeof(proxy_behavior))
-                };
+            proxy_behavior_pool behavior_pool = {
+                .base = proxyb,
+                .num  = nodes_num,
+                .arr  = calloc(nodes_num + 1, sizeof(proxy_behavior))
+            };
 
-                if (behavior_pool.arr != NULL) {
-                    const char *usr = vbucket_config_get_user(vch);
-                    if (usr != NULL) {
-                        strncpy(behavior_pool.base.usr, usr,
-                                sizeof(behavior_pool.base.usr) - 1);
-                        behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
+            if (behavior_pool.arr != NULL) {
+                cJSON *jUser = cJSON_GetObjectItem(jConfig, "user");
+                if (jUser != NULL &&
+                    jUser->type == cJSON_String &&
+                    jUser->valuestring != NULL) {
+                    strncpy(behavior_pool.base.usr,
+                            jUser->valuestring,
+                            sizeof(behavior_pool.base.usr) - 1);
+                    behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
 
-                        const char *pwd = vbucket_config_get_password(vch);
-                        if (pwd != NULL) {
-                            strncpy(behavior_pool.base.pwd,
-                                    pwd, sizeof(behavior_pool.base.pwd) - 1);
-                            behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
-                        }
+                    cJSON *jPassword = cJSON_GetObjectItem(jConfig, "password");
+                    if (jPassword != NULL &&
+                        jPassword->type == cJSON_String &&
+                        jPassword->valuestring != NULL) {
+                        strncpy(behavior_pool.base.pwd,
+                                jPassword->valuestring,
+                                sizeof(behavior_pool.base.pwd) - 1);
+                        behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
                     }
+                }
 
-                    int j = 0;
-                    for (; j < nodes_num; j++) {
-                        // Inherit default behavior.
-                        //
-                        behavior_pool.arr[j] = behavior_pool.base;
+                int j = 0;
+                for (; j < nodes_num; j++) {
+                    // Inherit default behavior.
+                    //
+                    behavior_pool.arr[j] = behavior_pool.base;
 
-                        const char *hostport = vbucket_config_get_server(vch, j);
-                        if (hostport != NULL &&
-                            strlen(hostport) > 0 &&
-                            strlen(hostport) < sizeof(behavior_pool.arr[j].host) - 1) {
-                            strncpy(behavior_pool.arr[j].host,
-                                    hostport,
-                                    sizeof(behavior_pool.arr[j].host) - 1);
-                            behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+                    cJSON *jNode = cJSON_GetArrayItem(jArr, j);
+                    if (jNode != NULL) {
+                        if (jNode->type == cJSON_String &&
+                            jNode->valuestring != NULL) {
+                            // Should look like "host:port".
+                            //
+                            char *hostport = jNode->valuestring;
 
-                            char *colon = strchr(behavior_pool.arr[j].host, ':');
-                            if (colon != NULL) {
-                                *colon = '\0';
-                                behavior_pool.arr[j].port = atoi(colon + 1);
-                                if (behavior_pool.arr[j].port <= 0) {
+                            if (strlen(hostport) > 0 &&
+                                strlen(hostport) < sizeof(behavior_pool.arr[j].host) - 1) {
+                                strncpy(behavior_pool.arr[j].host,
+                                        hostport,
+                                        sizeof(behavior_pool.arr[j].host) - 1);
+                                behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+
+                                char *colon = strchr(behavior_pool.arr[j].host, ':');
+                                if (colon != NULL) {
+                                    *colon = '\0';
+                                    behavior_pool.arr[j].port = atoi(colon + 1);
+                                    if (behavior_pool.arr[j].port <= 0) {
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        } else if (jNode->type == cJSON_Object) {
+                            // Should look like... {
+                            //   hostname: "host",
+                            //   ports: { direct: port }
+                            // }
+                            //
+                            cJSON *jHostname = cJSON_GetObjectItem(jNode, "hostname");
+                            if (jHostname != NULL &&
+                                jHostname->type == cJSON_String &&
+                                jHostname->valuestring != NULL &&
+                                strlen(jHostname->valuestring) < sizeof(behavior_pool.arr[j].host) - 1) {
+                                cJSON *jPorts = cJSON_GetObjectItem(jNode, "ports");
+                                if (jPorts != NULL &&
+                                    jPorts->type == cJSON_Object) {
+                                    cJSON *jDirect = cJSON_GetObjectItem(jPorts, "direct");
+                                    if (jDirect != NULL &&
+                                        jDirect->type == cJSON_Number &&
+                                        jDirect->valueint > 0) {
+                                        strncpy(behavior_pool.arr[j].host,
+                                                jHostname->valuestring,
+                                                sizeof(behavior_pool.arr[j].host) - 1);
+                                        behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
+
+                                        // The JSON might return a hostname that looks like "HOST:REST_PORT".
+                                        //
+                                        char *colon = strchr(behavior_pool.arr[j].host, ':');
+                                        if (colon != NULL) {
+                                            *colon = '\0';
+                                        }
+
+                                        behavior_pool.arr[j].port = jDirect->valueint;
+                                    } else {
+                                        break;
+                                    }
+                                } else {
                                     break;
                                 }
                             } else {
@@ -577,40 +807,112 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                         } else {
                             break;
                         }
+                    } else {
+                        break;
                     }
+                }
 
-                    if (j >= nodes_num) {
-                        cproxy_on_config_pool(m, name, pool_port,
-                                              config, new_config_ver,
-                                              &behavior_pool);
-                        rv = true;
+                if (j >= nodes_num) {
+                    // Create a config string that libmemcached likes,
+                    // such as "HOST:PORT,HOST:PORT,HOST:PORT".
+                    //
+                    int   config_len = 200;
+                    char *config_str = calloc(config_len, 1);
+
+                    if (config_str != NULL) {
+                        for (j = 0; j < nodes_num; j++) {
+                            // Grow config string for libmemcached.
+                            //
+                            int x = 40 + // For port and weight.
+                                strlen(config_str) +
+                                strlen(behavior_pool.arr[j].host);
+                            if (config_len < x) {
+                                config_len = 2 * (config_len + x);
+                                config_str = realloc(config_str, config_len);
+                                if (config_str == NULL) {
+                                    break;
+                                }
+                            }
+
+                            char *config_end = config_str + strlen(config_str);
+                            if (config_end != config_str) {
+                                *config_end++ = ',';
+                            }
+
+                            if (strlen(behavior_pool.arr[j].host) > 0 &&
+                                behavior_pool.arr[j].port > 0) {
+                                snprintf(config_end,
+                                         config_len - (config_end - config_str),
+                                         "%s:%u",
+                                         behavior_pool.arr[j].host,
+                                         behavior_pool.arr[j].port);
+                            } else {
+                                if (settings.verbose > 1) {
+                                    moxi_log_write("ERROR: conjk missing host/port %d in %s\n",
+                                                   j, name);
+                                }
+                            }
+
+                            if (behavior_pool.arr[j].downstream_weight > 0) {
+                                config_end = config_str + strlen(config_str);
+                                snprintf(config_end,
+                                         config_len - (config_end - config_str),
+                                         ":%u",
+                                         behavior_pool.arr[j].downstream_weight);
+                            }
+                        }
+
+                        if (j >= nodes_num) {
+                            cproxy_on_config_pool(m, name, proxyb.port_listen,
+                                                  config_str, new_config_ver,
+                                                  &behavior_pool);
+                            rv = true;
+                        }
+
+                        if (config_str != NULL) {
+                            free(config_str);
+                        }
                     } else {
                         if (settings.verbose > 1) {
-                            moxi_log_write("ERROR: error receiving host:port for server config %d in %s\n",
-                                           j, config);
+                            moxi_log_write("ERROR: oom on jk re-config str\n");;
                         }
                     }
+                } else {
+                    if (settings.verbose > 1) {
+                        moxi_log_write("ERROR: conjk parse error for config %d in %s\n",
+                                       j, config);
+                    }
+                }
 
-                    free(behavior_pool.arr);
+                free(behavior_pool.arr);
+            } else {
+                if (settings.verbose > 1) {
+                    moxi_log_write("ERROR: oom on jk re-config\n");;
                 }
             }
-
-            vbucket_config_destroy(vch);
         } else {
-            moxi_log_write("ERROR: bad JSON configuration: %s\n", config);
-            if (ml->log_mode != ERRORLOG_STDERR) {
-                fprintf(stderr, "ERROR: bad JSON configuration: %s\n", config);
+            if (settings.verbose > 1) {
+                moxi_log_write("ERROR: conjk empty serverList/nodes in re-config\n");;
             }
-
-            // Bug 1961 - don't exit() as we might be in a multitenant use case.
-            //
-            // exit(EXIT_FAILURE);
         }
     } else {
         if (settings.verbose > 1) {
-            moxi_log_write("ERROR: skipping empty config\n");
+            moxi_log_write("ERROR: conjk no serverList/nodes in re-config\n");;
         }
     }
+
+    cJSON_Delete(jConfig);
+
+#else // !MOXI_USE_LIBMEMCACHED
+
+    (void) m;
+    (void) new_config_ver;
+    (void) config;
+    (void) name;
+
+    moxi_log_write("ERROR: not compiled with libmemcached support\n");
+
+#endif // !MOXI_USE_LIBMEMCACHED
 
     return rv;
 }
