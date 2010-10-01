@@ -37,6 +37,10 @@ char **parse_kvs_behavior(kvpair_t *kvs,
                           char *name,
                           proxy_behavior *behavior);
 
+static void cproxy_parse_json_auth(char *config,
+                                   char *name,
+                                   proxy_behavior_pool *bp);
+
 static void cproxy_init_null_bucket(proxy_main *m);
 
 static void cproxy_on_config(void *data0, void *data1);
@@ -595,19 +599,7 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
             };
 
             if (behavior_pool.arr != NULL) {
-                const char *usr = vbucket_config_get_user(vch);
-                if (usr != NULL) {
-                    strncpy(behavior_pool.base.usr, usr,
-                            sizeof(behavior_pool.base.usr) - 1);
-                    behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
-
-                    const char *pwd = vbucket_config_get_password(vch);
-                    if (pwd != NULL) {
-                        strncpy(behavior_pool.base.pwd,
-                                pwd, sizeof(behavior_pool.base.pwd) - 1);
-                        behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
-                    }
-                }
+                cproxy_parse_json_auth(config, name, &behavior_pool);
 
                 int j = 0;
                 for (; j < nodes_num; j++) {
@@ -721,42 +713,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
             };
 
             if (behavior_pool.arr != NULL) {
-                strncpy(behavior_pool.base.usr,
-                        name,
-                        sizeof(behavior_pool.base.usr) - 1);
-                behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
-
-                if (jVBSM != NULL) {
-                    cJSON *jUser = cJSON_GetObjectItem(jVBSM, "user");
-                    if (jUser != NULL &&
-                        jUser->type == cJSON_String &&
-                        jUser->valuestring != NULL) {
-                        strncpy(behavior_pool.base.usr,
-                                jUser->valuestring,
-                                sizeof(behavior_pool.base.usr) - 1);
-                        behavior_pool.base.usr[sizeof(behavior_pool.base.usr) - 1] = '\0';
-
-                        cJSON *jPassword = cJSON_GetObjectItem(jVBSM, "password");
-                        if (jPassword != NULL &&
-                            jPassword->type == cJSON_String &&
-                            jPassword->valuestring != NULL) {
-                            strncpy(behavior_pool.base.pwd,
-                                    jPassword->valuestring,
-                                    sizeof(behavior_pool.base.pwd) - 1);
-                            behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
-                        }
-                    }
-                } else {
-                    cJSON *jPassword = cJSON_GetObjectItem(jConfig, "saslPassword");
-                    if (jPassword != NULL &&
-                        jPassword->type == cJSON_String &&
-                        jPassword->valuestring != NULL) {
-                        strncpy(behavior_pool.base.pwd,
-                                jPassword->valuestring,
-                                sizeof(behavior_pool.base.pwd) - 1);
-                        behavior_pool.base.pwd[sizeof(behavior_pool.base.pwd) - 1] = '\0';
-                    }
-                }
+                cproxy_parse_json_auth(config, name, &behavior_pool);
 
                 int curr = 0; // Moves slower than j so we can skip unhealthy nodes.
 
@@ -966,6 +923,28 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
 #endif // !MOXI_USE_LIBMEMCACHED
 
     return rv;
+}
+
+static void cproxy_parse_json_auth(char *config,
+                                   char *name,
+                                   proxy_behavior_pool *bp) {
+    strncpy(bp->base.usr, name, sizeof(bp->base.usr) - 1);
+    bp->base.usr[sizeof(bp->base.usr) - 1] = '\0';
+
+    cJSON *jConfig = cJSON_Parse(config);
+    if (jConfig != NULL) {
+        cJSON *jPassword = cJSON_GetObjectItem(jConfig, "saslPassword");
+        if (jPassword != NULL &&
+            jPassword->type == cJSON_String &&
+            jPassword->valuestring != NULL) {
+            strncpy(bp->base.pwd,
+                    jPassword->valuestring,
+                    sizeof(bp->base.pwd) - 1);
+            bp->base.pwd[sizeof(bp->base.pwd) - 1] = '\0';
+        }
+
+        cJSON_Delete(jConfig);
+    }
 }
 
 #else // !MOXI_USE_LIBVBUCKET
