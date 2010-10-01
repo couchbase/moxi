@@ -98,7 +98,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         """Test seeing a first AUTH B2B"""
         self.client_connect()
 
-        self.exerciseGoodAuth("userGood0", "passwordGood0")
+        self.exerciseGoodAuth("bucket0", "passwordGood0")
 
     def testBadAuth(self):
         """Test seeing a bad AUTH B2B"""
@@ -106,7 +106,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
 
         auth_req = self.packReq(memcacheConstants.CMD_SASL_AUTH,
                                 key="PLAIN",
-                                val="\0userBad0\0passwordBad0");
+                                val="\0bucket0\0passwordBad0");
         auth_res = self.packRes(memcacheConstants.CMD_SASL_AUTH,
                                 status=memcacheConstants.ERR_AUTH_ERROR,
                                 val="Auth failure")
@@ -114,7 +114,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         self.client_send(auth_req)
         self.client_recv(auth_res)
 
-        self.exerciseGoodAuth("userGood0", "passwordGood0")
+        self.exerciseGoodAuth("bucket0", "passwordGood0")
 
     def testBadPassword(self):
         """Test seeing a bad AUTH B2B"""
@@ -122,7 +122,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
 
         auth_req = self.packReq(memcacheConstants.CMD_SASL_AUTH,
                                 key="PLAIN",
-                                val="\0userGood0\0passwordBad0");
+                                val="\0bucket0\0passwordBad0");
         auth_res = self.packRes(memcacheConstants.CMD_SASL_AUTH,
                                 status=memcacheConstants.ERR_AUTH_ERROR,
                                 val="Auth failure")
@@ -130,7 +130,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         self.client_send(auth_req)
         self.client_recv(auth_res)
 
-        self.exerciseGoodAuth("userGood1", "passwordGood1")
+        self.exerciseGoodAuth("bucket1", "passwordGood1")
 
     def testBadEmptyUser(self):
         """Test seeing a bad AUTH B2B"""
@@ -146,7 +146,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         self.client_send(auth_req)
         self.client_recv(auth_res)
 
-        self.exerciseGoodAuth("userGood1", "passwordGood1")
+        self.exerciseGoodAuth("bucket1", "passwordGood1")
 
     def testBadEmptyPassword(self):
         """Test seeing a bad AUTH B2B"""
@@ -154,7 +154,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
 
         auth_req = self.packReq(memcacheConstants.CMD_SASL_AUTH,
                                 key="PLAIN",
-                                val="\0userGood0\0");
+                                val="\0bucket0\0");
         auth_res = self.packRes(memcacheConstants.CMD_SASL_AUTH,
                                 status=memcacheConstants.ERR_AUTH_ERROR,
                                 val="Auth failure")
@@ -162,7 +162,7 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         self.client_send(auth_req)
         self.client_recv(auth_res)
 
-        self.exerciseGoodAuth("userGood1", "passwordGood1")
+        self.exerciseGoodAuth("bucket1", "passwordGood1")
 
     def exerciseGoodAuth(self, user, password):
         auth_req = self.packReq(memcacheConstants.CMD_SASL_AUTH,

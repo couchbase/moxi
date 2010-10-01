@@ -63,7 +63,7 @@ print "------------------------------------ multitenancy\n";
 
 my $cmd = "./t/moxi_mock.pl moxi_multitenancy binary \"\"" .
                  " url=http://127.0.0.1:4567/pools/default/buckets/default" .
-                 " default_bucket_name=,port_listen=11333," .
+                 " default_bucket_name=default,port_listen=11333," .
                  " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest.cfg\"";
 print($cmd . "\n");
 my $res = system($cmd);

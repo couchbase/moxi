@@ -493,6 +493,8 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
     assert(config != NULL);
     assert(name != NULL);
 
+    bool rv = false;
+
     // Handle reconfiguration of a single proxy.
     //
     if (m != NULL &&
@@ -506,6 +508,7 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
         //
         // {"name":"default",                // The bucket name.
         //  "nodeLocator":"ketama",          // Optional.
+        //  "saslPassword":"someSASLPwd",
         //  "nodes":[{"hostname":"10.17.1.46","status":"healthy",
         //            "version":"0.3.0_114_g31859fe","os":"i386-apple-darwin9.8.0",
         //            "ports":{"proxy":11213,"direct":11212}}],
@@ -516,36 +519,43 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
         //  "vBucketServerMap":{
         //     "hashAlgorithm":"CRC",
         //     "user":"optionalSASLUsr",     // Optional.
-        //     "password":"optionalSASLPwd", // Optional.
+        //     "password":"someSASLPwd",     // Optional.
         //     "serverList":["10.17.1.46:11212"],
         //     ...more json here...}}
         //
         cJSON *jConfig = cJSON_Parse(config);
         if (jConfig != NULL) {
+            cJSON *jName = cJSON_GetObjectItem(jConfig, "name");
+            if (jName != NULL &&
+                jName->type == cJSON_String &&
+                jName->valuestring != NULL) {
+                name = jName->valuestring;
+            }
+
             cJSON *jNodeLocator = cJSON_GetObjectItem(jConfig, "nodeLocator");
             if (jNodeLocator != NULL &&
                 jNodeLocator->type == cJSON_String &&
                 jNodeLocator->valuestring != NULL) {
                 if (strcmp(jNodeLocator->valuestring, "ketama") == 0) {
-                    bool rv = cproxy_on_config_json_one_ketama(m, new_config_ver,
-                                                               config, name);
+                    rv = cproxy_on_config_json_one_ketama(m, new_config_ver,
+                                                          config, name);
                     cJSON_Delete(jConfig);
+
                     return rv;
                 }
             }
 
+            rv = cproxy_on_config_json_one_vbucket(m, new_config_ver,
+                                                   config, name);
             cJSON_Delete(jConfig);
         }
-
-        return cproxy_on_config_json_one_vbucket(m, new_config_ver,
-                                                 config, name);
     } else {
         if (settings.verbose > 1) {
             moxi_log_write("ERROR: skipping empty config\n");
         }
     }
 
-    return false;
+    return rv;
 }
 
 static
@@ -562,7 +572,8 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
     VBUCKET_CONFIG_HANDLE vch = vbucket_config_parse_string(config);
     if (vch) {
         if (settings.verbose > 2) {
-            moxi_log_write("conc vbucket_config_parse_string: %d\n", (vch != NULL));
+            moxi_log_write("conc vbucket_config_parse_string: %d for %s\n",
+                           (vch != NULL), name);
         }
 
         proxy_behavior proxyb = m->behavior;
