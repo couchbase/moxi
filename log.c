@@ -30,7 +30,7 @@
 # define O_LARGEFILE 0
 #endif
 
-#define MAX_LOGBUF_LEN 4096
+#define MAX_LOGBUF_LEN 1000
 
 /**
  * open the errorlog
@@ -44,11 +44,6 @@
  */
 int log_error_open(moxi_log *mlog) {
     assert(mlog);
-
-    if (!mlog->logbuf) {
-        mlog->logbuf = calloc(1, MAX_LOGBUF_LEN + 1);
-        mlog->logbuf_used = 0;
-    }
 
     if (mlog->log_mode == ERRORLOG_FILE) {
         const char *logfile = mlog->log_file;
@@ -140,30 +135,36 @@ int log_error_close(moxi_log *mlog) {
 }
 
 static inline
-void mappend_log(moxi_log *mlog, const char *str) {
+void mappend_log(char *logbuf, int *logbuf_used, const char *str) {
     int str_len = strlen(str);
-    if (mlog->logbuf_used + str_len >= MAX_LOGBUF_LEN)
-        str_len = MAX_LOGBUF_LEN - 1 - mlog->logbuf_used;
-    if (str_len <= 0)
+    if (*logbuf_used + str_len >= MAX_LOGBUF_LEN - 1) {
+        str_len = MAX_LOGBUF_LEN - 2 - *logbuf_used;
+    }
+    if (str_len <= 0) {
         return;
-    memcpy(mlog->logbuf + mlog->logbuf_used, str, str_len);
-    mlog->logbuf_used += str_len;
-    assert(mlog->logbuf_used < MAX_LOGBUF_LEN);
+    }
+    memcpy(logbuf + *logbuf_used, str, str_len);
+    *logbuf_used = *logbuf_used + str_len;
+    assert(*logbuf_used < MAX_LOGBUF_LEN);
 }
 
 static inline
-void mappend_log_int(moxi_log *mlog, int num) {
+void mappend_log_int(char *logbuf, int *logbuf_used, int num) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%d", num);
-    mappend_log(mlog, buf);
+    mappend_log(logbuf, &logbuf_used, buf);
 }
 
-int log_error_write(moxi_log *mlog, const char *filename, unsigned int line, const char *fmt, ...) {
+int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
+                    const char *fmt, ...) {
     va_list ap;
     static char ts_debug_str[255];
     int written = 0;
 
-    mlog->logbuf_used = 0;
+    char logbuf[MAX_LOGBUF_LEN + 10]; /* scratch buffer */
+    int  logbuf_used = 0;             /* length of scratch buffer */
+
+    logbuf_used = 0;
 
     switch(mlog->log_mode) {
         case ERRORLOG_FILE:
@@ -179,55 +180,53 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line, con
                 mlog->last_generated_debug_ts = mlog->cur_ts;
             }
 
-            mappend_log(mlog, ts_debug_str);
-
-            /*mappend_log(zl, ts_debug_str)*/
-            mappend_log(mlog, ": (");
+            mappend_log(logbuf, &logbuf_used, ts_debug_str);
+            mappend_log(logbuf, &logbuf_used, ": (");
             break;
 #ifdef HAVE_SYSLOG_H
         case ERRORLOG_SYSLOG:
-            memset(mlog->logbuf, 0,  MAX_LOGBUF_LEN);
+            memset(logbuf, 0, MAX_LOGBUF_LEN);
             /* syslog is generating its own timestamps */
-            mappend_log(mlog, "(");
+            mappend_log(logbuf, &logbuf_used, "(");
             break;
 #endif
     }
 
-    mappend_log(mlog, filename);
-    mappend_log(mlog, ".");
-    mappend_log_int(mlog, line);
-    mappend_log(mlog, ") ");
+    mappend_log(logbuf, &logbuf_used, filename);
+    mappend_log(logbuf, &logbuf_used, ".");
+    mappend_log_int(logbuf, &logbuf_used, line);
+    mappend_log(logbuf, &logbuf_used, ") ");
 
-    assert(mlog->logbuf_used < MAX_LOGBUF_LEN);
+    assert(logbuf_used < MAX_LOGBUF_LEN);
 
     va_start(ap, fmt);
-    mlog->logbuf_used +=
-        vsnprintf((mlog->logbuf + mlog->logbuf_used), (MAX_LOGBUF_LEN - mlog->logbuf_used - 1), fmt, ap);
+    logbuf_used +=
+        vsnprintf((logbuf + logbuf_used), (MAX_LOGBUF_LEN - logbuf_used - 1), fmt, ap);
     va_end(ap);
 
     /* vsprintf returns total string length, so no buffer overflow is
      * possible, but we can shoot logbuf_used past MAX_LOGBUF_LEN */
-    if (mlog->logbuf_used >= MAX_LOGBUF_LEN) {
-        mlog->logbuf_used = MAX_LOGBUF_LEN - 1;
+    if (logbuf_used >= MAX_LOGBUF_LEN) {
+        logbuf_used = MAX_LOGBUF_LEN - 1;
     }
 
-    if (mlog->logbuf_used > 1) {
-        mlog->logbuf[mlog->logbuf_used - 1] = '\n';
+    if (logbuf_used > 1) {
+        logbuf[logbuf_used - 1] = '\n';
     }
 
-    assert(mlog->logbuf_used < MAX_LOGBUF_LEN);
-    mlog->logbuf[mlog->logbuf_used] = '\0';
+    assert(logbuf_used < MAX_LOGBUF_LEN);
+    logbuf[logbuf_used] = '\0';
 
     switch(mlog->log_mode) {
         case ERRORLOG_FILE:
-            written = write(mlog->fd, mlog->logbuf, mlog->logbuf_used);
+            written = write(mlog->fd, logbuf, logbuf_used);
             break;
         case ERRORLOG_STDERR:
-            written = write(STDERR_FILENO, mlog->logbuf, mlog->logbuf_used);
+            written = write(STDERR_FILENO, logbuf, logbuf_used);
             break;
 #ifdef HAVE_SYSLOG_H
         case ERRORLOG_SYSLOG:
-            syslog(LOG_ERR, "%s", mlog->logbuf);
+            syslog(LOG_ERR, "%s", logbuf);
             break;
 #endif
     }
