@@ -137,14 +137,15 @@ int log_error_close(moxi_log *mlog) {
 static inline
 void mappend_log(char *logbuf, int *logbuf_used, const char *str) {
     int str_len = strlen(str);
-    if (*logbuf_used + str_len >= MAX_LOGBUF_LEN - 1) {
-        str_len = MAX_LOGBUF_LEN - 2 - *logbuf_used;
+    int used = *logbuf_used;
+    if (used + str_len >= MAX_LOGBUF_LEN - 1) {
+        str_len = MAX_LOGBUF_LEN - 2 - used;
     }
     if (str_len <= 0) {
         return;
     }
-    memcpy(logbuf + *logbuf_used, str, str_len);
-    *logbuf_used = *logbuf_used + str_len;
+    memcpy(logbuf + used, str, str_len);
+    *logbuf_used = used + str_len;
     assert(*logbuf_used < MAX_LOGBUF_LEN);
 }
 
@@ -152,7 +153,7 @@ static inline
 void mappend_log_int(char *logbuf, int *logbuf_used, int num) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%d", num);
-    mappend_log(logbuf, &logbuf_used, buf);
+    mappend_log(logbuf, logbuf_used, buf);
 }
 
 int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
