@@ -1461,6 +1461,11 @@ void cproxy_on_config_pool(proxy_main *m,
         pthread_mutex_unlock(&m->proxy_main_lock);
 
         work_collect_wait(&wc);
+
+        if (settings.verbose > 2) {
+            moxi_log_write("conp collected, changed %s, %d\n",
+                           changed ? "true" : "false", config_ver);
+        }
     }
 }
 
