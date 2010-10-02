@@ -48,7 +48,9 @@ void downstream_connect_time_sample(proxy_stats_td *ptds, uint64_t duration);
 bool downstream_connect_init(downstream *d, mcs_server_st *msst,
                              proxy_behavior *behavior, conn *c);
 
-int init_mcs_st(mcs_st *mst, char *config);
+int init_mcs_st(mcs_st *mst, char *config,
+                const char *default_usr,
+                const char *default_pwd);
 
 bool cproxy_on_connect_downstream_conn(conn *c);
 
@@ -1168,7 +1170,14 @@ downstream *cproxy_create_downstream(char *config,
 
         if (d->config != NULL &&
             d->behaviors_arr != NULL) {
-            int nconns = init_mcs_st(&d->mst, d->config);
+            char *usr = behavior_pool->base.usr[0] != '\0' ?
+                behavior_pool->base.usr :
+                NULL;
+            char *pwd = behavior_pool->base.pwd[0] != '\0' ?
+                behavior_pool->base.pwd :
+                NULL;
+
+            int nconns = init_mcs_st(&d->mst, d->config, usr, pwd);
             if (nconns > 0) {
                 d->downstream_conns = (conn **)
                     calloc(nconns, sizeof(conn *));
@@ -1188,11 +1197,14 @@ downstream *cproxy_create_downstream(char *config,
     return NULL;
 }
 
-int init_mcs_st(mcs_st *mst, char *config) {
+int init_mcs_st(mcs_st *mst, char *config,
+                const char *default_usr,
+                const char *default_pwd) {
     assert(mst);
     assert(config);
 
-    if (mcs_create(mst, config) != NULL) {
+    if (mcs_create(mst, config,
+                   default_usr, default_pwd) != NULL) {
         return mcs_server_count(mst);
     } else {
         if (settings.verbose > 1) {
@@ -1224,9 +1236,16 @@ bool cproxy_check_downstream_config(downstream *d) {
         // Parse the proxy/parent's config to see if we can
         // reuse our existing downstream connections.
         //
+        char *usr = d->ptd->behavior_pool.base.usr[0] != '\0' ?
+            d->ptd->behavior_pool.base.usr :
+            NULL;
+        char *pwd = d->ptd->behavior_pool.base.pwd[0] != '\0' ?
+            d->ptd->behavior_pool.base.pwd :
+            NULL;
+
         mcs_st next;
 
-        int n = init_mcs_st(&next, d->ptd->config);
+        int n = init_mcs_st(&next, d->ptd->config, usr, pwd);
         if (n > 0) {
             if (mcs_stable_update(&d->mst, &next)) {
                 if (settings.verbose > 2) {

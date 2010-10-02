@@ -51,8 +51,11 @@ typedef struct {
     mcs_server_st *servers;
 } mcs_st;
 
-mcs_st *mcs_create(mcs_st *ptr, const char *config);
-void    mcs_free(mcs_st *ptr);
+mcs_st *mcs_create(mcs_st *ptr, const char *config,
+                   const char *default_usr,
+                   const char *default_pwd);
+
+void mcs_free(mcs_st *ptr);
 
 bool mcs_stable_update(mcs_st *curr_version, mcs_st *next_version);
 

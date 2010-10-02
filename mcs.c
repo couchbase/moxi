@@ -18,27 +18,36 @@
 
 // The lvb stands for libvbucket.
 //
-mcs_st  *lvb_create(mcs_st *ptr, const char *config);
+mcs_st  *lvb_create(mcs_st *ptr, const char *config,
+                    const char *default_usr,
+                    const char *default_pwd);
 void     lvb_free_data(mcs_st *ptr);
 bool     lvb_stable_update(mcs_st *curr_version, mcs_st *next_version);
-uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbucket);
-void     lvb_server_invalid_vbucket(mcs_st *ptr, int server_index, int vbucket);
+uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
+                      int *vbucket);
+void     lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
+                                    int vbucket);
 
 // The lmc stands for libmemcached.
 //
-mcs_st  *lmc_create(mcs_st *ptr, const char *config);
+mcs_st  *lmc_create(mcs_st *ptr, const char *config,
+                    const char *default_usr,
+                    const char *default_pwd);
 void     lmc_free_data(mcs_st *ptr);
-uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbucket);
+uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length,
+                      int *vbucket);
 
 // ----------------------------------------------------------------------
 
-mcs_st *mcs_create(mcs_st *ptr, const char *config) {
+mcs_st *mcs_create(mcs_st *ptr, const char *config,
+                   const char *default_usr,
+                   const char *default_pwd) {
 #ifdef MOXI_USE_LIBVBUCKET
     if (config[0] == '{') {
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libvbucket\n");
         }
-        return lvb_create(ptr, config);
+        return lvb_create(ptr, config, default_usr, default_pwd);
     }
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
@@ -46,7 +55,7 @@ mcs_st *mcs_create(mcs_st *ptr, const char *config) {
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libmemcached\n");
         }
-        return lmc_create(ptr, config);
+        return lmc_create(ptr, config, default_usr, default_pwd);
     }
 #endif
     moxi_log_write("ERROR: unconfigured hash library\n");
@@ -103,7 +112,8 @@ mcs_server_st *mcs_server_index(mcs_st *ptr, int i) {
     return &ptr->servers[i];
 }
 
-uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbucket) {
+uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length,
+                      int *vbucket) {
 #ifdef MOXI_USE_LIBVBUCKET
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         return lvb_key_hash(ptr, key, key_length, vbucket);
@@ -117,7 +127,8 @@ uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbuc
     return 0;
 }
 
-void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index, int vbucket) {
+void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index,
+                                int vbucket) {
 #ifdef MOXI_USE_LIBVBUCKET
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         lvb_server_invalid_vbucket(ptr, server_index, vbucket);
@@ -129,7 +140,9 @@ void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index, int vbucket) {
 
 #ifdef MOXI_USE_LIBVBUCKET
 
-mcs_st *lvb_create(mcs_st *ptr, const char *config) {
+mcs_st *lvb_create(mcs_st *ptr, const char *config,
+                   const char *default_usr,
+                   const char *default_pwd) {
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBVBUCKET;
@@ -177,11 +190,15 @@ mcs_st *lvb_create(mcs_st *ptr, const char *config) {
                     const char *user = vbucket_config_get_user(vch);
                     if (user != NULL) {
                         ptr->servers[j].usr = strdup(user);
+                    } else if (default_usr != NULL) {
+                        ptr->servers[j].usr = strdup(default_usr);
                     }
 
                     const char *password = vbucket_config_get_password(vch);
                     if (password != NULL) {
                         ptr->servers[j].pwd = strdup(password);
+                    } else if (default_pwd != NULL) {
+                        ptr->servers[j].pwd = strdup(default_pwd);
                     }
                 }
 
@@ -245,7 +262,8 @@ bool lvb_stable_update(mcs_st *curr_version, mcs_st *next_version) {
     return rv;
 }
 
-uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbucket) {
+uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
+                      int *vbucket) {
     assert(ptr->kind == MCS_KIND_LIBVBUCKET);
     assert(ptr->data != NULL);
 
@@ -259,7 +277,8 @@ uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbuc
     return (uint32_t) vbucket_get_master(vch, v);
 }
 
-void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index, int vbucket) {
+void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
+                                int vbucket) {
     assert(ptr->kind == MCS_KIND_LIBVBUCKET);
     assert(ptr->data != NULL);
 
@@ -274,7 +293,9 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index, int vbucket) {
 
 #ifdef MOXI_USE_LIBMEMCACHED
 
-mcs_st *lmc_create(mcs_st *ptr, const char *config) {
+mcs_st *lmc_create(mcs_st *ptr, const char *config,
+                   const char *default_usr,
+                   const char *default_pwd) {
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBMEMCACHED;
@@ -305,11 +326,20 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config) {
                         strncpy(ptr->servers[j].hostname,
                                 memcached_server_name(mservers + j),
                                 sizeof(ptr->servers[j].hostname) - 1);
-                        ptr->servers[j].port = (int) memcached_server_port(mservers + j);
+                        ptr->servers[j].port =
+                            (int) memcached_server_port(mservers + j);
                         if (ptr->servers[j].port <= 0) {
                             moxi_log_write("lmc_create failed, could not parse port: %s\n",
                                            config);
                             break;
+                        }
+
+                        if (default_usr != NULL) {
+                            ptr->servers[j].usr = strdup(default_usr);
+                        }
+
+                        if (default_pwd != NULL) {
+                            ptr->servers[j].pwd = strdup(default_pwd);
                         }
                     }
 
@@ -607,12 +637,19 @@ char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii) {
 
     char *buf = is_ascii ? msst->ident_a : msst->ident_b;
     if (buf[0] == '\0') {
+        const char *usr = mcs_server_st_usr(msst) != NULL ?
+            mcs_server_st_usr(msst) :
+            NULL;
+
+        const char *pwd = mcs_server_st_pwd(msst) != NULL ?
+            mcs_server_st_pwd(msst) :
+            NULL;
+
         snprintf(buf, MCS_IDENT_SIZE - 1,
                  "%s:%d:%s:%s:%d",
                  mcs_server_st_hostname(msst),
                  mcs_server_st_port(msst),
-                 mcs_server_st_usr(msst),
-                 mcs_server_st_pwd(msst),
+                 usr, pwd,
                  is_ascii);
     }
 
