@@ -81,13 +81,10 @@ my $cmd = "./t/moxi_mock.pl moxi_multitenancy_default binary \"\"" .
                  " default_bucket_name=default,port_listen=11333," .
                  " \"./t/rest_mock.rb ./t/moxi_multitenancy_rest_default.cfg\"";
 print($cmd . "\n");
-
-print("SKIPPED\n");
-
-# my $res = system($cmd);
-# if ($res != 0) {
-#   print "exit: $res\n";
-#   exit($res);
-# }
+my $res = system($cmd);
+if ($res != 0) {
+  print "exit: $res\n";
+  exit($res);
+}
 
 

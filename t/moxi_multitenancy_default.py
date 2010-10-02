@@ -39,11 +39,24 @@ class TestMultitenancyWithDefaultBucket(moxi_mock_server.ProxyClientBase):
     def __init__(self, x):
         moxi_mock_server.ProxyClientBase.__init__(self, x)
 
+    def authReqRes(self, user, password):
+        auth_req = self.packReq(memcacheConstants.CMD_SASL_AUTH,
+                                key="PLAIN",
+                                val="\0" + user + "\0" + password);
+        auth_res = self.packRes(memcacheConstants.CMD_SASL_AUTH,
+                                val="Authenticated")
+        return auth_req, auth_res
+
     def testDefaultBucketAscii(self):
         """Test basic serial get commands"""
         self.client_connect()
 
         self.client_send("get keyNotThere0\r\n")
+
+        auth_req, auth_res = self.authReqRes('default', '')
+
+        self.mock_recv(auth_req)
+        self.mock_send(auth_res)
         self.mock_recv(self.packReq(memcacheConstants.CMD_GETK, key='keyNotThere0'))
         self.mock_send(self.packRes(memcacheConstants.CMD_GETK,
                                     status=memcacheConstants.ERR_NOT_FOUND,
@@ -54,11 +67,15 @@ class TestMultitenancyWithDefaultBucket(moxi_mock_server.ProxyClientBase):
         self.client_connect()
         self.doTestSimpleSet()
 
-    def doTestSimpleSet(self, flg=1234, exp=0, val='9876'):
+    def doTestSimpleSet(self, flg=1234, exp=0, val='9876', user='default', password=''):
         """Test simple set against mock server"""
         self.client_send(self.packReq(memcacheConstants.CMD_SET, key='simpleSet',
                                       extraHeader=struct.pack(memcacheConstants.SET_PKT_FMT, flg, exp),
                                       val=val))
+        auth_req, auth_res = self.authReqRes('default', '')
+
+        self.mock_recv(auth_req)
+        self.mock_send(auth_res)
         self.mock_recv(self.packReq(memcacheConstants.CMD_SET, key='simpleSet',
                                     extraHeader=struct.pack(memcacheConstants.SET_PKT_FMT, flg, exp),
                                     val=val))
