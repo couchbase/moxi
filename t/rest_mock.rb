@@ -28,13 +28,17 @@ def some_json()
 
   <<-eos
 {
-  "hashAlgorithm": "CRC",
-  "numReplicas": 0,
-  "serverList": ["127.0.0.1:11311"],
-  "vBucketMap":
-    [
-      [0]
-    ]
+  "name": "TheUser",
+  "saslPassword": "ThePassword",
+  "vBucketServerMap": {
+    "hashAlgorithm": "CRC",
+    "numReplicas": 0,
+    "serverList": ["127.0.0.1:11311"],
+    "vBucketMap":
+      [
+        [0]
+      ]
+  }
 }
   eos
 end
