@@ -1256,12 +1256,12 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
         // Otherwise, passing in a NULL config string signals that
         // a bucket's proxy struct should be shut down.
         //
-        if (down && (strcmp(NULL_BUCKET, name) != 0)) {
-            cproxy_on_config_pool(m, name, port, NULL, new_config_ver,
-                                  &empty_pool);
-        }
-
         if (name != NULL) {
+            if (down && (strcmp(NULL_BUCKET, name) != 0)) {
+                cproxy_on_config_pool(m, name, port, NULL, new_config_ver,
+                                      &empty_pool);
+            }
+
             free(name);
         }
 
