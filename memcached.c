@@ -3202,6 +3202,7 @@ static enum try_read_result try_read_network(conn *c) {
         }
 
         int avail = c->rsize - c->rbytes;
+        assert(avail > 0);
         res = read(c->sfd, c->rbuf + c->rbytes, avail);
         if (res > 0) {
             pthread_mutex_lock(&c->thread->stats.mutex);
@@ -3483,6 +3484,7 @@ void drive_machine(conn *c) {
             break;
 
         case conn_nread:
+            assert(c->rlbytes >= 0);
             if (c->rlbytes == 0) {
                 complete_nread(c);
                 break;
