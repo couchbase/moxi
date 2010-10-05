@@ -593,7 +593,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size) {
     while (done < size) {
         ssize_t n = read(fd, data + done, size - done);
         if (n == -1) {
-            fcntl(fd, F_SETFL, flags);
+            fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
             return MCS_FAILURE;
         }
@@ -601,7 +601,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size) {
         done += (size_t) n;
     }
 
-    fcntl(fd, F_SETFL, flags);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
     return MCS_SUCCESS;
 }
