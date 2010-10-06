@@ -130,6 +130,7 @@ static char *cmd_names[] = { // Keep sync'ed with enum_stats_cmd.
     "version",
     "verbosity",
     "quit",
+    "getl",
     "ERROR"
 };
 

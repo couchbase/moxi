@@ -331,6 +331,7 @@ typedef enum {
     STATS_CMD_VERSION,
     STATS_CMD_VERBOSITY,
     STATS_CMD_QUIT,
+    STATS_CMD_GETL,
     STATS_CMD_ERROR,
     STATS_CMD_last
 } enum_stats_cmd;

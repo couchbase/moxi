@@ -156,6 +156,10 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
         }
 
         conn_set_state(c, conn_new_cmd);
+    } else if (strncmp(line, "LOCK_ERROR", 10) == 0) {
+        d->upstream_suffix = "LOCK_ERROR\r\n";
+        d->upstream_suffix_len = 0;
+        conn_set_state(c, conn_pause);
     } else {
         conn_set_state(c, conn_pause);
 
@@ -294,7 +298,8 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
     // Handles get and gets.
     //
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETK ||
-        uc->cmd_curr == PROTOCOL_BINARY_CMD_GETKQ) {
+        uc->cmd_curr == PROTOCOL_BINARY_CMD_GETKQ ||
+        uc->cmd_curr == PROTOCOL_BINARY_CMD_GETL) {
         // Only use front_cache for 'get', not for 'gets'.
         //
         mcache *front_cache =

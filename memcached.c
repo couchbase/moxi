@@ -1016,7 +1016,8 @@ void write_bin_error(conn *c, protocol_binary_response_status err, int swallow) 
 /* Form and send a response to a command over the binary protocol */
 void write_bin_response(conn *c, void *d, int hlen, int keylen, int dlen) {
     if (!c->noreply || c->cmd == PROTOCOL_BINARY_CMD_GET ||
-        c->cmd == PROTOCOL_BINARY_CMD_GETK) {
+        c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+        c->cmd == PROTOCOL_BINARY_CMD_GETL) {
         add_bin_header(c, 0, hlen, keylen, dlen);
         if(dlen > 0) {
             add_iov(c, d, dlen);
@@ -1244,7 +1245,8 @@ static void process_bin_get(conn *c) {
         MEMCACHED_COMMAND_GET(c->sfd, ITEM_key(it), it->nkey,
                               it->nbytes, ITEM_get_cas(it));
 
-        if (c->cmd == PROTOCOL_BINARY_CMD_GETK) {
+        if (c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+            c->cmd == PROTOCOL_BINARY_CMD_GETL) {
             bodylen += nkey;
             keylen = nkey;
         }
@@ -1255,7 +1257,8 @@ static void process_bin_get(conn *c) {
         rsp->message.body.flags = htonl(strtoul(ITEM_suffix(it), NULL, 10));
         add_iov(c, &rsp->message.body, sizeof(rsp->message.body));
 
-        if (c->cmd == PROTOCOL_BINARY_CMD_GETK) {
+        if (c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+            c->cmd == PROTOCOL_BINARY_CMD_GETL) {
             add_iov(c, ITEM_key(it), nkey);
         }
 
@@ -1275,7 +1278,8 @@ static void process_bin_get(conn *c) {
         if (c->noreply) {
             conn_set_state(c, conn_new_cmd);
         } else {
-            if (c->cmd == PROTOCOL_BINARY_CMD_GETK) {
+            if (c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+                c->cmd == PROTOCOL_BINARY_CMD_GETL) {
                 char *ofs = c->wbuf + sizeof(protocol_binary_response_header);
                 add_bin_header(c, PROTOCOL_BINARY_RESPONSE_KEY_ENOENT,
                         0, nkey, nkey);
@@ -1607,6 +1611,7 @@ void dispatch_bin_command(conn *c) {
         case PROTOCOL_BINARY_CMD_GET:   /* FALLTHROUGH */
         case PROTOCOL_BINARY_CMD_GETKQ: /* FALLTHROUGH */
         case PROTOCOL_BINARY_CMD_GETK:
+        case PROTOCOL_BINARY_CMD_GETL:
             if (extlen == 0 && bodylen == keylen && keylen > 0) {
                 bin_read_key(c, bin_reading_get_key, 0);
             } else {

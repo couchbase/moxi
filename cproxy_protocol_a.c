@@ -129,7 +129,9 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
     if (ntokens >= 3 &&
         (false == self_command) &&
         (strncmp(cmd, "get", 3) == 0)) {
-        if (ntokens == 3) {
+        if (cmd[3] == 'l') {
+            c->cmd_curr = PROTOCOL_BINARY_CMD_GETL;
+        } else if (ntokens == 3) {
             // Single-key get/gets optimization.
             //
             c->cmd_curr = PROTOCOL_BINARY_CMD_GETK;
@@ -145,7 +147,11 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
         // all the keys, so cmd_len might not == strlen(command).
         // Handle read_bytes during multiget broadcast.
         //
-        SEEN(STATS_CMD_GET, cmd[3] == 's', 0);
+        if (cmd[3] == 'l') {
+            SEEN(STATS_CMD_GETL, true, 0);
+        } else {
+            SEEN(STATS_CMD_GET, cmd[3] == 's', 0);
+        }
 
     } else if ((ntokens == 6 || ntokens == 7) &&
                 (false == self_command) &&

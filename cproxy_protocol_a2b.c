@@ -136,13 +136,18 @@ struct A2BSpec a2b_specs[] = {
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_version)
     },
+    { .line = "getl <key> [timeout]", // Single-key GETL.
+      .cmd  = PROTOCOL_BINARY_CMD_GETL,
+      .cmdq = -1,
+      .size = sizeof(protocol_binary_request_header)
+    },
     { .line = 0 } // NULL sentinel.
 };
 
 // These are immutable after init.
 //
-struct A2BSpec *a2b_spec_map[0x80] = {0}; // Lookup table by A2BSpec->cmd.
-int             a2b_size_max = 0;         // Max header + extra frame bytes.
+struct A2BSpec *a2b_spec_map[0x100] = {0}; // Lookup table by A2BSpec->cmd.
+int             a2b_size_max = 0;          // Max header + extra frame bytes.
 
 int a2b_fill_request(short    cmd,
                      token_t *cmd_tokens,
@@ -369,6 +374,14 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
             htons((uint16_t) cmd_tokens[cur_token].length);
         break;
 
+   case 't': { // lock timeout for getl
+        uint32_t timeout = 0;
+        if (safe_strtoul(cmd_tokens[cur_token].value, &timeout)) {
+            header->request.opaque = htonl(timeout);
+        }
+        break;
+   }
+
     // The noreply was handled in a2b_fill_request().
     //
     // case 'n': // noreply
@@ -454,6 +467,7 @@ void cproxy_process_a2b_downstream(conn *c) {
         //
         assert(c->cmd == PROTOCOL_BINARY_CMD_GET ||
                c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+               c->cmd == PROTOCOL_BINARY_CMD_GETL ||
                c->cmd == PROTOCOL_BINARY_CMD_STAT);
 
         bin_read_key(c, bin_reading_get_key, extlen);
@@ -519,7 +533,8 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
         header->response.status == 0 &&
         (c->cmd == PROTOCOL_BINARY_CMD_GET ||
          c->cmd == PROTOCOL_BINARY_CMD_GETK ||
-         c->cmd == PROTOCOL_BINARY_CMD_STAT)) {
+         c->cmd == PROTOCOL_BINARY_CMD_STAT ||
+         c->cmd == PROTOCOL_BINARY_CMD_GETL)) {
         if (settings.verbose > 2) {
             moxi_log_write("<%d cproxy_process_a2b_downstream_nread %d %d %x get/getk/stat\n",
                     c->sfd, c->ileft, c->isize, c->cmd);
@@ -540,7 +555,8 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
         assert(vlen >= 0);
 
         if (c->cmd == PROTOCOL_BINARY_CMD_GET ||
-            c->cmd == PROTOCOL_BINARY_CMD_GETK) {
+            c->cmd == PROTOCOL_BINARY_CMD_GETK ||
+            c->cmd == PROTOCOL_BINARY_CMD_GETL) {
             protocol_binary_response_get *response_get =
                 (protocol_binary_response_get *) binary_get_request(c);
 
@@ -561,7 +577,8 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
             conn *uc = d->upstream_conn;
             if (uc != NULL &&
                 uc->cmd_start != NULL &&
-                strncmp(uc->cmd_start, "gets ", 5) == 0) {
+                (strncmp(uc->cmd_start, "gets ", 5) == 0 ||
+                 strncmp(uc->cmd_start, "getl ", 5) == 0)) {
                 cas = header->response.cas;
             }
 
@@ -691,6 +708,7 @@ void a2b_process_downstream_response(conn *c) {
 
     switch (c->cmd) {
     case PROTOCOL_BINARY_CMD_GETK:
+    case PROTOCOL_BINARY_CMD_GETL:
         if (settings.verbose > 2) {
             moxi_log_write("%d: cproxy_process_a2b_downstream_response GETK "
                     "noreply: %d\n", c->sfd, c->noreply);
@@ -715,6 +733,15 @@ void a2b_process_downstream_response(conn *c) {
                 }
 
                 item_remove(it);
+            } else if (PROTOCOL_BINARY_CMD_GETL == c->cmd &&
+                (status == PROTOCOL_BINARY_RESPONSE_ETMPFAIL ||
+                 status == PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND)) {
+                /*
+                 * currently membase does not send ETMPFAIL for
+                 * engine error code for ENGINE_TMPFAIL
+                 */
+                d->upstream_suffix_len = 0;
+                d->upstream_suffix = "LOCK_ERROR\r\n";
             }
 
             conn_set_state(c, conn_pause);
@@ -1048,7 +1075,8 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
                                          front_cache);
     }
 
-    if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETK) {
+    if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETK ||
+        uc->cmd_curr == PROTOCOL_BINARY_CMD_GETL) {
         d->upstream_suffix = "END\r\n";
         d->upstream_suffix_len = 0;
         d->upstream_retry = 0;
@@ -1662,7 +1690,8 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
                        c->sfd, header->response.opcode, uc != NULL);
     }
 
-    if (c->cmd != PROTOCOL_BINARY_CMD_GETK ||
+    if ((c->cmd != PROTOCOL_BINARY_CMD_GETK &&
+         c->cmd != PROTOCOL_BINARY_CMD_GETL) ||
         c->noreply == false) {
         // For non-multi-key GET commands, enqueue a retry after
         // informing the vbucket map.  This includes single-key GET's.
