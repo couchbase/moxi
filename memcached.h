@@ -283,7 +283,7 @@ struct proxy_stats_cmd_info {
     bool do_zeros; /* might be used later */
 };
 
-#define MAX_VERBOSITY_LEVEL 2
+#define MAX_VERBOSITY_LEVEL 4
 
 /* When adding a setting, be sure to update process_stat_settings */
 /**
