@@ -3232,16 +3232,19 @@ static enum try_read_result try_read_network(conn *c) {
     return gotdata;
 }
 
-bool update_event(conn *c, const int new_flags) {
-    return update_event_timed(c, new_flags, NULL);
+bool update_event_real(conn *c, const int new_flags, const char *update_diag) {
+    return update_event_timed_real(c, new_flags, NULL, update_diag);
 }
 
-bool update_event_timed(conn *c, const int new_flags, struct timeval *timeout) {
+bool update_event_timed_real(conn *c, const int new_flags, struct timeval *timeout, const char *update_diag) {
     assert(c != NULL);
 
     struct event_base *base = c->event.ev_base;
     if (c->ev_flags == new_flags && timeout == NULL)
         return true;
+
+    c->update_diag = update_diag;
+
     if (event_del(&c->event) == -1)
         return false;
     c->ev_flags = new_flags;
@@ -3706,6 +3709,8 @@ void event_handler(const int fd, const short which, void *arg) {
         conn_close(c);
         return;
     }
+
+    c->update_diag = "working";
 
     drive_machine(c);
 

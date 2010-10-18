@@ -491,6 +491,8 @@ struct conn {
     char *peer_host;    // this and the following two paramters are used for mcmux
     unsigned int peer_protocol;  // compatiblity mode
     int peer_port;
+
+    const char *update_diag;
 };
 
 extern conn *listen_conn;
@@ -522,8 +524,16 @@ conn *conn_new(const int sfd, const enum conn_states init_state,
 void conn_set_state(conn *c, enum conn_states state);
 void add_bytes_read(conn *c, int bytes_read);
 void out_string(conn *c, const char *str);
-bool update_event(conn *c, const int new_flags);
-bool update_event_timed(conn *c, const int new_flags, struct timeval *timeout);
+
+#define ___update_event_str(a) #a
+#define __update_event_str(a) ___update_event_str(a)
+
+#define update_event(c, new_flags) update_event_real(c, new_flags, (__FILE__ ":" __update_event_str(__LINE__)))
+#define update_event_timed(c, new_flags, timeout) update_event_timed_real(c, new_flags, timeout, (__FILE__ ":" __update_event_str(__LINE__)))
+
+bool update_event_real(conn *c, const int new_flags, const char *update_diag);
+bool update_event_timed_real(conn *c, const int new_flags, struct timeval *timeout, const char *update_diag);
+
 int try_read_command(conn *c);
 void process_command(conn *c, char *command);
 void process_update_command(conn *c, token_t *tokens, const size_t ntokens, int comm, bool handle_cas);

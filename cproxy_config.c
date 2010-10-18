@@ -528,6 +528,8 @@ int cproxy_init_string(char *cfg_str,
     return 0;
 }
 
+proxy_main *diag_last_proxy_main;
+
 proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior, int nthreads,
                                   enum_proxy_conf_type conf_type) {
     proxy_main *m = calloc(1, sizeof(proxy_main));
@@ -545,6 +547,8 @@ proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior, int nthreads,
         m->stat_proxy_start_fails = 0;
         m->stat_proxy_existings   = 0;
         m->stat_proxy_shutdowns   = 0;
+
+        diag_last_proxy_main = m;
     }
 
     return m;

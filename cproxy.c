@@ -3221,3 +3221,84 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
 
     return found;
 }
+
+static
+void diag_single_connection(FILE *out, conn *c) {
+    fprintf(out, "%p (%d), ev: 0x%04x, state: 0x%x, substate: 0x%x - %s\n",
+            (void *)c, c->sfd, c->ev_flags,
+            c->state, c->substate,
+            c->update_diag ? c->update_diag : "(none)");
+}
+
+static
+void diag_connections(FILE *out, conn *head, int indent) {
+    static char *blank = "";
+    for (; head != NULL; head = head->next) {
+        fprintf(out, "%*s" "connection: ", indent, blank);
+        diag_single_connection(out, head);
+    }
+}
+
+static
+void diag_single_downstream(FILE *out, downstream *d, int indent) {
+    static char *blank = "";
+    conn *upstream = d->upstream_conn;
+    fprintf(out, "%*s" "upstream: ", indent, blank);
+    if (upstream) {
+        diag_single_connection(out, upstream);
+    } else {
+        fprintf(out, "none\n");
+    }
+
+    fprintf(out, "%*s" "downstream_used: %d\n", indent, blank, d->downstream_used);
+    fprintf(out, "%*s" "downstream_used_start: %d\n", indent, blank, d->downstream_used_start);
+    fprintf(out, "%*s" "downstream_conns:\n", indent, blank);
+
+    int n = mcs_server_count(&d->mst);
+    for (int i = 0; i < n; i++) {
+        if (d->downstream_conns[i] == NULL)
+            continue;
+        fprintf(out, "%*s", indent+2, blank);
+        diag_single_connection(out, d->downstream_conns[i]);
+    }
+}
+
+static
+void diag_downstream_chain(FILE *out, downstream *head, int indent) {
+    for (; head != NULL; head = head->next) {
+        diag_single_downstream(out, head, indent);
+    }
+}
+
+// this is supposed to be called from gdb when other threads are suspended
+void connections_diag(FILE *out);
+
+void connections_diag(FILE *out) {
+    extern proxy_main *diag_last_proxy_main;
+
+    proxy_main *m = diag_last_proxy_main;
+    if (!m) {
+        fputs("no proxy_main!\n", out);
+        return;
+    }
+
+    proxy *cur_proxy;
+    for (cur_proxy = m->proxy_head; cur_proxy != NULL ; cur_proxy = cur_proxy->next) {
+        int ti;
+        fprintf(out, "proxy: name='%s', port=%d, cfg=%s (%u)\n",
+                cur_proxy->name ? cur_proxy->name : "(null)",
+                cur_proxy->port,
+                cur_proxy->config, cur_proxy->config_ver);
+        for (ti = 0; ti < cur_proxy->thread_data_num; ti++) {
+            proxy_td *td = cur_proxy->thread_data + ti;
+            fprintf(out, "  thread:%d\n", ti);
+            fprintf(out, "    waiting_any_downstream:\n");
+            diag_connections(out, td->waiting_any_downstream_head, 6);
+
+            fprintf(out, "    downstream_reserved:\n");
+            diag_downstream_chain(out, td->downstream_reserved, 6);
+            fprintf(out, "    downstream_released:\n");
+            diag_downstream_chain(out, td->downstream_released, 6);
+        }
+    }
+}
