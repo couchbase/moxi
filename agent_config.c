@@ -385,8 +385,8 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
     LIBEVENT_THREAD *mthread = thread_by_index(0);
     assert(mthread != NULL);
 
-    if (settings.verbose > 2) {
-        moxi_log_write("agent_config ocnc on_conflate_new_config\n");
+    if (settings.verbose > 0) {
+        moxi_log_write("configuration received\n");
     }
 
     work_collect completion;
