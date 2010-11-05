@@ -1791,3 +1791,34 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
 
     pthread_mutex_unlock(&pm->proxy_main_lock);
 }
+
+void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
+    assert(c != NULL);
+
+    proxy_td *ptd = c->extra;
+    if (ptd == NULL ||
+        ptd->proxy == NULL ||
+        ptd->proxy->main == NULL) {
+        return;
+    }
+
+    proxy_main *pm = ptd->proxy->main;
+
+    if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
+        return;
+    }
+
+    char prefix[200];
+
+    for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
+        pthread_mutex_lock(&p->proxy_lock);
+
+        snprintf(prefix, sizeof(prefix), "%u:%s:config", p->port, p->name);
+
+        add_stats(prefix, strlen(prefix), p->config, strlen(p->config), c);
+
+        pthread_mutex_unlock(&p->proxy_lock);
+    }
+
+    pthread_mutex_unlock(&pm->proxy_main_lock);
+}

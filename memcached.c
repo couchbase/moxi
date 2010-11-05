@@ -2982,6 +2982,8 @@ void process_stats_proxy_command(conn *c, token_t *tokens, const size_t ntokens)
 
     if (ntokens == 4 && strcmp(tokens[2].value, "timings") == 0) {
         proxy_stats_dump_timings(&append_stats, c);
+    } else if (ntokens == 4 && strcmp(tokens[2].value, "config") == 0) {
+        proxy_stats_dump_config(&append_stats, c);
     } else {
         bool do_all = (ntokens == 3 || strcmp(tokens[2].value, "all") == 0);
         struct proxy_stats_cmd_info psci = {
