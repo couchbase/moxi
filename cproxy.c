@@ -772,7 +772,8 @@ void cproxy_add_downstream(proxy_td *ptd) {
     assert(ptd != NULL);
     assert(ptd->proxy != NULL);
 
-    if (ptd->downstream_num < ptd->downstream_max) {
+    if (ptd->downstream_max == 0 ||
+        ptd->downstream_num < ptd->downstream_max) {
         if (settings.verbose > 2) {
             moxi_log_write("cproxy_add_downstream %d %d\n",
                     ptd->downstream_num,
