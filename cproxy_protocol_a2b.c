@@ -976,10 +976,10 @@ void a2b_process_downstream_response(conn *c) {
             item_remove(it);
             conn_set_state(c, conn_new_cmd);
         } else {
-            // Handle the stats terminator.
+            // Handle the stats terminator, which might have an error or
+            // non-empty bodylen, for some implementations of memcached protocol.
             //
             assert(it == NULL);
-            assert(bodylen == 0);
             conn_set_state(c, conn_pause);
         }
         break;
