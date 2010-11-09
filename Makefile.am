@@ -113,6 +113,7 @@ test: memcached-debug sizes testapp
 	$(srcdir)/sizes
 	$(srcdir)/testapp
 	./t/moxi_all.pl
+	./t/issue-MB-2660.sh
 
 test_gcov: test
 	@if test `basename $(PROFILER)` = "gcov"; then \

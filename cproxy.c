@@ -612,8 +612,6 @@ int delink_from_downstream_conns(conn *c) {
         return -1;
     }
 
-    c->extra = NULL;
-
     int n = mcs_server_count(&d->mst);
     int k = -1; // Index of conn.
 
@@ -663,6 +661,13 @@ void cproxy_on_close_downstream_conn(conn *c) {
     }
 
     int k = delink_from_downstream_conns(c);
+
+    c->extra = NULL;
+
+    if (c->thread != NULL &&
+        c->host_ident != NULL) {
+        zstored_error_count(c->thread, c->host_ident, true);
+    }
 
     proxy_td *ptd = d->ptd;
     assert(ptd);
@@ -1354,11 +1359,17 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
             }
 
             if (d->downstream_conns[i] == NULL &&
-                downstream_conn_max_reached == true &&
-                zstored_downstream_waiting_add(d, thread,
-                                               msst_actual,
-                                               &d->behaviors_arr[i]) == true) {
-                return -1;
+                downstream_conn_max_reached == true) {
+                if (settings.verbose > 2) {
+                    moxi_log_write("%d: downstream_conn_max reached\n",
+                                   d->upstream_conn->sfd);
+                }
+
+                if (zstored_downstream_waiting_add(d, thread,
+                                                   msst_actual,
+                                                   &d->behaviors_arr[i]) == true) {
+                    return -1;
+                }
             }
         }
 
@@ -2864,8 +2875,6 @@ cleanup:
         d->downstream_conns[k] = NULL_CONN;
     }
 
-    zstored_error_count(c->thread, c->host_ident, true);
-
     conn_set_state(c, conn_closing);
     update_event(c, 0);
     cproxy_forward_or_error(d);
@@ -2934,6 +2943,9 @@ zstored_downstream_conns *zstored_get_downstream_conns(LIBEVENT_THREAD *thread,
 void zstored_error_count(LIBEVENT_THREAD *thread,
                          const char *host_ident,
                          bool has_error) {
+    assert(thread != NULL);
+    assert(host_ident != NULL);
+
     zstored_downstream_conns *conns =
         zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
@@ -2955,7 +2967,8 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
         }
 
         if (has_error) {
-            // We reach here when a non-blocking connect() has failed.
+            // We reach here when a non-blocking connect() has failed
+            // or when an acquired downstream conn had an error.
             // The downstream conn is just going to be closed
             // rather than be released back to the thread->conn_hash,
             // so update the dc_acquired here.
