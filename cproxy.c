@@ -1,4 +1,5 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -2608,8 +2609,14 @@ bool cproxy_auth_downstream(mcs_server_st *server,
 
     protocol_binary_response_header res = { .bytes = {0} };
 
+    struct timeval *timeout = NULL;
+    if (behavior->downstream_timeout.tv_sec != 0 &&
+        behavior->downstream_timeout.tv_usec != 0) {
+        timeout = &behavior->downstream_timeout;
+    }
+
     if (mcs_io_read(fd, &res.bytes,
-                    sizeof(res.bytes)) == MCS_SUCCESS &&
+                    sizeof(res.bytes), timeout) == MCS_SUCCESS &&
         res.response.magic == PROTOCOL_BINARY_RES) {
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
@@ -2620,7 +2627,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
         int len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
-            if (mcs_io_read(fd, buf, amt) != MCS_SUCCESS) {
+            if (mcs_io_read(fd, buf, amt, timeout) != MCS_SUCCESS) {
                 if (settings.verbose > 1) {
                     moxi_log_write("auth could not read response body (%d)\n",
                                    usr, amt);
@@ -2698,8 +2705,15 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
     }
 
     protocol_binary_response_header res = { .bytes = {0} };
+
+    struct timeval *timeout = NULL;
+    if (behavior->downstream_timeout.tv_sec != 0 &&
+        behavior->downstream_timeout.tv_usec != 0) {
+        timeout = &behavior->downstream_timeout;
+    }
+
     if (mcs_io_read(fd, &res.bytes,
-                    sizeof(res.bytes)) == MCS_SUCCESS &&
+                    sizeof(res.bytes), timeout) == MCS_SUCCESS &&
         res.response.magic == PROTOCOL_BINARY_RES) {
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
@@ -2712,7 +2726,7 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
         int len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
-            if (mcs_io_read(fd, buf, amt) != MCS_SUCCESS) {
+            if (mcs_io_read(fd, buf, amt, timeout) != MCS_SUCCESS) {
                 return false;
             }
             len -= amt;

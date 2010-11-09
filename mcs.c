@@ -577,7 +577,7 @@ ssize_t mcs_io_write(int fd, const void *buffer, size_t length) {
     return write(fd, buffer, length);
 }
 
-mcs_return mcs_io_read(int fd, void *dta, size_t size) {
+mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout) {
     // We use a blocking read, but reset back to non-blocking
     // or the original state when we're done.
     //
@@ -591,6 +591,18 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size) {
     size_t done = 0;
 
     while (done < size) {
+        if (timeout != NULL) {
+            fd_set readfds;
+            FD_ZERO(&readfds);
+            FD_SET(fd, &readfds);
+
+            if (select(1, &readfds, NULL, NULL, timeout) != 1) {
+                fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+                return MCS_FAILURE;
+            }
+        }
+
         ssize_t n = read(fd, data + done, size - done);
         if (n == -1) {
             fcntl(fd, F_SETFL, flags | O_NONBLOCK);

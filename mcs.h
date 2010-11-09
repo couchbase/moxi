@@ -73,7 +73,7 @@ mcs_return mcs_server_st_connect(mcs_server_st *ptr,
                                  bool blocking);
 
 ssize_t mcs_io_write(int fd, const void *buffer, size_t length);
-mcs_return mcs_io_read(int fd, void *dta, size_t size);
+mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout);
 void mcs_io_reset(int fd);
 
 const char *mcs_server_st_hostname(mcs_server_st *ptr);
