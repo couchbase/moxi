@@ -347,8 +347,13 @@ void cproxy_upstream_ascii_item_response(item *it, conn *uc,
     assert(IS_PROXY(uc->protocol));
 
     if (settings.verbose > 2) {
-        moxi_log_write("<%d cproxy ascii item response\n",
-                uc->sfd);
+        char key[KEY_MAX_LENGTH + 10];
+        assert(it->nkey <= KEY_MAX_LENGTH);
+        memcpy(key, ITEM_key(it), it->nkey);
+        key[it->nkey] = '\0';
+
+        moxi_log_write("<%d cproxy ascii item response, key %s\n",
+                       uc->sfd, key);
     }
 
     if (strncmp(ITEM_data(it) + it->nbytes - 2, "\r\n", 2) == 0) {
@@ -368,7 +373,7 @@ void cproxy_upstream_ascii_item_response(item *it, conn *uc,
                             it->nsuffix + it->nbytes) == 0) {
                     if (settings.verbose > 2) {
                         moxi_log_write("<%d cproxy ascii item response success\n",
-                                uc->sfd);
+                                       uc->sfd);
                     }
                 }
             }
