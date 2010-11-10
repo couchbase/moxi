@@ -2610,7 +2610,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
     protocol_binary_response_header res = { .bytes = {0} };
 
     struct timeval *timeout = NULL;
-    if (behavior->downstream_timeout.tv_sec != 0 &&
+    if (behavior->downstream_timeout.tv_sec != 0 ||
         behavior->downstream_timeout.tv_usec != 0) {
         timeout = &behavior->downstream_timeout;
     }
@@ -2707,7 +2707,7 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
     protocol_binary_response_header res = { .bytes = {0} };
 
     struct timeval *timeout = NULL;
-    if (behavior->downstream_timeout.tv_sec != 0 &&
+    if (behavior->downstream_timeout.tv_sec != 0 ||
         behavior->downstream_timeout.tv_usec != 0) {
         timeout = &behavior->downstream_timeout;
     }
