@@ -596,7 +596,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout) 
             FD_ZERO(&readfds);
             FD_SET(fd, &readfds);
 
-            if (select(1, &readfds, NULL, NULL, timeout) != 1) {
+            if (select(fd + 1, &readfds, NULL, NULL, timeout) != 1) {
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
                 return MCS_FAILURE;
