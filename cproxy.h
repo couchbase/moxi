@@ -115,6 +115,7 @@ struct proxy_behavior {
     enum protocol  downstream_protocol; // SL: Favored downstream protocol.
     struct timeval downstream_timeout;  // SL: Fields of 0 mean no timeout.
     struct timeval wait_queue_timeout;  // PL: Fields of 0 mean no timeout.
+    struct timeval auth_timeout;        // PL: Fields of 0 mean no timeout.
     bool           time_stats;          // IL: Capture timing stats.
 
     uint32_t connect_max_errors;      // IL: Pause when too many connect() errs.
@@ -284,6 +285,7 @@ struct proxy_stats {
     uint64_t tot_downstream_close_on_upstream_close;
     uint64_t tot_downstream_timeout;
     uint64_t tot_wait_queue_timeout;
+    uint64_t tot_auth_timeout;
     uint64_t tot_assign_downstream;
     uint64_t tot_assign_upstream;
     uint64_t tot_assign_recursion;
@@ -513,10 +515,10 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
                                  const char *usr,
                                  const char *pwd);
 
-bool  cproxy_auth_downstream(mcs_server_st *server,
+int cproxy_auth_downstream(mcs_server_st *server,
+                           proxy_behavior *behavior, int fd);
+int cproxy_bucket_downstream(mcs_server_st *server,
                              proxy_behavior *behavior, int fd);
-bool  cproxy_bucket_downstream(mcs_server_st *server,
-                               proxy_behavior *behavior, int fd);
 
 void  cproxy_pause_upstream_for_downstream(proxy_td *ptd, conn *upstream);
 conn *cproxy_find_downstream_conn(downstream *d, char *key, int key_length,

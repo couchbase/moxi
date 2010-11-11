@@ -1472,19 +1472,23 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
         host_ident = mcs_server_st_ident(msst, IS_ASCII(c->protocol));
     }
 
-    zstored_error_count(c->thread, host_ident, false);
-
     if (c->cmd_start_time != 0 &&
         d->ptd->behavior_pool.base.time_stats) {
         downstream_connect_time_sample(&d->ptd->stats,
                                        usec_now() - c->cmd_start_time);
     }
 
-    if (cproxy_auth_downstream(msst, behavior, c->sfd)) {
+    int rv;
+
+    rv = cproxy_auth_downstream(msst, behavior, c->sfd);
+    if (rv == 0) {
         d->ptd->stats.stats.tot_downstream_auth++;
 
-        if (cproxy_bucket_downstream(msst, behavior, c->sfd)) {
+        rv = cproxy_bucket_downstream(msst, behavior, c->sfd);
+        if (rv == 0) {
             d->ptd->stats.stats.tot_downstream_bucket++;
+
+            zstored_error_count(c->thread, host_ident, false);
 
             return true;
         } else {
@@ -1492,7 +1496,14 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
         }
     } else {
         d->ptd->stats.stats.tot_downstream_auth_failed++;
+        if (rv == 1) {
+            d->ptd->stats.stats.tot_auth_timeout++;
+        }
     }
+
+    // Treat a auth/bucket error as a blacklistable error.
+    //
+    zstored_error_count(c->thread, host_ident, true);
 
     return false;
 }
@@ -2535,9 +2546,11 @@ bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
     return (evtimer_add(&d->timeout_event, &d->timeout_tv) == 0);
 }
 
-bool cproxy_auth_downstream(mcs_server_st *server,
-                            proxy_behavior *behavior,
-                            int fd) {
+// Return 0 on success, -1 on general failure, 1 on timeout failure.
+//
+int cproxy_auth_downstream(mcs_server_st *server,
+                           proxy_behavior *behavior,
+                           int fd) {
     assert(server);
     assert(behavior);
     assert(fd != -1);
@@ -2545,7 +2558,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
     char buf[3000];
 
     if (!IS_BINARY(behavior->downstream_protocol)) {
-        return true;
+        return 0;
     }
 
     const char *usr = mcs_server_st_usr(server) != NULL ?
@@ -2557,7 +2570,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
     int pwd_len = strlen(pwd);
 
     if (usr_len <= 0) {
-        return true;
+        return 0;
     }
 
     if (settings.verbose > 2) {
@@ -2572,7 +2585,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
             moxi_log_write("auth failure args\n");
         }
 
-        return false; // Probably misconfigured.
+        return -1; // Probably misconfigured.
     }
 
     // The key should look like "PLAIN", or the sasl mech string.
@@ -2604,19 +2617,19 @@ bool cproxy_auth_downstream(mcs_server_st *server,
                            usr, buf_len);
         }
 
-        return false;
+        return -1;
     }
 
     protocol_binary_response_header res = { .bytes = {0} };
 
     struct timeval *timeout = NULL;
-    if (behavior->downstream_timeout.tv_sec != 0 ||
-        behavior->downstream_timeout.tv_usec != 0) {
-        timeout = &behavior->downstream_timeout;
+    if (behavior->auth_timeout.tv_sec != 0 ||
+        behavior->auth_timeout.tv_usec != 0) {
+        timeout = &behavior->auth_timeout;
     }
 
-    if (mcs_io_read(fd, &res.bytes,
-                    sizeof(res.bytes), timeout) == MCS_SUCCESS &&
+    mcs_return mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
+    if (mr == MCS_SUCCESS &&
         res.response.magic == PROTOCOL_BINARY_RES) {
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
@@ -2627,13 +2640,19 @@ bool cproxy_auth_downstream(mcs_server_st *server,
         int len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
-            if (mcs_io_read(fd, buf, amt, timeout) != MCS_SUCCESS) {
+
+            mr = mcs_io_read(fd, buf, amt, timeout);
+            if (mr != MCS_SUCCESS) {
                 if (settings.verbose > 1) {
-                    moxi_log_write("auth could not read response body (%d)\n",
-                                   usr, amt);
+                    moxi_log_write("auth could not read response body (%d) %d\n",
+                                   usr, amt, mr);
                 }
 
-                return false;
+                if (mr == MCS_TIMEOUT) {
+                    return 1;
+                }
+
+                return -1;
             }
 
             len -= amt;
@@ -2649,7 +2668,7 @@ bool cproxy_auth_downstream(mcs_server_st *server,
                 moxi_log_write("auth_downstream success for %s\n", usr);
             }
 
-            return true;
+            return 0;
         }
 
         if (settings.verbose > 1) {
@@ -2658,29 +2677,35 @@ bool cproxy_auth_downstream(mcs_server_st *server,
         }
     } else {
         if (settings.verbose > 1) {
-            moxi_log_write("auth_downstream response error for %s\n",
-                           usr);
+            moxi_log_write("auth_downstream response error for %s, %d\n",
+                           usr, mr);
         }
     }
 
-    return false;
+    if (mr == MCS_TIMEOUT) {
+        return 1;
+    }
+
+    return -1;
 }
 
-bool cproxy_bucket_downstream(mcs_server_st *server,
-                              proxy_behavior *behavior,
-                              int fd) {
+// Return 0 on success, -1 on general failure, 1 on timeout failure.
+//
+int cproxy_bucket_downstream(mcs_server_st *server,
+                             proxy_behavior *behavior,
+                             int fd) {
     assert(server);
     assert(behavior);
     assert(IS_PROXY(behavior->downstream_protocol));
     assert(fd != -1);
 
     if (!IS_BINARY(behavior->downstream_protocol)) {
-        return true;
+        return 0;
     }
 
     int bucket_len = strlen(behavior->bucket);
     if (bucket_len <= 0) {
-        return true; // When no bucket.
+        return 0; // When no bucket.
     }
 
     protocol_binary_request_header req = { .bytes = {0} };
@@ -2701,19 +2726,19 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
                     bucket_len);
         }
 
-        return false;
+        return -1;
     }
 
     protocol_binary_response_header res = { .bytes = {0} };
 
     struct timeval *timeout = NULL;
-    if (behavior->downstream_timeout.tv_sec != 0 ||
-        behavior->downstream_timeout.tv_usec != 0) {
-        timeout = &behavior->downstream_timeout;
+    if (behavior->auth_timeout.tv_sec != 0 ||
+        behavior->auth_timeout.tv_usec != 0) {
+        timeout = &behavior->auth_timeout;
     }
 
-    if (mcs_io_read(fd, &res.bytes,
-                    sizeof(res.bytes), timeout) == MCS_SUCCESS &&
+    mcs_return mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
+    if (mr == MCS_SUCCESS &&
         res.response.magic == PROTOCOL_BINARY_RES) {
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
@@ -2726,9 +2751,16 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
         int len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
-            if (mcs_io_read(fd, buf, amt, timeout) != MCS_SUCCESS) {
-                return false;
+
+            mr = mcs_io_read(fd, buf, amt, timeout);
+            if (mr != MCS_SUCCESS) {
+                if (mr == MCS_TIMEOUT) {
+                    return 1;
+                }
+
+                return -1;
             }
+
             len -= amt;
         }
 
@@ -2743,7 +2775,7 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
                         behavior->bucket);
             }
 
-            return true;
+            return 0;
         }
 
         if (settings.verbose > 1) {
@@ -2753,7 +2785,11 @@ bool cproxy_bucket_downstream(mcs_server_st *server,
         }
     }
 
-    return false;
+    if (mr == MCS_TIMEOUT) {
+        return 1;
+    }
+
+    return -1;
 }
 
 int cproxy_max_retries(downstream *d) {
@@ -2987,8 +3023,9 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
             // rather than be released back to the thread->conn_hash,
             // so update the dc_acquired here.
             //
-            assert(conns->dc_acquired > 0);
-            conns->dc_acquired--;
+            if (conns->dc_acquired > 0) {
+                conns->dc_acquired--;
+            }
 
             // When zero downstream conns are available, wake up all
             // waiting downstreams so they can proceed (possibly by

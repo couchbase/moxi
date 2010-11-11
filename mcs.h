@@ -22,6 +22,7 @@
 typedef enum {
     MCS_SUCCESS = 0,
     MCS_FAILURE,
+    MCS_TIMEOUT,
     MCS_MAXIMUM_RETURN /* Always add new error code before */
 } mcs_return;
 

@@ -599,7 +599,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout) 
             if (select(fd + 1, &readfds, NULL, NULL, timeout) != 1) {
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
-                return MCS_FAILURE;
+                return MCS_TIMEOUT;
             }
         }
 

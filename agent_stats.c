@@ -470,6 +470,9 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
         APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", // In millisecs.
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
+        APPEND_PREFIX_STAT("auth_timeout", "%ld", // In millisecs.
+              (b->auth_timeout.tv_sec * 1000 +
+               b->auth_timeout.tv_usec / 1000));
         APPEND_PREFIX_STAT("time_stats", "%d", b->time_stats);
         APPEND_PREFIX_STAT("connect_max_errors", "%d", b->connect_max_errors);
         APPEND_PREFIX_STAT("connect_retry_interval", "%d", b->connect_retry_interval);
@@ -590,6 +593,8 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->tot_downstream_timeout);
     APPEND_PREFIX_STAT("tot_wait_queue_timeout",
               "%llu", (long long unsigned int) pstats->tot_wait_queue_timeout);
+    APPEND_PREFIX_STAT("tot_auth_timeout",
+              "%llu", (long long unsigned int) pstats->tot_auth_timeout);
     APPEND_PREFIX_STAT("tot_assign_downstream",
               "%llu", (long long unsigned int) pstats->tot_assign_downstream);
     APPEND_PREFIX_STAT("tot_assign_upstream",
@@ -1204,6 +1209,7 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
         x->tot_downstream_close_on_upstream_close;
     agg->tot_downstream_timeout   += x->tot_downstream_timeout;
     agg->tot_wait_queue_timeout   += x->tot_wait_queue_timeout;
+    agg->tot_auth_timeout         += x->tot_auth_timeout;
     agg->tot_assign_downstream    += x->tot_assign_downstream;
     agg->tot_assign_upstream      += x->tot_assign_upstream;
     agg->tot_assign_recursion     += x->tot_assign_recursion;
@@ -1457,6 +1463,8 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.tot_downstream_timeout);
     more_stat("tot_wait_queue_timeout",
               pstd->stats.tot_wait_queue_timeout);
+    more_stat("tot_auth_timeout",
+              pstd->stats.tot_auth_timeout);
     more_stat("tot_assign_downstream",
               pstd->stats.tot_assign_downstream);
     more_stat("tot_assign_upstream",
