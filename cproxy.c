@@ -1530,7 +1530,7 @@ conn *cproxy_find_downstream_conn_ex(downstream *d,
     int v = -1;
     int s = cproxy_server_index(d, key, key_length, &v);
 
-    if (settings.verbose > 2) {
+    if (settings.verbose > 2 && s >= 0) {
         moxi_log_write("%d: server_index %d, vbucket %d, conn %d\n", s, v,
                        (d->upstream_conn != NULL ?
                         d->upstream_conn->sfd : 0),
@@ -3180,9 +3180,12 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
     }
 
     assert(dc->next == NULL);
-    assert(dc->state == conn_pause);
     assert(dc->thread != NULL);
     assert(dc->host_ident != NULL);
+    assert(dc->state == conn_pause || dc->state == conn_connecting);
+
+    conn_set_state(dc, conn_pause);
+    update_event(dc, 0);
 
     dc->extra = NULL;
 

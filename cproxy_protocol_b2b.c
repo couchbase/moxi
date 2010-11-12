@@ -70,6 +70,9 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
 
         if (key_len > 0) {
             server_index = cproxy_server_index(d, key, key_len, NULL);
+            if (server_index < 0) {
+                return false;
+            }
         }
     }
 

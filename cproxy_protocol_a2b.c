@@ -1017,6 +1017,9 @@ bool cproxy_forward_a2b_downstream(downstream *d) {
             key != NULL &&
             key_len > 0) {
             server_index = cproxy_server_index(d, key, key_len, NULL);
+            if (server_index < 0) {
+                return false;
+            }
         }
     }
 
