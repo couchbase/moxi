@@ -874,6 +874,21 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
     }
 }
 
+bool cproxy_clear_timeout(downstream *d) {
+    bool rv = false;
+
+    if (d->timeout_tv.tv_sec != 0 ||
+        d->timeout_tv.tv_usec != 0) {
+        evtimer_del(&d->timeout_event);
+        rv = true;
+    }
+
+    d->timeout_tv.tv_sec = 0;
+    d->timeout_tv.tv_usec = 0;
+
+    return rv;
+}
+
 bool cproxy_release_downstream(downstream *d, bool force) {
     assert(d != NULL);
     assert(d->ptd != NULL);
@@ -887,13 +902,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     // Always release the timeout_event, even if we're going to retry,
     // to avoid pegging CPU with leaked timeout_events.
     //
-    if (d->timeout_tv.tv_sec != 0 ||
-        d->timeout_tv.tv_usec != 0) {
-        evtimer_del(&d->timeout_event);
-    }
-
-    d->timeout_tv.tv_sec = 0;
-    d->timeout_tv.tv_usec = 0;
+    cproxy_clear_timeout(d);
 
     // If we need to retry the command, we do so here,
     // keeping the same downstream that would otherwise
@@ -1126,13 +1135,7 @@ void cproxy_free_downstream(downstream *d) {
     //
     mcs_free(&d->mst);
 
-    if (d->timeout_tv.tv_sec != 0 ||
-        d->timeout_tv.tv_usec != 0) {
-        evtimer_del(&d->timeout_event);
-    }
-
-    d->timeout_tv.tv_sec = 0;
-    d->timeout_tv.tv_usec = 0;
+    cproxy_clear_timeout(d);
 
     if (d->downstream_conns != NULL) {
         free(d->downstream_conns);
@@ -2489,13 +2492,7 @@ void downstream_timeout(const int fd,
     // closing downstream conns, which might help by
     // freeing up downstream resources.
     //
-    if (d->timeout_tv.tv_sec != 0 ||
-        d->timeout_tv.tv_usec != 0) {
-        evtimer_del(&d->timeout_event);
-
-        d->timeout_tv.tv_sec = 0;
-        d->timeout_tv.tv_usec = 0;
-
+    if (cproxy_clear_timeout(d) == true) {
         d->ptd->stats.stats.tot_downstream_timeout++;
 
         int n = mcs_server_count(&d->mst);

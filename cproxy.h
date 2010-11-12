@@ -667,6 +667,8 @@ bool cproxy_is_broadcast_cmd(int cmd);
 void cproxy_upstream_ascii_item_response(item *it, conn *uc,
                                          int cas_emit);
 
+bool cproxy_clear_timeout(downstream *d);
+
 struct timeval cproxy_get_downstream_timeout(downstream *d, conn *c);
 
 bool cproxy_start_downstream_timeout(downstream *d, conn *c);
