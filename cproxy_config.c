@@ -55,6 +55,10 @@ proxy_behavior behavior_default_g = {
         .tv_sec  = 0,
         .tv_usec = 0
     },
+    .connect_timeout = {
+        .tv_sec  = 5,
+        .tv_usec = 0
+    },
     .auth_timeout = {
         .tv_sec  = 0,
         .tv_usec = 0
@@ -651,6 +655,10 @@ void cproxy_parse_behavior_key_val(char *key,
             int ms = strtol(val, NULL, 10);
             behavior->wait_queue_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->wait_queue_timeout.tv_usec = (ms % 1000) * 1000;
+        } else if (wordeq(key, "connect_timeout")) {
+            int ms = strtol(val, NULL, 10);
+            behavior->connect_timeout.tv_sec  = floor(ms / 1000.0);
+            behavior->connect_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "auth_timeout")) {
             int ms = strtol(val, NULL, 10);
             behavior->auth_timeout.tv_sec  = floor(ms / 1000.0);
@@ -818,6 +826,9 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
         vdump("wait_queue_timeout", "%ld", // In millisecs.
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
+        vdump("connect_timeout", "%ld", // In millisecs.
+              (b->connect_timeout.tv_sec * 1000 +
+               b->connect_timeout.tv_usec / 1000));
         vdump("auth_timeout", "%ld", // In millisecs.
               (b->auth_timeout.tv_sec * 1000 +
                b->auth_timeout.tv_usec / 1000));

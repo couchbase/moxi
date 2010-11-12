@@ -115,6 +115,7 @@ struct proxy_behavior {
     enum protocol  downstream_protocol; // SL: Favored downstream protocol.
     struct timeval downstream_timeout;  // SL: Fields of 0 mean no timeout.
     struct timeval wait_queue_timeout;  // PL: Fields of 0 mean no timeout.
+    struct timeval connect_timeout;     // PL: Fields of 0 mean no timeout.
     struct timeval auth_timeout;        // PL: Fields of 0 mean no timeout.
     bool           time_stats;          // IL: Capture timing stats.
 

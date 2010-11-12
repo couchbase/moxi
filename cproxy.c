@@ -1434,13 +1434,8 @@ conn *cproxy_connect_downstream_conn(downstream *d,
             c->cmd_start_time = start;
 
             if (err == EINPROGRESS) {
-                struct timeval connect_timeout;
-
-                connect_timeout.tv_sec = 5;
-                connect_timeout.tv_usec = 0;
-
                 if (update_event_timed(c, EV_WRITE | EV_PERSIST,
-                                       &connect_timeout)) {
+                                       &behavior->connect_timeout)) {
                     conn_set_state(c, conn_connecting);
 
                     return c;

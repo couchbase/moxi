@@ -470,6 +470,9 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
         APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", // In millisecs.
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
+        APPEND_PREFIX_STAT("connect_timeout", "%ld", // In millisecs.
+              (b->connect_timeout.tv_sec * 1000 +
+               b->connect_timeout.tv_usec / 1000));
         APPEND_PREFIX_STAT("auth_timeout", "%ld", // In millisecs.
               (b->auth_timeout.tv_sec * 1000 +
                b->auth_timeout.tv_usec / 1000));
