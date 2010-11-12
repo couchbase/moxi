@@ -596,10 +596,17 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout) 
             FD_ZERO(&readfds);
             FD_SET(fd, &readfds);
 
-            if (select(fd + 1, &readfds, NULL, NULL, timeout) != 1) {
+            int s = select(fd + 1, &readfds, NULL, NULL, timeout);
+            if (s == 0) {
                 fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
                 return MCS_TIMEOUT;
+            }
+
+            if (s != 1 || !FD_ISSET(fd, &readfds)) {
+                fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+                return MCS_FAILURE;
             }
         }
 
