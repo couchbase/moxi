@@ -613,7 +613,8 @@ void cproxy_parse_behavior_key_val(char *key,
 
         if (wordeq(key, "cycle")) {
             behavior->cycle = strtol(val, NULL, 10);
-        } else if (wordeq(key, "downstream_max")) {
+        } else if (wordeq(key, "downstream_max") ||
+                   wordeq(key, "concurrency")) {
             behavior->downstream_max = strtol(val, NULL, 10);
         } else if (wordeq(key, "downstream_conn_max")) {
             behavior->downstream_conn_max = strtol(val, NULL, 10);
@@ -641,7 +642,8 @@ void cproxy_parse_behavior_key_val(char *key,
                 }
             }
         } else if (wordeq(key, "timeout") ||
-                   wordeq(key, "downstream_timeout")) {
+                   wordeq(key, "downstream_timeout") ||
+                   wordeq(key, "downstream_conn_timeout")) {
             int ms = strtol(val, NULL, 10);
             behavior->downstream_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->downstream_timeout.tv_usec = (ms % 1000) * 1000;
