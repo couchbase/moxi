@@ -2509,8 +2509,6 @@ void downstream_timeout(const int fd,
 
 bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
     assert(d != NULL);
-    assert(d->timeout_tv.tv_sec == 0);
-    assert(d->timeout_tv.tv_usec == 0);
     assert(d->behaviors_num > 0);
     assert(d->behaviors_arr != NULL);
 
@@ -2519,6 +2517,8 @@ bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
         dt.tv_usec == 0) {
         return true;
     }
+
+    cproxy_clear_timeout(d);
 
     conn *uc = d->upstream_conn;
 
