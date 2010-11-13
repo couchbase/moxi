@@ -1410,6 +1410,8 @@ conn *cproxy_connect_downstream_conn(downstream *d,
         start = usec_now();
     }
 
+    d->ptd->stats.stats.tot_downstream_connect_started++;
+
     int err = -1;
     int fd = mcs_connect(mcs_server_st_hostname(msst),
                          mcs_server_st_port(msst), &err,
@@ -1452,9 +1454,9 @@ conn *cproxy_connect_downstream_conn(downstream *d,
         } else {
             d->ptd->stats.stats.err_oom++;
         }
-    } else {
-        d->ptd->stats.stats.tot_downstream_connect_failed++;
     }
+
+    d->ptd->stats.stats.tot_downstream_connect_failed++;
 
     return NULL;
 }
@@ -1462,8 +1464,6 @@ conn *cproxy_connect_downstream_conn(downstream *d,
 bool downstream_connect_init(downstream *d, mcs_server_st *msst,
                              proxy_behavior *behavior, conn *c) {
     assert(c->thread != NULL);
-
-    d->ptd->stats.stats.tot_downstream_connect++;
 
     char *host_ident = c->host_ident;
     if (host_ident == NULL) {
@@ -1487,6 +1487,8 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
             d->ptd->stats.stats.tot_downstream_bucket++;
 
             zstored_error_count(c->thread, host_ident, false);
+
+            d->ptd->stats.stats.tot_downstream_connect++;
 
             return true;
         } else {

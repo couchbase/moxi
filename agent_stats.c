@@ -568,6 +568,8 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->tot_downstream_max_reached);
     APPEND_PREFIX_STAT("tot_downstream_create_failed",
               "%llu", (long long unsigned int) pstats->tot_downstream_create_failed);
+    APPEND_PREFIX_STAT("tot_downstream_connect_started",
+              "%llu", (long long unsigned int) pstats->tot_downstream_connect_started);
     APPEND_PREFIX_STAT("tot_downstream_connect",
               "%llu", (long long unsigned int) pstats->tot_downstream_connect);
     APPEND_PREFIX_STAT("tot_downstream_connect_failed",
@@ -1196,6 +1198,7 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
     agg->tot_downstream_quit_server    += x->tot_downstream_quit_server;
     agg->tot_downstream_max_reached    += x->tot_downstream_max_reached;
     agg->tot_downstream_create_failed  += x->tot_downstream_create_failed;
+    agg->tot_downstream_connect_started += x->tot_downstream_connect_started;
     agg->tot_downstream_connect        += x->tot_downstream_connect;
     agg->tot_downstream_connect_failed += x->tot_downstream_connect_failed;
     agg->tot_downstream_connect_timeout += x->tot_downstream_connect_timeout;
@@ -1438,6 +1441,8 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.tot_downstream_max_reached);
     more_stat("tot_downstream_create_failed",
               pstd->stats.tot_downstream_create_failed);
+    more_stat("tot_downstream_connect_started",
+              pstd->stats.tot_downstream_connect_started);
     more_stat("tot_downstream_connect",
               pstd->stats.tot_downstream_connect);
     more_stat("tot_downstream_connect_failed",

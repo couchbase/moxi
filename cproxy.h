@@ -272,11 +272,23 @@ struct proxy_stats {
     uint64_t tot_downstream_quit_server;
     uint64_t tot_downstream_max_reached;
     uint64_t tot_downstream_create_failed;
-    uint64_t tot_downstream_connect;
+
+    // When connections have stabilized...
+    //   tot_downstream_connect_started ==
+    //     tot_downstream_connect + tot_downstream_connect_failed.
+    //
+    // When a new connection is just created but not yet ready for use...
+    //   tot_downstream_connect_started >
+    //     tot_downstream_connect + tot_downstream_connect_failed.
+    //
+    uint64_t tot_downstream_connect_started;
+    uint64_t tot_downstream_connect; // Incremented when connect() + auth +
+                                     // bucket_selection succeeds.
     uint64_t tot_downstream_connect_failed;
     uint64_t tot_downstream_connect_timeout;
     uint64_t tot_downstream_connect_interval;
     uint64_t tot_downstream_connect_max_reached;
+
     uint64_t tot_downstream_waiting_errors;
     uint64_t tot_downstream_auth;
     uint64_t tot_downstream_auth_failed;
