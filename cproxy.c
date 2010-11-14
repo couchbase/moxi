@@ -71,7 +71,7 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
                                     mcs_server_st *msst,
                                     proxy_behavior *behavior);
 
-void zstored_downstream_waiting_remove(downstream *d);
+bool zstored_downstream_waiting_remove(downstream *d);
 
 typedef struct {
     conn      *dc;          // Linked-list of available downstream conns.
@@ -1372,6 +1372,12 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                 if (zstored_downstream_waiting_add(d, thread,
                                                    msst_actual,
                                                    &d->behaviors_arr[i]) == true) {
+                    // Since we're waiting on the downstream conn queue,
+                    // start a downstream timer per configuration.
+                    //
+                    cproxy_start_downstream_timeout_ex(d, c,
+                        d->behaviors_arr[i].downstream_conn_queue_timeout);
+
                     return -1;
                 }
             }
@@ -2499,7 +2505,22 @@ void downstream_timeout(const int fd,
                 d->downstream_conns[i] != NULL_CONN) {
                 cproxy_close_conn(d->downstream_conns[i]);
             }
-            d->downstream_conns[i] = NULL;
+            d->downstream_conns[i] = NULL_CONN;
+        }
+
+        // The downstream_timeout() callback is invoked for
+        // two cases (downstream_conn_queue_timeouts and
+        // downstream_timeouts), so cleanup and track stats
+        // accordingly.
+        //
+        if (zstored_downstream_waiting_remove(d) == true) {
+            if (settings.verbose > 2) {
+                moxi_log_write("conn_queue_timeout\n");
+            }
+
+            d->ptd->stats.stats.tot_downstream_conn_queue_timeout++;
+
+            cproxy_forward_or_error(d);
         }
     }
 }
@@ -2509,9 +2530,18 @@ bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
     assert(d->behaviors_num > 0);
     assert(d->behaviors_arr != NULL);
 
+    return cproxy_start_downstream_timeout_ex(d, c,
+                cproxy_get_downstream_timeout(d, c));
+}
+
+bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
+                                        struct timeval dt) {
+    assert(d != NULL);
+    assert(d->behaviors_num > 0);
+    assert(d->behaviors_arr != NULL);
+
     cproxy_clear_timeout(d);
 
-    struct timeval dt = cproxy_get_downstream_timeout(d, c);
     if (dt.tv_sec == 0 &&
         dt.tv_usec == 0) {
         return true;
@@ -3210,15 +3240,65 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
     }
 }
 
-void zstored_downstream_waiting_remove(downstream *d) {
-    // TODO: Need to remove the downstream if it is on
-    // any conns->downstream_waiting_head/tail queues.
-    //
-    // Actually, the downstream should _not_ be on any queues in any
-    // of this function's (current) callers, so we should check that
-    // here with a stronger assert() than the following.
-    //
-    assert(d->next_waiting == NULL);
+// Returns true if the downstream was found on any
+// conns->downstream_waiting_head/tail queues and was removed.
+//
+bool zstored_downstream_waiting_remove(downstream *d) {
+    bool found = false;
+
+    LIBEVENT_THREAD *thread = thread_by_index(thread_index(pthread_self()));
+    assert(thread != NULL);
+
+    int n = mcs_server_count(&d->mst);
+
+    for (int i = 0; i < n; i++) {
+        mcs_server_st *msst = mcs_server_index(&d->mst, i);
+
+        enum protocol downstream_protocol =
+            d->behaviors_arr[i].downstream_protocol;
+
+        assert(IS_PROXY(downstream_protocol));
+
+        char *host_ident =
+            mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
+
+        zstored_downstream_conns *conns =
+            zstored_get_downstream_conns(thread, host_ident);
+        if (conns != NULL) {
+            // Linked-list removal, on the next_waiting pointer,
+            // and keep head and tail pointers updated.
+            //
+            downstream *prev = NULL;
+            downstream *curr = conns->downstream_waiting_head;
+
+            while (curr != NULL) {
+                if (curr == d) {
+                    found = true;
+
+                    if (conns->downstream_waiting_head == curr) {
+                        assert(conns->downstream_waiting_tail != NULL);
+                        conns->downstream_waiting_head = curr->next_waiting;
+                    }
+
+                    if (conns->downstream_waiting_tail == curr) {
+                        conns->downstream_waiting_tail = prev;
+                    }
+
+                    if (prev != NULL) {
+                        prev->next_waiting = curr->next_waiting;
+                    }
+
+                    curr->next_waiting = NULL;
+                    break;
+                }
+
+                prev = curr;
+                curr = curr->next_waiting;
+            }
+        }
+    }
+
+    return found;
 }
 
 bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,

@@ -465,6 +465,9 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
     APPEND_PREFIX_STAT("downstream_timeout", "%ld", // In millisecs.
               (b->downstream_timeout.tv_sec * 1000 +
                b->downstream_timeout.tv_usec / 1000));
+    APPEND_PREFIX_STAT("downstream_conn_queue_timeout", "%ld", // In millisecs.
+              (b->downstream_conn_queue_timeout.tv_sec * 1000 +
+               b->downstream_conn_queue_timeout.tv_usec / 1000));
 
     if (level >= 1) {
         APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", // In millisecs.
@@ -594,6 +597,8 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->tot_downstream_propagate_failed);
     APPEND_PREFIX_STAT("tot_downstream_close_on_upstream_close",
               "%llu", (long long unsigned int) pstats->tot_downstream_close_on_upstream_close);
+    APPEND_PREFIX_STAT("tot_downstream_conn_queue_timeout",
+              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_timeout);
     APPEND_PREFIX_STAT("tot_downstream_timeout",
               "%llu", (long long unsigned int) pstats->tot_downstream_timeout);
     APPEND_PREFIX_STAT("tot_wait_queue_timeout",
@@ -1213,6 +1218,8 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
         x->tot_downstream_propagate_failed;
     agg->tot_downstream_close_on_upstream_close +=
         x->tot_downstream_close_on_upstream_close;
+    agg->tot_downstream_conn_queue_timeout +=
+        x->tot_downstream_conn_queue_timeout;
     agg->tot_downstream_timeout   += x->tot_downstream_timeout;
     agg->tot_wait_queue_timeout   += x->tot_wait_queue_timeout;
     agg->tot_auth_timeout         += x->tot_auth_timeout;
@@ -1467,6 +1474,8 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.tot_downstream_propagate_failed);
     more_stat("tot_downstream_close_on_upstream_close",
               pstd->stats.tot_downstream_close_on_upstream_close);
+    more_stat("tot_downstream_conn_queue_timeout",
+              pstd->stats.tot_downstream_conn_queue_timeout);
     more_stat("tot_downstream_timeout",
               pstd->stats.tot_downstream_timeout);
     more_stat("tot_wait_queue_timeout",

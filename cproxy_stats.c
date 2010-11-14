@@ -417,6 +417,7 @@ void cproxy_reset_stats(proxy_stats *ps) {
     ps->tot_downstream_bucket_failed = 0;
     ps->tot_downstream_propagate_failed = 0;
     ps->tot_downstream_close_on_upstream_close = 0;
+    ps->tot_downstream_conn_queue_timeout = 0;
     ps->tot_downstream_timeout = 0;
     ps->tot_wait_queue_timeout = 0;
     ps->tot_assign_downstream = 0;

@@ -51,6 +51,10 @@ proxy_behavior behavior_default_g = {
         .tv_sec  = 0,
         .tv_usec = 0
     },
+    .downstream_conn_queue_timeout = {
+        .tv_sec  = 0,
+        .tv_usec = 0
+    },
     .wait_queue_timeout = {
         .tv_sec  = 0,
         .tv_usec = 0
@@ -651,6 +655,10 @@ void cproxy_parse_behavior_key_val(char *key,
             int ms = strtol(val, NULL, 10);
             behavior->downstream_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->downstream_timeout.tv_usec = (ms % 1000) * 1000;
+        } else if (wordeq(key, "downstream_conn_queue_timeout")) {
+            int ms = strtol(val, NULL, 10);
+            behavior->downstream_conn_queue_timeout.tv_sec  = floor(ms / 1000.0);
+            behavior->downstream_conn_queue_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "wait_queue_timeout")) {
             int ms = strtol(val, NULL, 10);
             behavior->wait_queue_timeout.tv_sec  = floor(ms / 1000.0);
@@ -821,6 +829,9 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
     vdump("downstream_timeout", "%ld", // In millisecs.
           (b->downstream_timeout.tv_sec * 1000 +
            b->downstream_timeout.tv_usec / 1000));
+    vdump("downstream_conn_queue_timeout", "%ld", // In millisecs.
+          (b->downstream_conn_queue_timeout.tv_sec * 1000 +
+           b->downstream_conn_queue_timeout.tv_usec / 1000));
 
     if (level >= 1) {
         vdump("wait_queue_timeout", "%ld", // In millisecs.

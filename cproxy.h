@@ -114,6 +114,7 @@ struct proxy_behavior {
     uint32_t       downstream_retry;    // SL: How many times to retry a cmd.
     enum protocol  downstream_protocol; // SL: Favored downstream protocol.
     struct timeval downstream_timeout;  // SL: Fields of 0 mean no timeout.
+    struct timeval downstream_conn_queue_timeout; // SL: Fields of 0 mean no timeout.
     struct timeval wait_queue_timeout;  // PL: Fields of 0 mean no timeout.
     struct timeval connect_timeout;     // PL: Fields of 0 mean no timeout.
     struct timeval auth_timeout;        // PL: Fields of 0 mean no timeout.
@@ -296,6 +297,7 @@ struct proxy_stats {
     uint64_t tot_downstream_bucket_failed;
     uint64_t tot_downstream_propagate_failed;
     uint64_t tot_downstream_close_on_upstream_close;
+    uint64_t tot_downstream_conn_queue_timeout;
     uint64_t tot_downstream_timeout;
     uint64_t tot_wait_queue_timeout;
     uint64_t tot_auth_timeout;
@@ -685,6 +687,8 @@ bool cproxy_clear_timeout(downstream *d);
 struct timeval cproxy_get_downstream_timeout(downstream *d, conn *c);
 
 bool cproxy_start_downstream_timeout(downstream *d, conn *c);
+bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
+                                        struct timeval dt);
 bool cproxy_start_wait_queue_timeout(proxy_td *ptd, conn *uc);
 
 rel_time_t cproxy_realtime(const time_t exptime);
