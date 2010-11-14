@@ -2509,13 +2509,13 @@ bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
     assert(d->behaviors_num > 0);
     assert(d->behaviors_arr != NULL);
 
+    cproxy_clear_timeout(d);
+
     struct timeval dt = cproxy_get_downstream_timeout(d, c);
     if (dt.tv_sec == 0 &&
         dt.tv_usec == 0) {
         return true;
     }
-
-    cproxy_clear_timeout(d);
 
     conn *uc = d->upstream_conn;
 
@@ -3114,9 +3114,6 @@ conn *zstored_acquire_downstream_conn(downstream *d,
                 d->ptd->stats.stats.tot_downstream_connect_interval++;
 
                 return NULL;
-            } else {
-                conns->error_count = 0;
-                conns->error_time = 0;
             }
         }
 
