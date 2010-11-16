@@ -4044,6 +4044,8 @@ static void usage(char **argv) {
 
     char *m = "moxi";
 
+    proxy_behavior *b = &behavior_default_g;
+
     printf(PACKAGE " " VERSION "\n");
     printf("\n");
     printf("Usage:\n");
@@ -4054,37 +4056,35 @@ static void usage(char **argv) {
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("  %s [FLAGS] -z LOCAL_PORT=MCHOST[:MCPORT][,MCHOST2[:MCPORT2][,*]]\n", m);
 #endif
+    printf("\n");
+    printf("The -z parameter specifies a 'cluster configuration' that tells\n");
+    printf("moxi which servers to communicate with.\n");
 #ifdef MOXI_USE_LIBVBUCKET
     printf("\n");
-    printf("The URL's provide REST/JSON vbucket-server-map(s) for dynamic\n"
-           "REST-based cluster (re-)configurability, using libvbucket hashing.\n"
-           "\nExample:\n"
+    printf("The URL approach allows you to specify the cluster configuration\n"
+           "via dynamic HTTP/REST-based lookup.  Example:\n"
            "  %s http://127.0.0.1:8091/pools/default/bucketsStreaming/default\n", m);
-    printf("\nExample, multiple comma-separated URL's (without whitespace):\n"
-           "  moxi http://membase1:8091/pools/default/bucketsStreaming/default,\\\n"
-           "       http://membase2:8091/pools/default/bucketsStreaming/default\n");
+    printf("\n"
+           "You can also specify multiple cluster configuration URL's for higher\n"
+           "availability, using comma-separated URL's (no whitespace).  A URL list\n"
+           "as the last parameter is also assumed to be a -z cluster configuration.\n");
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("\n");
-    printf("The MCHOST:MCPORT variant uses libmemcached/ketama hashing, where\n"
-           "moxi listens on the given LOCAL_PORT and forwards to downstream memcached\n"
-           "servers running at MCHOST:MCPORT.  More than one MCHOST:MCPORT\n"
-           "can be listed, separated by commas.  Example:\n"
+    printf("The MCHOST:MCPORT approach allows you to specify the cluster\n"
+           "configuration for libmemcached/ketama hashing, where moxi listens\n"
+           "on the given LOCAL_PORT and forwards to downstream memcached servers\n"
+           "running at MCHOST:MCPORT.  More than one MCHOST:MCPORT can be listed,\n"
+           "separated by commas.  Example:\n"
            "  %s -z 11211=mc_server1:11211,mc_server2:11211\n", m);
 #endif
     printf("\n");
-    printf("The -z information can be instead supplied in a config file:\n");
+    printf("The -z cluster configuration can be also specified in a config file:\n");
     printf("  %s [FLAGS] -z /path/to/absolute/configFile\n", m);
     printf("  %s [FLAGS] -z ./path/to/relative/configFile\n", m);
     printf("\n");
     printf("The optional FLAGS are...\n\n");
-    printf("-Z <key=val*> optional comma-separated key=value proxy behaviors, including:\n");
-    printf("              port_listen=11211,\n");
-#ifdef MOXI_USE_LIBVBUCKET
-    printf("              usr=REST_USER,pwd=REST_PWD,\n");
-#endif
-    printf("              downstream_max=4,downstream_conn_max=8,\n");
-    printf("              downstream_protocol=binary\n");
+    printf("-Z <key=val*> optional 'proxy configuration'.  See more below.\n");
 #ifdef HAVE_GETPWNAM
     printf("-u <username> assume identity of <username> (only when run as root)\n");
 #endif
@@ -4137,7 +4137,99 @@ static void usage(char **argv) {
            "-C            (deprecated) disable use of CAS\n"
            "-O <log path> moxi log file name.\n"
            "-X            enable mcmux compatibility; disables libvbucket & libmemcached\n");
-    return;
+    printf("\n"
+           "The proxy configuration flag, -Z, is a comma-separated list of key=value\n"
+           "pairs, which specify additional proxy behavior.  The more useful proxy\n"
+           "configuration keys include the following, with their default values...\n");
+    printf("  port_listen=%d\n", b->port_listen);
+    printf("      Port number that moxi will listen on, if not otherwise specified.\n");
+#ifdef MOXI_USE_LIBVBUCKET
+    printf("  usr=<USR, none by default>\n");
+    printf("  pwd=<PWD, none by default>\n");
+    printf("      User/password that moxi will use for SASL plain or HTTP basic auth.\n");
+    printf("      You can also define these using the MOXI_SASL_PLAIN_USR\n"
+           "      and MOXI_SASL_PLAIN_PWD environment variables.\n");
+#endif
+    printf("  default_bucket_name=<use the first bucket>\n"
+           "      When unspecified, moxi will treat the first bucket it sees as\n"
+           "      the default bucket.  This is the bucket that new clients will\n"
+           "      use when they first connect.\n");
+    printf("  concurrency=%d\n", b->downstream_max);
+    printf("      Number of requests that moxi will process concurrently\n"
+           "      per worker thread and per bucket.  Requests will otherwise go\n"
+           "      onto the tail of a wait queue.  0 means no limit to concurrency.\n"
+           "      This parameter is also (confusingly) known as 'downstream_max'\n");
+    printf("  wait_queue_timeout=%ld\n",
+           b->wait_queue_timeout.tv_sec * 1000 +
+           b->wait_queue_timeout.tv_usec / 1000);
+    printf("      Millisecs before moxi will timeout requests that have stayed\n"
+           "      too long on the wait queue.  0 means no timeout.\n");
+    printf("  connect_timeout=%ld\n",
+           b->connect_timeout.tv_sec * 1000 +
+           b->connect_timeout.tv_usec / 1000);
+    printf("      Millisecs before moxi will timeout a connect() attempt.\n"
+           "      0 means no timeout.\n");
+    printf("  auth_timeout=%ld\n",
+           b->auth_timeout.tv_sec * 1000 +
+           b->auth_timeout.tv_usec / 1000);
+    printf("      Millisecs before moxi will timeout a SASL auth attempt.\n"
+           "      0 means no timeout.\n");
+    printf("  connect_max_errors=%d\n", b->connect_max_errors);
+    printf("      Max number of errors per host:port:bucket per worker thread\n"
+           "      before moxi blacklists an unresponsive host:port:bucket.\n"
+           "      0 means blacklisting is disabled.\n");
+    printf("  connect_retry_interval=%d\n", b->connect_retry_interval);
+    printf("      Millisecs that a host:port:bucket will be blacklisted\n"
+           "      before moxi tries again to contact the host:port:bucket.\n"
+           "      0 means blacklisting is disabled.\n");
+    printf("  downstream_conn_max=%d\n", b->downstream_conn_max);
+    printf("      Max number of downstream conns moxi will open per worker thread\n"
+           "      to a host:port:bucket.  If downstream_conn_max is reached,\n"
+           "      requests go onto the tail of a downstream conn queue.\n"
+           "      0 means no limit.\n");
+    printf("  downstream_conn_queue_timeout=%ld\n",
+           b->downstream_conn_queue_timeout.tv_sec * 1000 +
+           b->downstream_conn_queue_timeout.tv_usec / 1000);
+    printf("      Millisecs before moxi will timeout a request that has been\n"
+           "      waiting too long in a downstream conn queue.\n"
+           "      0 means no timeout.\n");
+    printf("  downstream_timeout=%ld\n",
+           b->downstream_timeout.tv_sec * 1000 +
+           b->downstream_timeout.tv_usec / 1000);
+    printf("      Millisecs that moxi will allow a request to run after necessary\n"
+           "      downstream conns have been allocated to the request (such as\n"
+           "      when the request reaches the head of the downstream conn queue).\n"
+           "      0 means no timeout.\n");
+    printf("  cycle=%d\n", b->cycle);
+    printf("      Millisec clock quantum for moxi.\n");
+    printf("\n"
+           "Example of a 'gateway' moxi:\n");
+    printf("  ./moxi -Z usr=Administrator,pwd=password,port_listen=11311,"
+           "concurrency=1024,"
+           "wait_queue_timeout=200,"
+           "connect_timeout=400,"
+           "connect_max_errors=3,"
+           "connect_retry_interval=30000,"
+           "auth_timeout=100,"
+           "downstream_conn_max=16,"
+           "downstream_timeout=5000,"
+           "cycle=200,"
+           "default_bucket_name=default"
+           " http://127.0.0.1:8091/pools/default/saslBucketsStreaming\n");
+
+    printf("\n"
+           "Example of a 'per-bucket' moxi, for the 'default' bucket:\n");
+    printf("  ./moxi -Z usr=Administrator,pwd=password,port_listen=11411,"
+           "concurrency=1024,"
+           "wait_queue_timeout=200,"
+           "connect_timeout=400,"
+           "connect_max_errors=3,"
+           "connect_retry_interval=30000,"
+           "auth_timeout=100,"
+           "downstream_conn_max=16,"
+           "downstream_timeout=5000,"
+           "cycle=200"
+           " http://127.0.0.1:8091/pools/default/bucketsStreaming/default\n");
 }
 
 static void usage_license(void) {
@@ -4843,9 +4935,9 @@ int main (int argc, char **argv) {
 #ifndef MAIN_CHECK
             if (settings.port == UNSPECIFIED &&
                 settings.udpport == UNSPECIFIED) {
-                moxi_log_write("ERROR: need proxy configuration. See usage (-h).\n");
+                moxi_log_write("ERROR: need cluster configuration. See usage (-h).\n");
                 if (ml->log_mode != ERRORLOG_STDERR) {
-                    fprintf(stderr, "ERROR: need proxy configuration. See usage (-h).\n");
+                    fprintf(stderr, "ERROR: need cluster configuration. See usage (-h).\n");
                 }
                 exit(EXIT_FAILURE);
             }
