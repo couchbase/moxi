@@ -285,6 +285,7 @@ struct proxy_stats {
     //     tot_downstream_connect + tot_downstream_connect_failed.
     //
     uint64_t tot_downstream_connect_started;
+    uint64_t tot_downstream_connect_wait;
     uint64_t tot_downstream_connect; // Incremented when connect() + auth +
                                      // bucket_selection succeeds.
     uint64_t tot_downstream_connect_failed;

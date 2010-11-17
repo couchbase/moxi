@@ -7,7 +7,7 @@ echo starting moxi...
 
 ./moxi -d -P /tmp/moxi-2825-test-moxi.pid \
   -z 11266=127.0.0.1:11277 -t 1 \
-  -Z downstream_conn_max=1,downstream_max=0,downstream_timeout=0,wait_queue_timeout=0,downstream_conn_queue_timeout=100 -vvv
+  -Z downstream_conn_max=1,downstream_max=0,downstream_timeout=0,wait_queue_timeout=0,downstream_conn_queue_timeout=100
 
 echo starting memcached simulant...
 

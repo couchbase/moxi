@@ -1446,6 +1446,8 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                                        &behavior->connect_timeout)) {
                     conn_set_state(c, conn_connecting);
 
+                    d->ptd->stats.stats.tot_downstream_connect_wait++;
+
                     return c;
                 } else {
                     d->ptd->stats.stats.err_oom++;

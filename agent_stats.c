@@ -469,16 +469,17 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
               (b->downstream_conn_queue_timeout.tv_sec * 1000 +
                b->downstream_conn_queue_timeout.tv_usec / 1000));
 
+    APPEND_PREFIX_STAT("connect_timeout", "%ld", // In millisecs.
+                       (b->connect_timeout.tv_sec * 1000 +
+                        b->connect_timeout.tv_usec / 1000));
+    APPEND_PREFIX_STAT("auth_timeout", "%ld", // In millisecs.
+                       (b->auth_timeout.tv_sec * 1000 +
+                        b->auth_timeout.tv_usec / 1000));
+
     if (level >= 1) {
         APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", // In millisecs.
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
-        APPEND_PREFIX_STAT("connect_timeout", "%ld", // In millisecs.
-              (b->connect_timeout.tv_sec * 1000 +
-               b->connect_timeout.tv_usec / 1000));
-        APPEND_PREFIX_STAT("auth_timeout", "%ld", // In millisecs.
-              (b->auth_timeout.tv_sec * 1000 +
-               b->auth_timeout.tv_usec / 1000));
         APPEND_PREFIX_STAT("time_stats", "%d", b->time_stats);
         APPEND_PREFIX_STAT("connect_max_errors", "%d", b->connect_max_errors);
         APPEND_PREFIX_STAT("connect_retry_interval", "%d", b->connect_retry_interval);
@@ -573,6 +574,8 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->tot_downstream_create_failed);
     APPEND_PREFIX_STAT("tot_downstream_connect_started",
               "%llu", (long long unsigned int) pstats->tot_downstream_connect_started);
+    APPEND_PREFIX_STAT("tot_downstream_connect_wait",
+              "%llu", (long long unsigned int) pstats->tot_downstream_connect_wait);
     APPEND_PREFIX_STAT("tot_downstream_connect",
               "%llu", (long long unsigned int) pstats->tot_downstream_connect);
     APPEND_PREFIX_STAT("tot_downstream_connect_failed",
@@ -1204,6 +1207,7 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
     agg->tot_downstream_max_reached    += x->tot_downstream_max_reached;
     agg->tot_downstream_create_failed  += x->tot_downstream_create_failed;
     agg->tot_downstream_connect_started += x->tot_downstream_connect_started;
+    agg->tot_downstream_connect_wait   += x->tot_downstream_connect_wait;
     agg->tot_downstream_connect        += x->tot_downstream_connect;
     agg->tot_downstream_connect_failed += x->tot_downstream_connect_failed;
     agg->tot_downstream_connect_timeout += x->tot_downstream_connect_timeout;
@@ -1450,6 +1454,8 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.tot_downstream_create_failed);
     more_stat("tot_downstream_connect_started",
               pstd->stats.tot_downstream_connect_started);
+    more_stat("tot_downstream_connect_wait",
+              pstd->stats.tot_downstream_connect_wait);
     more_stat("tot_downstream_connect",
               pstd->stats.tot_downstream_connect);
     more_stat("tot_downstream_connect_failed",
