@@ -32,6 +32,8 @@
 
 #define MAX_LOGBUF_LEN 1000
 
+extern volatile uint32_t msec_current_time;
+
 /**
  * open the errorlog
  *
@@ -164,6 +166,7 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
 
     char logbuf[MAX_LOGBUF_LEN + 10]; /* scratch buffer */
     int  logbuf_used = 0;             /* length of scratch buffer */
+    time_t cur_ts = 0;
 
     logbuf_used = 0;
 
@@ -171,14 +174,15 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
         case ERRORLOG_FILE:
         case ERRORLOG_STDERR:
             /* cache the generated timestamp */
-            if (!mlog->cur_ts) {
-                mlog->cur_ts = time(NULL);
+            if (!mlog->base_ts) {
+                mlog->base_ts = time(NULL);
             }
+            cur_ts = mlog->base_ts + (msec_current_time/1000);
 
-            if (mlog->cur_ts != mlog->last_generated_debug_ts) {
+            if (cur_ts != mlog->last_generated_debug_ts) {
                 memset(ts_debug_str, 0, sizeof(ts_debug_str));
-                strftime(ts_debug_str, 254, "%Y-%m-%d %H:%M:%S", localtime(&(mlog->cur_ts)));
-                mlog->last_generated_debug_ts = mlog->cur_ts;
+                strftime(ts_debug_str, 254, "%Y-%m-%d %H:%M:%S", localtime(&(cur_ts)));
+                mlog->last_generated_debug_ts = cur_ts;
             }
 
             mappend_log(logbuf, &logbuf_used, ts_debug_str);

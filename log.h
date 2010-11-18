@@ -28,7 +28,7 @@ struct moxi_log {
     char *log_ident;    /* syslog identifier */
     char *log_file;     /* if log file is specified */
     int use_syslog;     /* set if syslog is being used */
-    time_t cur_ts;      /* current timestamp */
+    time_t base_ts;     /* base timestamp */
     time_t last_generated_debug_ts;
 };
 
