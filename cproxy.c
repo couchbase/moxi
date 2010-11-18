@@ -3218,8 +3218,10 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
         assert(dc->next == NULL);
         dc->next = conns->dc;
         conns->dc = dc;
-        assert(conns->dc_acquired > 0);
-        conns->dc_acquired--;
+
+        if (conns->dc_acquired > 0) {
+            conns->dc_acquired--;
+        }
 
         // Since one downstream conn was released, process a single
         // waiting downstream, if any.
