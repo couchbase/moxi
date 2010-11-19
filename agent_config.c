@@ -650,9 +650,11 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
 
         vbucket_config_destroy(vch);
     } else {
-        moxi_log_write("ERROR: bad JSON configuration: %s\n", config);
+        moxi_log_write("ERROR: bad JSON configuration: %s (%s)\n",
+                       vbucket_get_error(), config);
         if (ml->log_mode != ERRORLOG_STDERR) {
-            fprintf(stderr, "ERROR: bad JSON configuration: %s\n", config);
+            fprintf(stderr, "ERROR: bad JSON configuration: %s (%s)\n",
+                    vbucket_get_error(), config);
         }
 
         // Bug 1961 - don't exit() as we might be in a multitenant use case.
