@@ -612,6 +612,10 @@ void cproxy_parse_behavior_key_val_str(char *key_val,
 void cproxy_parse_behavior_key_val(char *key,
                                    char *val,
                                    proxy_behavior *behavior) {
+    uint32_t ms = 0;
+    uint32_t x = 0;
+    bool ok = false;
+
     assert(behavior != NULL);
 
     if (key != NULL &&
@@ -620,18 +624,18 @@ void cproxy_parse_behavior_key_val(char *key,
         val = trimstr(val);
 
         if (wordeq(key, "cycle")) {
-            behavior->cycle = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->cycle);
         } else if (wordeq(key, "downstream_max") ||
                    wordeq(key, "concurrency")) {
-            behavior->downstream_max = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->downstream_max);
         } else if (wordeq(key, "downstream_conn_max")) {
-            behavior->downstream_conn_max = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->downstream_conn_max);
         } else if (wordeq(key, "weight") ||
                    wordeq(key, "downstream_weight")) {
-            behavior->downstream_weight = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->downstream_weight);
         } else if (wordeq(key, "retry") ||
                    wordeq(key, "downstream_retry")) {
-            behavior->downstream_retry = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->downstream_retry);
         } else if (wordeq(key, "protocol") ||
                    wordeq(key, "downstream_protocol")) {
             if (wordeq(val, "ascii") ||
@@ -639,11 +643,13 @@ void cproxy_parse_behavior_key_val(char *key,
                 wordeq(val, "membase-ascii")) {
                 behavior->downstream_protocol =
                     proxy_downstream_ascii_prot;
+                ok = true;
             } else if (wordeq(val, "binary") ||
                        wordeq(val, "memcached-binary") ||
                        wordeq(val, "membase-binary")) {
                 behavior->downstream_protocol =
                     proxy_downstream_binary_prot;
+                ok = true;
             } else {
                 if (settings.verbose > 1) {
                     moxi_log_write("unknown behavior prot: %s\n", val);
@@ -652,88 +658,104 @@ void cproxy_parse_behavior_key_val(char *key,
         } else if (wordeq(key, "timeout") ||
                    wordeq(key, "downstream_timeout") ||
                    wordeq(key, "downstream_conn_timeout")) {
-            int ms = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &ms);
             behavior->downstream_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->downstream_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "downstream_conn_queue_timeout")) {
-            int ms = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &ms);
             behavior->downstream_conn_queue_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->downstream_conn_queue_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "wait_queue_timeout")) {
-            int ms = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &ms);
             behavior->wait_queue_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->wait_queue_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "connect_timeout")) {
-            int ms = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &ms);
             behavior->connect_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->connect_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "auth_timeout")) {
-            int ms = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &ms);
             behavior->auth_timeout.tv_sec  = floor(ms / 1000.0);
             behavior->auth_timeout.tv_usec = (ms % 1000) * 1000;
         } else if (wordeq(key, "time_stats")) {
-            behavior->time_stats = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &x);
+            behavior->time_stats = x;
         } else if (wordeq(key, "connect_max_errors")) {
-            behavior->connect_max_errors = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->connect_max_errors);
         } else if (wordeq(key, "connect_retry_interval")) {
-            behavior->connect_retry_interval = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->connect_retry_interval);
         } else if (wordeq(key, "front_cache_max")) {
-            behavior->front_cache_max = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->front_cache_max);
         } else if (wordeq(key, "front_cache_lifespan")) {
-            behavior->front_cache_lifespan = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->front_cache_lifespan);
         } else if (wordeq(key, "front_cache_spec")) {
             if (strlen(val) < sizeof(behavior->front_cache_spec)) {
                 strcpy(behavior->front_cache_spec, val);
+                ok = true;
             }
         } else if (wordeq(key, "front_cache_unspec")) {
             if (strlen(val) < sizeof(behavior->front_cache_unspec)) {
                 strcpy(behavior->front_cache_unspec, val);
+                ok = true;
             }
         } else if (wordeq(key, "key_stats_max")) {
-            behavior->key_stats_max = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->key_stats_max);
         } else if (wordeq(key, "key_stats_lifespan")) {
-            behavior->key_stats_lifespan = strtol(val, NULL, 10);
+            ok = safe_strtoul(val, &behavior->key_stats_lifespan);
         } else if (wordeq(key, "key_stats_spec")) {
             if (strlen(val) < sizeof(behavior->key_stats_spec)) {
                 strcpy(behavior->key_stats_spec, val);
+                ok = true;
             }
         } else if (wordeq(key, "key_stats_unspec")) {
             if (strlen(val) < sizeof(behavior->key_stats_unspec)) {
                 strcpy(behavior->key_stats_unspec, val);
+                ok = true;
             }
         } else if (wordeq(key, "optimize_set")) {
             if (strlen(val) < sizeof(behavior->optimize_set)) {
                 strcpy(behavior->optimize_set, val);
+                ok = true;
             }
         } else if (wordeq(key, "usr")) {
             if (strlen(val) < sizeof(behavior->usr)) {
                 strcpy(behavior->usr, val);
+                ok = true;
             }
         } else if (wordeq(key, "pwd")) {
             if (strlen(val) < sizeof(behavior->pwd)) {
                 strcpy(behavior->pwd, val);
+                ok = true;
             }
         } else if (wordeq(key, "host")) {
             if (strlen(val) < sizeof(behavior->host)) {
                 strcpy(behavior->host, val);
+                ok = true;
             }
         } else if (wordeq(key, "port")) {
-            behavior->port = strtol(val, NULL, 10);
+            ok = safe_strtol(val, &behavior->port);
         } else if (wordeq(key, "bucket")) {
             if (strlen(val) < sizeof(behavior->bucket)) {
                 strcpy(behavior->bucket, val);
+                ok = true;
             }
         } else if (wordeq(key, "port_listen")) {
-            behavior->port_listen = strtol(val, NULL, 10);
+            ok = safe_strtol(val, &behavior->port_listen);
         } else if (wordeq(key, "default_bucket_name")) {
             if (strlen(val) < sizeof(behavior->default_bucket_name)) {
                 strcpy(behavior->default_bucket_name, val);
+                ok = true;
             }
         } else {
             if (settings.verbose > 1) {
-                moxi_log_write("unknown behavior key: %s\n", key);
+                moxi_log_write("ERROR: unknown behavior key: %s\n", key);
             }
         }
+    }
+
+    if (ok == false) {
+        moxi_log_write("ERROR: config error in key: %s value: %s\n",
+                       key, val);
     }
 }
 
