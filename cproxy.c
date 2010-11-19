@@ -3205,43 +3205,47 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
     assert(dc->next == NULL);
     assert(dc->thread != NULL);
     assert(dc->host_ident != NULL);
-    assert(dc->state == conn_pause || dc->state == conn_connecting);
+
+    bool keep = dc->state == conn_pause;
 
     conn_set_state(dc, conn_pause);
     update_event(dc, 0);
-
     dc->extra = NULL;
 
     zstored_downstream_conns *conns =
         zstored_get_downstream_conns(dc->thread, dc->host_ident);
     if (conns != NULL) {
-        assert(dc->next == NULL);
-        dc->next = conns->dc;
-        conns->dc = dc;
-
         if (conns->dc_acquired > 0) {
             conns->dc_acquired--;
         }
 
-        // Since one downstream conn was released, process a single
-        // waiting downstream, if any.
-        //
-        downstream *d_head = conns->downstream_waiting_head;
-        if (d_head != NULL) {
-            assert(conns->downstream_waiting_tail != NULL);
+        if (keep) {
+            assert(dc->next == NULL);
+            dc->next = conns->dc;
+            conns->dc = dc;
 
-            conns->downstream_waiting_head =
-                conns->downstream_waiting_head->next_waiting;
-            if (conns->downstream_waiting_head == NULL) {
-                conns->downstream_waiting_tail = NULL;
+            // Since one downstream conn was released, process a single
+            // waiting downstream, if any.
+            //
+            downstream *d_head = conns->downstream_waiting_head;
+            if (d_head != NULL) {
+                assert(conns->downstream_waiting_tail != NULL);
+
+                conns->downstream_waiting_head =
+                    conns->downstream_waiting_head->next_waiting;
+                if (conns->downstream_waiting_head == NULL) {
+                    conns->downstream_waiting_tail = NULL;
+                }
+                d_head->next_waiting = NULL;
+
+                cproxy_forward_or_error(d_head);
             }
-            d_head->next_waiting = NULL;
 
-            cproxy_forward_or_error(d_head);
+            return;
         }
-    } else {
-        cproxy_close_conn(dc);
     }
+
+    cproxy_close_conn(dc);
 }
 
 // Returns true if the downstream was found on any
