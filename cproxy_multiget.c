@@ -121,6 +121,10 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         char *command = uc_cur->cmd_start;
         assert(command != NULL);
 
+        while (*command != '\0' && *command == ' ') {
+            command++;
+        }
+
         char *space = strchr(command, ' ');
         assert(space > command);
 

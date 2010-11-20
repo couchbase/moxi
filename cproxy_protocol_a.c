@@ -542,6 +542,11 @@ bool ascii_scan_key(char *line, char **key, int *key_len) {
     char *curr = line;
 
     while (*curr != '\0' &&
+           *curr == ' ') { // Scan to start of cmd.
+        curr++;
+    }
+
+    while (*curr != '\0' &&
            *curr != ' ') { // Scan to end of cmd.
         curr++;
     }
