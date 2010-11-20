@@ -389,12 +389,9 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
         moxi_log_write("configuration received\n");
     }
 
-    work_collect completion;
-    work_collect_init(&completion, 1, m);
-
     kvpair_t *copy = dup_kvpair(config);
     if (copy != NULL) {
-        if (!work_send(mthread->work_queue, cproxy_on_config, &completion, copy) &&
+        if (!work_send(mthread->work_queue, cproxy_on_config, m, copy) &&
             settings.verbose > 1) {
             moxi_log_write("work_send failed\n");
         }
@@ -403,8 +400,6 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
             moxi_log_write("agent_config ocnc failed dup_kvpair\n");
         }
     }
-
-    work_collect_wait(&completion);
 }
 
 #ifdef MOXI_USE_LIBVBUCKET
@@ -1134,8 +1129,7 @@ bool cproxy_on_config_kvs(proxy_main *m, uint32_t new_config_ver, kvpair_t *kvs)
 
 static
 void cproxy_on_config(void *data0, void *data1) {
-    work_collect *completion = data0;
-    proxy_main *m = completion->data;
+    proxy_main *m = data0;
     assert(m);
 
     kvpair_t *kvs = data1;
@@ -1196,8 +1190,6 @@ void cproxy_on_config(void *data0, void *data1) {
 
     free_kvpair(kvs);
 
- out:
-    work_collect_one(completion);
     return;
 
  fail:
@@ -1208,7 +1200,6 @@ void cproxy_on_config(void *data0, void *data1) {
         moxi_log_write("ERROR: conc failed config %llu\n",
                        (long long unsigned int) m->stat_config_fails);
     }
-    goto out;
 }
 
 void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
@@ -1445,9 +1436,6 @@ void cproxy_on_config_pool(proxy_main *m,
 
         // Send update across worker threads, avoiding locks.
         //
-        work_collect wc = {.count = 0};
-        work_collect_init(&wc, m->nthreads - 1, NULL);
-
         for (int i = 1; i < m->nthreads; i++) {
             LIBEVENT_THREAD *t = thread_by_index(i);
             assert(t);
@@ -1456,16 +1444,14 @@ void cproxy_on_config_pool(proxy_main *m,
             proxy_td *ptd = &p->thread_data[i];
             if (t &&
                 t->work_queue) {
-                work_send(t->work_queue, update_ptd_config, ptd, &wc);
+                work_send(t->work_queue, update_ptd_config, ptd, NULL);
             }
         }
 
         pthread_mutex_unlock(&m->proxy_main_lock);
 
-        work_collect_wait(&wc);
-
         if (settings.verbose > 2) {
-            moxi_log_write("conp collected, changed %s, %d\n",
+            moxi_log_write("conp changed %s, %d\n",
                            changed ? "true" : "false", config_ver);
         }
     }
@@ -1474,14 +1460,13 @@ void cproxy_on_config_pool(proxy_main *m,
 // ----------------------------------------------------------
 
 static void update_ptd_config(void *data0, void *data1) {
+    (void)data1;
+
     proxy_td *ptd = data0;
     assert(ptd);
 
     proxy *p = ptd->proxy;
     assert(p);
-
-    work_collect *c = data1;
-    assert(c);
 
     assert(is_listen_thread() == false); // Expecting a worker thread.
 
@@ -1546,8 +1531,6 @@ static void update_ptd_config(void *data0, void *data1) {
                     port, prev, ptd->config_ver);
         }
     }
-
-    work_collect_one(c);
 }
 
 // ----------------------------------------------------------
