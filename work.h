@@ -54,9 +54,9 @@ bool work_send(work_queue *m,
 
 void work_recv(int fd, short which, void *arg);
 
-void work_collect_init(work_collect *c, int count, void *data);
-void work_collect_wait(work_collect *c);
-void work_collect_count(work_collect *c, int count);
-void work_collect_one(work_collect *c);
+int work_collect_init(work_collect *c, int count, void *data);
+int work_collect_wait(work_collect *c);
+int work_collect_count(work_collect *c, int count);
+int work_collect_one(work_collect *c);
 
 #endif // WORK_H

@@ -230,7 +230,7 @@ void work_recv(int fd, short which, void *arg) {
  *  been counted, work_collect_wait() returns control back to the
  *  main caller.
  */
-void work_collect_init(work_collect *c, int count, void *data) {
+int work_collect_init(work_collect *c, int count, void *data) {
     assert(c);
 
     memset(c, 0, sizeof(work_collect));
@@ -238,31 +238,50 @@ void work_collect_init(work_collect *c, int count, void *data) {
     c->count = count;
     c->data  = data;
 
-    pthread_mutex_init(&c->collect_lock, NULL);
-    pthread_cond_init(&c->collect_cond, NULL);
+    int rv;
+
+    rv = pthread_mutex_init(&c->collect_lock, NULL);
+    if (rv != 0) {
+        return rv;
+    }
+
+    rv = pthread_cond_init(&c->collect_cond, NULL);
+    if (rv != 0) {
+        return rv;
+    }
+
+    return 0;
 }
 
-void work_collect_wait(work_collect *c) {
+int work_collect_wait(work_collect *c) {
+    int rv = 0;
     pthread_mutex_lock(&c->collect_lock);
-    while (c->count != 0) { // Can't test for > 0, due to -1 on init race.
-        pthread_cond_wait(&c->collect_cond, &c->collect_lock);
+    while (c->count != 0 && rv == 0) { // Can't test for > 0, due to -1 on init race.
+        rv = pthread_cond_wait(&c->collect_cond, &c->collect_lock);
     }
     pthread_mutex_unlock(&c->collect_lock);
+    return rv;
 }
 
-void work_collect_count(work_collect *c, int count) {
+int work_collect_count(work_collect *c, int count) {
+    int rv = 0;
     pthread_mutex_lock(&c->collect_lock);
     c->count = count;
-    if (c->count <= 0)
-        pthread_cond_signal(&c->collect_cond);
+    if (c->count <= 0) {
+        rv = pthread_cond_signal(&c->collect_cond);
+    }
     pthread_mutex_unlock(&c->collect_lock);
+    return rv;
 }
 
-void work_collect_one(work_collect *c) {
+int work_collect_one(work_collect *c) {
+    int rv = 0;
     pthread_mutex_lock(&c->collect_lock);
     assert(c->count >= 1);
     c->count--;
-    if (c->count <= 0)
-        pthread_cond_signal(&c->collect_cond);
+    if (c->count <= 0) {
+        rv = pthread_cond_signal(&c->collect_cond);
+    }
     pthread_mutex_unlock(&c->collect_lock);
+    return rv;
 }
