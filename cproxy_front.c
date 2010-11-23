@@ -214,6 +214,10 @@ void *mcache_get(mcache *m, char *key, int key_len,
             genhash_delete(m->map, key);
         } else {
             m->tot_get_misses++;
+
+            if (settings.verbose > 1) {
+                moxi_log_write("mcache miss: %s\n", key);
+            }
         }
     }
 
@@ -359,6 +363,10 @@ void mcache_delete(mcache *m, char *key, int key_len) {
             genhash_delete(m->map, key);
 
             m->tot_deletes++;
+
+            if (settings.verbose > 1) {
+                moxi_log_write("mcache delete: %s\n", key);
+            }
         }
     }
 
