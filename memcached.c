@@ -3468,7 +3468,7 @@ void drive_machine(conn *c) {
                connections */
 
             --nreqs;
-            if (nreqs >= 0) {
+            if (IS_DOWNSTREAM(c->protocol) || nreqs >= 0) {
                 reset_cmd_handler(c);
             } else {
                 pthread_mutex_lock(&c->thread->stats.mutex);
