@@ -142,6 +142,7 @@ struct proxy_behavior {
     char host[250];   // SL.
     int  port;        // SL.
     char bucket[250]; // SL.
+    char nodeLocator[20]; // Ex: ketama or vbucket.
 
     // ML: Port for proxy_main to listen on.
     //

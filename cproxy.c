@@ -1854,7 +1854,10 @@ void upstream_error(conn *uc) {
         if (uc->cmd == -1 &&
             uc->cmd_start != NULL &&
             strncmp(uc->cmd_start, "get", 3) == 0 &&
-            (false == settings.enable_mcmux_mode)) {
+            (false == settings.enable_mcmux_mode) &&
+            (0 != strncmp(ptd->behavior_pool.base.nodeLocator,
+                          "vbucket",
+                          sizeof(ptd->behavior_pool.base.nodeLocator) - 1))) {
             msg = "END\r\n";
         }
 

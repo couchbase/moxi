@@ -82,6 +82,7 @@ proxy_behavior behavior_default_g = {
     .host = {0},
     .port = 0,
     .bucket = {0},
+    .nodeLocator = {0},
     .usr = {0},
     .pwd = {0},
     .port_listen = MOXI_DEFAULT_LISTEN_PORT,

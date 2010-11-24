@@ -576,6 +576,7 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
         }
 
         proxy_behavior proxyb = m->behavior;
+        strcpy(proxyb.nodeLocator, "vbucket");
 
         int pool_port = proxyb.port_listen;
         int nodes_num = vbucket_config_get_num_servers(vch);
@@ -698,6 +699,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
         int nodes_num = cJSON_GetArraySize(jArr);
         if (nodes_num > 0) {
             proxy_behavior proxyb = m->behavior;
+            strcpy(proxyb.nodeLocator, "ketama");
 
             if (settings.verbose > 2) {
                 moxi_log_write("conjk nodes_num: %d\n", nodes_num);
