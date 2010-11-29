@@ -3452,3 +3452,22 @@ void connections_diag(FILE *out) {
         }
     }
 }
+
+bool cproxy_front_cache_key(proxy_td *ptd, char *key, int key_len) {
+    return (key != NULL &&
+            key_len > 0 &&
+            ptd->behavior_pool.base.front_cache_lifespan > 0 &&
+            matcher_check(&ptd->proxy->front_cache_matcher, key, key_len, false) == true &&
+            matcher_check(&ptd->proxy->front_cache_unmatcher, key, key_len, false) == false);
+}
+
+void cproxy_front_cache_delete(proxy_td *ptd, char *key, int key_len) {
+    if (cproxy_front_cache_key(ptd, key, key_len) == true) {
+        mcache_delete(&ptd->proxy->front_cache, key, key_len);
+
+        if (settings.verbose > 1) {
+            moxi_log_write("front_cache del %s\n", key);
+        }
+    }
+}
+

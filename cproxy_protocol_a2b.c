@@ -1275,11 +1275,7 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
                     } else {
                         c->write_and_go = conn_pause;
 
-                        if (key != NULL &&
-                            key_len > 0) {
-                            mcache_delete(&d->ptd->proxy->front_cache,
-                                          key, key_len);
-                        }
+                        cproxy_front_cache_delete(d->ptd, key, key_len);
                     }
 
                     return true;

@@ -453,14 +453,8 @@ void cproxy_del_front_cache_key_ascii(downstream *d,
         if (spc != NULL) {
             char *key = spc + 1;
             int   key_len = skey_len(key);
-            if (key_len > 0) {
-                mcache_delete(&d->ptd->proxy->front_cache,
-                              key, key_len);
 
-                if (settings.verbose > 2) {
-                    moxi_log_write("front_cache del %s\n", key);
-                }
-            }
+            cproxy_front_cache_delete(d->ptd, key, key_len);
         }
     }
 }

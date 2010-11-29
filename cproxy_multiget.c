@@ -186,8 +186,14 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                 // Note, front cache stats are part of mcache.
                 //
                 if (!cas_emit) {
-                    item *it = mcache_get(front_cache, key, key_len,
-                                          msec_current_time_snapshot);
+                    item *it = NULL;
+
+                    if (front_cache != NULL &&
+                        cproxy_front_cache_key(ptd, key, key_len) == true) {
+                        it = mcache_get(front_cache, key, key_len,
+                                        msec_current_time_snapshot);
+                    }
+
                     if (it != NULL) {
                         assert(it->nkey == key_len);
                         assert(strncmp(ITEM_key(it), key, it->nkey) == 0);
@@ -428,18 +434,13 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
     proxy *p = ptd->proxy;
     assert(p);
 
-    uint32_t front_cache_lifespan =
-        ptd->behavior_pool.base.front_cache_lifespan;
+    if (cproxy_front_cache_key(ptd, ITEM_key(it), it->nkey) == true) {
+        uint32_t front_cache_lifespan =
+            ptd->behavior_pool.base.front_cache_lifespan;
 
-    if (front_cache_lifespan > 0) {
-        if (matcher_check(&p->front_cache_matcher,
-                          ITEM_key(it), it->nkey, false) == true &&
-            matcher_check(&p->front_cache_unmatcher,
-                          ITEM_key(it), it->nkey, false) == false) {
-            mcache_set(&p->front_cache, it,
-                       front_cache_lifespan + msec_current_time,
-                       true, false);
-        }
+        mcache_set(&p->front_cache, it,
+                   front_cache_lifespan + msec_current_time,
+                   true, false);
     }
 
     if (d->multiget != NULL) {

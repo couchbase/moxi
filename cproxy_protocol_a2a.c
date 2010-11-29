@@ -398,7 +398,7 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
                     // the front_cache.  For with-reply requests, we
                     // clear the front_cache when we get a success reply.
                     //
-                    mcache_delete(&d->ptd->proxy->front_cache, key, key_len);
+                    cproxy_front_cache_delete(d->ptd, key, key_len);
                 }
 
                 return true;
@@ -600,8 +600,8 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
                         } else {
                             c->write_and_go = conn_pause;
 
-                            mcache_delete(&d->ptd->proxy->front_cache,
-                                          ITEM_key(it), it->nkey);
+                            cproxy_front_cache_delete(d->ptd,
+                                                      ITEM_key(it), it->nkey);
                         }
 
                         return true;

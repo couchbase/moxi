@@ -118,6 +118,7 @@ test: memcached-debug sizes testapp
 	./t/issue-MB-2811.sh
 	./t/issue-MB-2825.sh
 	./t/issue-MB-2972.sh
+	./t/issue-MB-2980.sh
 
 test_gcov: test
 	@if test `basename $(PROFILER)` = "gcov"; then \

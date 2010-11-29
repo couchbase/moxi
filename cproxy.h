@@ -780,6 +780,10 @@ void cproxy_del_front_cache_key_ascii_response(downstream *d,
                                                char *response,
                                                char *command);
 
+void cproxy_front_cache_delete(proxy_td *ptd, char *key, int key_len);
+
+bool cproxy_front_cache_key(proxy_td *ptd, char *key, int key_len);
+
 HTGRAM_HANDLE cproxy_create_timing_histogram(void);
 
 typedef void (*mcache_traversal_func)(const void *it, void *userdata);
