@@ -577,7 +577,17 @@ ssize_t mcs_io_write(int fd, const void *buffer, size_t length) {
     return write(fd, buffer, length);
 }
 
-mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout) {
+mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
+    struct timeval my_timeout; // Linux select() modifies its timeout param.
+    struct timeval *timeout = NULL;
+
+    if (timeout_in != NULL &&
+        (timeout_in->tv_sec != 0 ||
+         timeout_in->tv_usec != 0)) {
+        my_timeout = *timeout_in;
+        timeout = &my_timeout;
+    }
+
     char *data = dta;
     size_t done = 0;
 
