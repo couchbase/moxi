@@ -794,55 +794,66 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
     for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
 
-        if (pscip->do_info) {
-            snprintf(prefix, sizeof(prefix), "%u:%s:info:", p->port, p->name);
-            APPEND_PREFIX_STAT("port",          "%u", p->port);
-            APPEND_PREFIX_STAT("name",          "%s", p->name);
+        bool go = true;
 
-            char *buf = trimstrdup(p->config);
-            if (buf != NULL) {
-                // Remove embedded newlines, as config might be a JSON string.
-                char *slow = buf;
-                for (char *fast = buf; *fast != '\0'; fast++) {
-                    *slow = *fast;
-                    if (*slow != '\n' && *slow != '\r') {
-                        slow++;
+        if (p->name != NULL &&
+            p->config != NULL) {
+            if (pscip->do_info) {
+                snprintf(prefix, sizeof(prefix), "%u:%s:info:", p->port, p->name);
+                APPEND_PREFIX_STAT("port",          "%u", p->port);
+                APPEND_PREFIX_STAT("name",          "%s", p->name);
+
+                char *buf = trimstrdup(p->config);
+                if (buf != NULL) {
+                    // Remove embedded newlines, as config might be a JSON string.
+                    char *slow = buf;
+                    for (char *fast = buf; *fast != '\0'; fast++) {
+                        *slow = *fast;
+                        if (*slow != '\n' && *slow != '\r') {
+                            slow++;
+                        }
                     }
+                    *slow = '\0';
+
+                    APPEND_PREFIX_STAT("config", "%s", buf);
+
+                    free(buf);
                 }
-                *slow = '\0';
 
-                APPEND_PREFIX_STAT("config", "%s", buf);
-
-                free(buf);
+                APPEND_PREFIX_STAT("config_ver",    "%u", p->config_ver);
+                APPEND_PREFIX_STAT("behaviors_num", "%u", p->behavior_pool.num);
             }
 
-            APPEND_PREFIX_STAT("config_ver",    "%u", p->config_ver);
-            APPEND_PREFIX_STAT("behaviors_num", "%u", p->behavior_pool.num);
-        }
-
-        if (pscip->do_behaviors) {
-            snprintf(prefix, sizeof(prefix), "%u:%s:behavior:",
-                     p->port, p->name);
-            proxy_stats_dump_behavior(add_stats, c, prefix,
-                                      &p->behavior_pool.base, 1);
-
-            for (int i = 0; i < p->behavior_pool.num; i++) {
-                snprintf(prefix, sizeof(prefix), "%u:%s:behavior-%u:",
-                         p->port, p->name, i);
+            if (pscip->do_behaviors) {
+                snprintf(prefix, sizeof(prefix), "%u:%s:behavior:",
+                         p->port, p->name);
                 proxy_stats_dump_behavior(add_stats, c, prefix,
-                                          &p->behavior_pool.arr[i], 0);
-            }
-        }
+                                          &p->behavior_pool.base, 1);
 
-        if (pscip->do_stats) {
-            snprintf(prefix, sizeof(prefix), "%u:%s:stats:", p->port, p->name);
-            APPEND_PREFIX_STAT("listening", "%llu",
-                        (long long unsigned int) p->listening);
-            APPEND_PREFIX_STAT("listening_failed", "%llu",
-                        (long long unsigned int) p->listening_failed);
+                for (int i = 0; i < p->behavior_pool.num; i++) {
+                    snprintf(prefix, sizeof(prefix), "%u:%s:behavior-%u:",
+                             p->port, p->name, i);
+                    proxy_stats_dump_behavior(add_stats, c, prefix,
+                                              &p->behavior_pool.arr[i], 0);
+                }
+            }
+
+            if (pscip->do_stats) {
+                snprintf(prefix, sizeof(prefix), "%u:%s:stats:", p->port, p->name);
+                APPEND_PREFIX_STAT("listening", "%llu",
+                                   (long long unsigned int) p->listening);
+                APPEND_PREFIX_STAT("listening_failed", "%llu",
+                                   (long long unsigned int) p->listening_failed);
+            }
+        } else {
+            go = false;
         }
 
         pthread_mutex_unlock(&p->proxy_lock);
+
+        if (go == false) {
+            continue;
+        }
 
         if (pscip->do_frontcache) {
             snprintf(prefix, sizeof(prefix), "%u:%s:frontcache:",
@@ -1844,9 +1855,12 @@ void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
     for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
 
-        snprintf(prefix, sizeof(prefix), "%u:%s:config", p->port, p->name);
+        if (p->name != NULL &&
+            p->config != NULL) {
+            snprintf(prefix, sizeof(prefix), "%u:%s:config", p->port, p->name);
 
-        add_stats(prefix, strlen(prefix), p->config, strlen(p->config), c);
+            add_stats(prefix, strlen(prefix), p->config, strlen(p->config), c);
+        }
 
         pthread_mutex_unlock(&p->proxy_lock);
     }
