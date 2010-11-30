@@ -298,6 +298,12 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
 
         SEEN(STATS_CMD_QUIT, false, cmd_len);
 
+    } else if (ntokens == 4 &&
+               (strncmp(cmd, "unl", 3) == 0) &&
+               (false == self_command) &&
+               (c->cmd_curr = PROTOCOL_BINARY_CMD_UNL)) {
+        cproxy_pause_upstream_for_downstream(ptd, c);
+        SEEN(STATS_CMD_UNL, false, cmd_len);
     } else {
         out_string(c, "ERROR");
 

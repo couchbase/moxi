@@ -141,6 +141,11 @@ struct A2BSpec a2b_specs[] = {
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header)
     },
+    { .line = "unl <key> <cas>", // Single-key UNL.
+      .cmd  = PROTOCOL_BINARY_CMD_UNL,
+      .cmdq = -1,
+      .size = sizeof(protocol_binary_request_header)
+    },
     { .line = 0 } // NULL sentinel.
 };
 
@@ -381,6 +386,13 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
         }
         break;
    }
+   case 'c': { // cas value for unl
+        uint64_t cas = 0;
+        if (safe_strtoull(cmd_tokens[cur_token].value, &cas)) {
+            header->request.cas = cas;
+        }
+        break;
+   }
 
     // The noreply was handled in a2b_fill_request().
     //
@@ -488,7 +500,8 @@ void cproxy_process_a2b_downstream(conn *c) {
             assert(header->response.status != 0 ||
                    c->cmd == PROTOCOL_BINARY_CMD_VERSION ||
                    c->cmd == PROTOCOL_BINARY_CMD_INCREMENT ||
-                   c->cmd == PROTOCOL_BINARY_CMD_DECREMENT);
+                   c->cmd == PROTOCOL_BINARY_CMD_DECREMENT ||
+                   c->cmd == PROTOCOL_BINARY_CMD_UNL);
 
             bin_read_key(c, bin_reading_get_key, bodylen);
         } else {
@@ -923,23 +936,30 @@ void a2b_process_downstream_response(conn *c) {
         break;
 
     case PROTOCOL_BINARY_CMD_VERSION:
+    case PROTOCOL_BINARY_CMD_UNL:
         conn_set_state(c, conn_pause);
 
         if (uc != NULL) {
             assert(uc->next == NULL);
 
-            if (header->response.status == 0 &&
+            if ((header->response.status == 0 ||
+                 c->cmd == PROTOCOL_BINARY_CMD_UNL) &&
                 header->response.keylen == 0 &&
                 header->response.extlen == 0 &&
                 header->response.bodylen > 0) {
                 char *s = add_conn_suffix(uc);
+                uint32_t buf_offset = 0;
+
                 if (s != NULL) {
                     // TODO: Assuming bodylen is not that long.
-                    memcpy(s, "VERSION ", 8);
-                    memcpy(s + 8,
+                    if (c->cmd == PROTOCOL_BINARY_CMD_VERSION) {
+                        memcpy(s, "VERSION ", 8);
+                        buf_offset = 8; // sizeof "VERSION "
+                    }
+                    memcpy(s + buf_offset,
                            c->cmd_start + sizeof(protocol_binary_response_version),
                            header->response.bodylen);
-                    s[8 + header->response.bodylen] = '\0';
+                    s[buf_offset + header->response.bodylen] = '\0';
                     out_string(uc, s);
                 } else {
                     d->ptd->stats.stats.err_oom++;

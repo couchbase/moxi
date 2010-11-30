@@ -147,8 +147,9 @@ extern "C"
     PROTOCOL_BINARY_CMD_TAP_VBUCKET_SET = 0x45,
     /* End TAP */
 
-    /* getl command */
+    /* getl/unl command */
     PROTOCOL_BINARY_CMD_GETL = 0x94,
+    PROTOCOL_BINARY_CMD_UNL  = 0x95,
     /* end getl */
 
     PROTOCOL_BINARY_CMD_LAST_RESERVED = 0xef,
