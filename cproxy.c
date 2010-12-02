@@ -677,6 +677,14 @@ void cproxy_on_close_downstream_conn(conn *c) {
         ptd->stats.stats.num_downstream_conn--;
     }
 
+    if (k < 0) {
+        // If this downstream conn wasn't linked into the
+        // downstream, it was delinked already during connect error
+        // handling (where its slot was set to NULL_CONN already).
+        //
+        return;
+    }
+
     conn *uc_retry = NULL;
 
     if (d->upstream_conn != NULL &&
@@ -1828,6 +1836,10 @@ bool cproxy_forward(downstream *d) {
 }
 
 bool cproxy_forward_or_error(downstream *d) {
+    if (d->downstream_used_start > 0) {
+        return true; // We've already forwarded this downstream.
+    }
+
     if (cproxy_forward(d) == false) {
         d->ptd->stats.stats.tot_downstream_propagate_failed++;
         propagate_error(d);
