@@ -238,7 +238,9 @@ bool cproxy_forward_a2a_downstream(downstream *d) {
 
     int server_index = -1;
 
-    if (cproxy_is_broadcast_cmd(uc->cmd_curr) == false) {
+    if (cproxy_is_broadcast_cmd(uc->cmd_curr) == true) {
+        cproxy_ascii_broadcast_suffix(d);
+    } else {
         char *key = NULL;
         int   key_len = 0;
 

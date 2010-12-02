@@ -562,3 +562,17 @@ bool ascii_scan_key(char *line, char **key, int *key_len) {
     return *key_len > 0;
 }
 
+void cproxy_ascii_broadcast_suffix(downstream *d) {
+    conn *uc = d->upstream_conn;
+    if (uc != NULL &&
+        uc->noreply == false) {
+        if (uc->cmd_curr == PROTOCOL_BINARY_CMD_FLUSH) {
+            d->upstream_suffix = "OK\r\n";
+        } else {
+            d->upstream_suffix = "END\r\n";
+        }
+
+        d->upstream_suffix_len = 0;
+        d->upstream_retry = 0;
+    }
+}

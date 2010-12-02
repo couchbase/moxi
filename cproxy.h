@@ -683,6 +683,8 @@ void cproxy_dump_behavior_stderr(const void *dump_opaque,
 
 bool cproxy_is_broadcast_cmd(int cmd);
 
+void cproxy_ascii_broadcast_suffix(downstream *d);
+
 void cproxy_upstream_ascii_item_response(item *it, conn *uc,
                                          int cas_emit);
 

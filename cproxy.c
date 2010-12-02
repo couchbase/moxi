@@ -989,6 +989,13 @@ bool cproxy_release_downstream(downstream *d, bool force) {
             }
         }
 
+        if (settings.verbose > 2) {
+            moxi_log_write("%d: release_downstream upstream_suffix %s\n",
+                           d->upstream_conn->sfd,
+                           d->upstream_suffix_len == 0 ?
+                           d->upstream_suffix : "(binary)");
+        }
+
         if (d->upstream_suffix != NULL) {
             // Do a last write on the upstream.  For example,
             // the upstream_suffix might be "END\r\n" or other
