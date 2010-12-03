@@ -610,6 +610,11 @@ void cproxy_on_close_upstream_conn(conn *c) {
 int delink_from_downstream_conns(conn *c) {
     downstream *d = c->extra;
     if (d == NULL) {
+        if (settings.verbose > 2) {
+            moxi_log_write("%d: delink_from_downstream_conn no-op\n",
+                           c->sfd);
+        }
+
         return -1;
     }
 
@@ -682,6 +687,11 @@ void cproxy_on_close_downstream_conn(conn *c) {
         // downstream, it was delinked already during connect error
         // handling (where its slot was set to NULL_CONN already).
         //
+        if (settings.verbose > 2) {
+            moxi_log_write("%d: skipping release dc in on_close_dc\n",
+                           c->sfd);
+        }
+
         return;
     }
 
@@ -1836,10 +1846,6 @@ bool cproxy_forward(downstream *d) {
 }
 
 bool cproxy_forward_or_error(downstream *d) {
-    if (d->downstream_used_start > 0) {
-        return true; // We've already forwarded this downstream.
-    }
-
     if (cproxy_forward(d) == false) {
         d->ptd->stats.stats.tot_downstream_propagate_failed++;
         propagate_error(d);
@@ -1878,6 +1884,10 @@ void upstream_error(conn *uc) {
                           "vbucket",
                           sizeof(ptd->behavior_pool.base.nodeLocator) - 1))) {
             msg = "END\r\n";
+        }
+
+        if (settings.verbose > 2) {
+            moxi_log_write("%d: upstream_error: %s\n", uc->sfd, msg);
         }
 
         if (add_iov(uc, msg, strlen(msg)) == 0 &&
