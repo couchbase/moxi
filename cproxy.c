@@ -3091,23 +3091,20 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
             //
             if (conns->dc_acquired <= 0 &&
                 conns->dc == NULL) {
-                while (conns->downstream_waiting_head != NULL) {
-                    assert(conns->downstream_waiting_tail != NULL);
+                downstream *head = conns->downstream_waiting_head;
 
-                    downstream *d_head = conns->downstream_waiting_head;
+                conns->downstream_waiting_head = NULL;
+                conns->downstream_waiting_tail = NULL;
 
-                    conns->downstream_waiting_head =
-                        conns->downstream_waiting_head->next_waiting;
-                    if (conns->downstream_waiting_head == NULL) {
-                        conns->downstream_waiting_tail = NULL;
-                    }
+                while (head != NULL) {
+                    head->ptd->stats.stats.tot_downstream_waiting_errors++;
+                    head->ptd->stats.stats.tot_downstream_conn_queue_remove++;
 
-                    d_head->next_waiting = NULL;
+                    downstream *prev = head;
+                    head = head->next_waiting;
+                    prev->next_waiting = NULL;
 
-                    d_head->ptd->stats.stats.tot_downstream_waiting_errors++;
-                    d_head->ptd->stats.stats.tot_downstream_conn_queue_remove++;
-
-                    cproxy_forward_or_error(d_head);
+                    cproxy_forward_or_error(prev);
                 }
             }
         }
@@ -3307,6 +3304,7 @@ bool zstored_downstream_waiting_remove(downstream *d) {
 
         zstored_downstream_conns *conns =
             zstored_get_downstream_conns(thread, host_ident);
+
         if (conns != NULL) {
             // Linked-list removal, on the next_waiting pointer,
             // and keep head and tail pointers updated.
