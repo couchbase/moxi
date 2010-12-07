@@ -3105,6 +3105,7 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
                     d_head->next_waiting = NULL;
 
                     d_head->ptd->stats.stats.tot_downstream_waiting_errors++;
+                    d_head->ptd->stats.stats.tot_downstream_conn_queue_remove++;
 
                     cproxy_forward_or_error(d_head);
                 }
@@ -3270,6 +3271,8 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
                 }
                 d_head->next_waiting = NULL;
 
+                d_head->ptd->stats.stats.tot_downstream_conn_queue_remove++;
+
                 cproxy_forward_or_error(d_head);
             }
 
@@ -3329,6 +3332,9 @@ bool zstored_downstream_waiting_remove(downstream *d) {
                     }
 
                     curr->next_waiting = NULL;
+
+                    d->ptd->stats.stats.tot_downstream_conn_queue_remove++;
+
                     break;
                 }
 
@@ -3371,6 +3377,8 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
             conns->downstream_waiting_tail->next_waiting = d;
         }
         conns->downstream_waiting_tail = d;
+
+        d->ptd->stats.stats.tot_downstream_conn_queue_add++;
 
         return true;
     }

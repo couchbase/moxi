@@ -602,6 +602,10 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->tot_downstream_close_on_upstream_close);
     APPEND_PREFIX_STAT("tot_downstream_conn_queue_timeout",
               "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_timeout);
+    APPEND_PREFIX_STAT("tot_downstream_conn_queue_add",
+              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_add);
+    APPEND_PREFIX_STAT("tot_downstream_conn_queue_remove",
+              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_remove);
     APPEND_PREFIX_STAT("tot_downstream_timeout",
               "%llu", (long long unsigned int) pstats->tot_downstream_timeout);
     APPEND_PREFIX_STAT("tot_wait_queue_timeout",
@@ -1235,6 +1239,10 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
         x->tot_downstream_close_on_upstream_close;
     agg->tot_downstream_conn_queue_timeout +=
         x->tot_downstream_conn_queue_timeout;
+    agg->tot_downstream_conn_queue_add +=
+        x->tot_downstream_conn_queue_add;
+    agg->tot_downstream_conn_queue_remove +=
+        x->tot_downstream_conn_queue_remove;
     agg->tot_downstream_timeout   += x->tot_downstream_timeout;
     agg->tot_wait_queue_timeout   += x->tot_wait_queue_timeout;
     agg->tot_auth_timeout         += x->tot_auth_timeout;
@@ -1493,6 +1501,10 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.tot_downstream_close_on_upstream_close);
     more_stat("tot_downstream_conn_queue_timeout",
               pstd->stats.tot_downstream_conn_queue_timeout);
+    more_stat("tot_downstream_conn_queue_add",
+              pstd->stats.tot_downstream_conn_queue_add);
+    more_stat("tot_downstream_conn_queue_remove",
+              pstd->stats.tot_downstream_conn_queue_remove);
     more_stat("tot_downstream_timeout",
               pstd->stats.tot_downstream_timeout);
     more_stat("tot_wait_queue_timeout",
