@@ -685,7 +685,8 @@ void cproxy_on_close_downstream_conn(conn *c) {
     if (k < 0) {
         // If this downstream conn wasn't linked into the
         // downstream, it was delinked already during connect error
-        // handling (where its slot was set to NULL_CONN already).
+        // handling (where its slot was set to NULL_CONN already),
+        // or during downstream_timeout/conn_queue_timeout.
         //
         if (settings.verbose > 2) {
             moxi_log_write("%d: skipping release dc in on_close_dc\n",
@@ -878,7 +879,8 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
             ptd->downstream_released =
                 downstream_list_remove(ptd->downstream_released, d);
 
-            zstored_downstream_waiting_remove(d);
+            bool found = zstored_downstream_waiting_remove(d);
+            assert(!found);
 
             d->next = ptd->downstream_reserved;
             ptd->downstream_reserved = d;
@@ -1105,7 +1107,8 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         d->ptd->downstream_released =
             downstream_list_remove(d->ptd->downstream_released, d);
 
-        zstored_downstream_waiting_remove(d);
+        bool found = zstored_downstream_waiting_remove(d);
+        assert(!found);
 
         d->next = d->ptd->downstream_released;
         d->ptd->downstream_released = d;
@@ -1138,7 +1141,8 @@ void cproxy_free_downstream(downstream *d) {
     d->ptd->downstream_released =
         downstream_list_remove(d->ptd->downstream_released, d);
 
-    zstored_downstream_waiting_remove(d);
+    bool found = zstored_downstream_waiting_remove(d);
+    assert(!found);
 
     d->ptd->downstream_num--;
     assert(d->ptd->downstream_num >= 0);
@@ -2518,11 +2522,9 @@ void downstream_timeout(const int fd,
 
     downstream *d = arg;
     assert(d != NULL);
-    assert(d->ptd != NULL);
 
-    if (settings.verbose > 2) {
-        moxi_log_write("downstream_timeout\n");
-    }
+    proxy_td *ptd = d->ptd;
+    assert(ptd != NULL);
 
     // This timer callback is invoked when one or more of
     // the downstream conns must be really slow.  Handle by
@@ -2530,32 +2532,48 @@ void downstream_timeout(const int fd,
     // freeing up downstream resources.
     //
     if (cproxy_clear_timeout(d) == true) {
-        d->ptd->stats.stats.tot_downstream_timeout++;
-
-        int n = mcs_server_count(&d->mst);
-
-        for (int i = 0; i < n; i++) {
-            if (d->downstream_conns[i] != NULL &&
-                d->downstream_conns[i] != NULL_CONN) {
-                cproxy_close_conn(d->downstream_conns[i]);
-            }
-            d->downstream_conns[i] = NULL_CONN;
-        }
-
         // The downstream_timeout() callback is invoked for
         // two cases (downstream_conn_queue_timeouts and
         // downstream_timeouts), so cleanup and track stats
         // accordingly.
         //
-        if (zstored_downstream_waiting_remove(d) == true) {
+        bool was_conn_queue_waiting =
+            zstored_downstream_waiting_remove(d);
+
+        if (was_conn_queue_waiting == true) {
             if (settings.verbose > 2) {
                 moxi_log_write("conn_queue_timeout\n");
             }
 
-            d->ptd->stats.stats.tot_downstream_conn_queue_timeout++;
+            ptd->stats.stats.tot_downstream_conn_queue_timeout++;
+        } else {
+            if (settings.verbose > 2) {
+                moxi_log_write("downstream_timeout\n");
+            }
 
-            cproxy_forward_or_error(d);
+            ptd->stats.stats.tot_downstream_timeout++;
         }
+
+        propagate_error(d);
+
+        int n = mcs_server_count(&d->mst);
+
+        for (int i = 0; i < n; i++) {
+            conn *dc = d->downstream_conns[i];
+            if (dc != NULL &&
+                dc != NULL_CONN) {
+                // We have to de-link early, because we don't want
+                // to have cproxy_close_conn() release the downstream
+                // while we're in the middle of this loop.
+                //
+                delink_from_downstream_conns(dc);
+
+                cproxy_close_conn(dc);
+            }
+        }
+
+        cproxy_release_downstream(d, false);
+        cproxy_assign_downstream(ptd);
     }
 }
 
