@@ -113,6 +113,7 @@ test: memcached-debug sizes testapp
 	$(srcdir)/sizes
 	$(srcdir)/testapp
 	./t/moxi_all.pl
+	./t/issue-MB-2649.sh
 	./t/issue-MB-2660.sh
 	./t/issue-MB-2689.sh
 	./t/issue-MB-2811.sh
