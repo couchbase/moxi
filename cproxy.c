@@ -452,7 +452,7 @@ proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id) {
     return NULL;
 }
 
-void cproxy_init_upstream_conn(conn *c) {
+bool cproxy_init_upstream_conn(conn *c) {
     assert(c != NULL);
 
     // We're called once per client/upstream conn early in its
@@ -519,14 +519,18 @@ void cproxy_init_upstream_conn(conn *c) {
 
     c->extra = ptd;
     c->funcs = &cproxy_upstream_funcs;
+
+    return true;
 }
 
-void cproxy_init_downstream_conn(conn *c) {
+bool cproxy_init_downstream_conn(conn *c) {
     downstream *d = c->extra;
     assert(d != NULL);
 
     d->ptd->stats.stats.num_downstream_conn++;
     d->ptd->stats.stats.tot_downstream_conn++;
+
+    return true;
 }
 
 void cproxy_on_close_upstream_conn(conn *c) {

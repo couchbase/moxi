@@ -460,8 +460,13 @@ conn *conn_new(const int sfd, enum conn_states init_state,
         return NULL;
     }
 
-    if (c->funcs->conn_init != NULL)
-        c->funcs->conn_init(c);
+    if (c->funcs->conn_init != NULL &&
+        c->funcs->conn_init(c) == false) {
+        if (conn_add_to_freelist(c)) {
+            conn_free(c);
+        }
+        return NULL;
+    }
 
     STATS_LOCK();
     stats.curr_conns++;

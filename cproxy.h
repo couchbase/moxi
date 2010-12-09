@@ -502,8 +502,8 @@ int cproxy_listen_port(int port,
                        conn_funcs *conn_funcs);
 
 proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id);
-void      cproxy_init_upstream_conn(conn *c);
-void      cproxy_init_downstream_conn(conn *c);
+bool      cproxy_init_upstream_conn(conn *c);
+bool      cproxy_init_downstream_conn(conn *c);
 void      cproxy_on_close_upstream_conn(conn *c);
 void      cproxy_on_close_downstream_conn(conn *c);
 void      cproxy_on_pause_downstream_conn(conn *c);
