@@ -95,6 +95,8 @@ bool cproxy_forward_or_error(downstream *d);
 
 int delink_from_downstream_conns(conn *c);
 
+int cproxy_num_active_proxies(proxy_main *m);
+
 // Function tables.
 //
 conn_funcs cproxy_listen_funcs = {
@@ -463,6 +465,17 @@ bool cproxy_init_upstream_conn(conn *c) {
 
     proxy *p = c->extra;
     assert(p != NULL);
+    assert(p->main != NULL);
+
+    int n = cproxy_num_active_proxies(p->main);
+    if (n <= 0) {
+        if (settings.verbose > 2) {
+            moxi_log_write("<%d disallowing upstream conn due to no buckets\n",
+                           c->sfd);
+        }
+
+        return false;
+    }
 
     proxy_td *ptd = cproxy_find_thread_data(p, pthread_self());
     assert(ptd != NULL);
@@ -3427,6 +3440,26 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
     pthread_mutex_unlock(&m->proxy_main_lock);
 
     return found;
+}
+
+int cproxy_num_active_proxies(proxy_main *m) {
+    int n = 0;
+
+    pthread_mutex_lock(&m->proxy_main_lock);
+
+    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+        pthread_mutex_lock(&p->proxy_lock);
+        if (p->name != NULL &&
+            p->config != NULL &&
+            p->config[0] != '\0') {
+            n++;
+        }
+        pthread_mutex_unlock(&p->proxy_lock);
+    }
+
+    pthread_mutex_unlock(&m->proxy_main_lock);
+
+    return n;
 }
 
 static
