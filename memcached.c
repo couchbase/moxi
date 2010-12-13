@@ -453,18 +453,16 @@ conn *conn_new(const int sfd, enum conn_states init_state,
     c->ev_flags = event_flags;
 
     if (event_add(&c->event, 0) == -1) {
-        if (conn_add_to_freelist(c)) {
-            conn_free(c);
-        }
-        perror("event_add");
+        event_del(&c->event);
+        conn_free(c);
+        perror("event_add\n");
         return NULL;
     }
 
     if (c->funcs->conn_init != NULL &&
         c->funcs->conn_init(c) == false) {
-        if (conn_add_to_freelist(c)) {
-            conn_free(c);
-        }
+        event_del(&c->event);
+        conn_free(c);
         return NULL;
     }
 
