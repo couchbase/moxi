@@ -558,6 +558,7 @@ bool cproxy_update_event_write(downstream *d, conn *c);
 bool cproxy_forward(downstream *d);
 
 void upstream_error(conn *uc);
+void upstream_error_msg(conn *uc, char *ascii_msg);
 void upstream_retry(void *data0, void *data1);
 
 int downstream_conn_index(downstream *d, conn *c);

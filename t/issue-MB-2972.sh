@@ -43,7 +43,7 @@ sleep 1
 
 echo client request 1 - attempt get when memcached is down
 echo get 1 | nc 127.0.0.1 11266 > /tmp/moxi-2972.out
-if ! (echo "SERVER_ERROR proxy write to downstream\r" | diff - /tmp/moxi-2972.out); then \
+if ! (echo "SERVER_ERROR proxy downstream timeout\r" | diff - /tmp/moxi-2972.out); then \
     echo FAIL - did not get expected SERVER_ERROR
     killall moxi
     exit -1
@@ -82,7 +82,7 @@ echo starting moxi
 
 sleep 1
 
-echo client request 1 - attempt get when memcached is down
+echo client request 2 - attempt get when memcached is down
 echo get 1 | nc 127.0.0.1 11266 > /tmp/moxi-2972.out
 if ! (echo "SERVER_ERROR proxy write to downstream\r" | diff - /tmp/moxi-2972.out); then \
     echo FAIL - did not get expected SERVER_ERROR

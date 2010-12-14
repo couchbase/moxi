@@ -42,6 +42,7 @@ conn *conn_list_remove(conn *head, conn **tail,
 bool is_compatible_request(conn *existing, conn *candidate);
 
 void propagate_error(downstream *d);
+void propagate_error_msg(downstream *d, char *ascii_msg);
 
 void downstream_reserved_time_sample(proxy_stats_td *ptds, uint64_t duration);
 void downstream_connect_time_sample(proxy_stats_td *ptds, uint64_t duration);
@@ -1812,6 +1813,10 @@ void cproxy_assign_downstream(proxy_td *ptd) {
 }
 
 void propagate_error(downstream *d) {
+    propagate_error_msg(d, NULL);
+}
+
+void propagate_error_msg(downstream *d, char *ascii_msg) {
     assert(d != NULL);
 
     while (d->upstream_conn != NULL) {
@@ -1822,7 +1827,7 @@ void propagate_error(downstream *d) {
                            uc->sfd);
         }
 
-        upstream_error(uc);
+        upstream_error_msg(uc, ascii_msg);
 
         conn *curr = d->upstream_conn;
         d->upstream_conn = d->upstream_conn->next;
@@ -1879,6 +1884,10 @@ bool cproxy_forward_or_error(downstream *d) {
 }
 
 void upstream_error(conn *uc) {
+    upstream_error_msg(uc, NULL);
+}
+
+ void upstream_error_msg(conn *uc, char *ascii_msg) {
     assert(uc);
     assert(uc->state == conn_pause);
 
@@ -1886,7 +1895,10 @@ void upstream_error(conn *uc) {
     assert(ptd != NULL);
 
     if (IS_ASCII(uc->protocol)) {
-        char *msg = "SERVER_ERROR proxy write to downstream\r\n";
+        char *msg = ascii_msg;
+        if (msg == NULL) {
+            msg = "SERVER_ERROR proxy write to downstream\r\n";
+        }
 
         pthread_mutex_lock(&ptd->proxy->proxy_lock);
         if (ptd->proxy->name != NULL &&
@@ -2571,7 +2583,7 @@ void downstream_timeout(const int fd,
             ptd->stats.stats.tot_downstream_timeout++;
         }
 
-        propagate_error(d);
+        propagate_error_msg(d, "SERVER_ERROR proxy downstream timeout\r\n");
 
         int n = mcs_server_count(&d->mst);
 
