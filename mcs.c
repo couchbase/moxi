@@ -465,12 +465,18 @@ int mcs_connect(const char *hostname, int portnum,
         }
 
         if (connect(sock, ai->ai_addr, ai->ai_addrlen) == -1) {
-            int errno_last = errno;
+            int errno_last;
+#ifdef WIN32
+            errno_last = WSAGetLastError();
+#else
+            errno_last = errno;
+#endif
             if (errno_out != NULL) {
                 *errno_out = errno_last;
             }
 
-            if (!blocking && (errno_last == EINPROGRESS)) {
+            if (!blocking && (errno_last == EINPROGRESS ||
+                              errno_last == EWOULDBLOCK)) {
                 ret = sock;
                 break;
             }

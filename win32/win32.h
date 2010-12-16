@@ -20,7 +20,7 @@
 #include <process.h>
 #include <signal.h>
 
-#define EWOULDBLOCK        EAGAIN
+#define EWOULDBLOCK        WSAEWOULDBLOCK
 #define EAFNOSUPPORT       47
 #define EADDRINUSE         WSAEADDRINUSE
 #define ECONNRESET         WSAECONNRESET
@@ -137,9 +137,10 @@ static inline size_t mem_write(int s, void *buf, size_t len)
     if(WSASend(s, &wsabuf, 1, &dwBufferCount, 0, NULL, NULL) == 0) {
         return dwBufferCount;
     }
-        error = WSAGetLastError();
-    if(error == WSAECONNRESET) return 0;
-        mapErr(error);
+    error = WSAGetLastError();
+    if(error == WSAECONNRESET)
+        return 0;
+    mapErr(error);
     return -1;
 }
 
@@ -158,13 +159,13 @@ static inline size_t mem_read(int s, void *buf, size_t len)
         &dwBufferCount,
         &flags,
         NULL,
-        NULL
-    ) == 0) {
+        NULL) == 0) {
         return dwBufferCount;
     }
     error = WSAGetLastError();
-        if (error == WSAECONNRESET) return 0;
-        mapErr(error);
+    if (error == WSAECONNRESET)
+        return 0;
+    mapErr(error);
     return -1;
 }
 
@@ -181,13 +182,13 @@ static inline int sendmsg(int s, const struct msghdr *msg, int flags)
         msg->msg_name,
         msg->msg_namelen,
         NULL,
-        NULL
-    ) == 0) {
+        NULL) == 0) {
         return dwBufferCount;
     }
     error = WSAGetLastError();
-        if (error == WSAECONNRESET) return 0;
-        mapErr(error);
+    if (error == WSAECONNRESET)
+        return 0;
+    mapErr(error);
     return -1;
 }
 
@@ -212,11 +213,13 @@ static int fcntl(SOCKET s, int cmd, int val)
                     imode = 1;
                     if(ioctlsocket(s, FIONBIO, &imode) == SOCKET_ERROR)
                         return -1;
+                    return 0;
                     break;
                 case O_BLOCK:
                     imode = 0;
                     if(ioctlsocket(s, FIONBIO, &imode) == SOCKET_ERROR)
                         return -1;
+                    return 0;
                     break;
                 default:
                     return -1;

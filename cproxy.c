@@ -15,11 +15,7 @@
 #include "log.h"
 
 #ifndef MOXI_BLOCKING_CONNECT
-#ifdef WIN32
-#define MOXI_BLOCKING_CONNECT true
-#else
 #define MOXI_BLOCKING_CONNECT false
-#endif
 #endif
 
 // Internal forward declarations.
@@ -1469,13 +1465,15 @@ conn *cproxy_connect_downstream_conn(downstream *d,
     int fd = mcs_connect(mcs_server_st_hostname(msst),
                          mcs_server_st_port(msst), &err,
                          MOXI_BLOCKING_CONNECT);
-    if (fd != -1) {
-        if (settings.verbose > 2) {
-            moxi_log_write("%d: cproxy_connect_downstream_conn %s:%d\n", fd,
-                           mcs_server_st_hostname(msst),
-                           mcs_server_st_port(msst));
-        }
 
+    if (settings.verbose > 2) {
+        moxi_log_write("%d: cproxy_connect_downstream_conn %s:%d %d %d\n", fd,
+                       mcs_server_st_hostname(msst),
+                       mcs_server_st_port(msst),
+                       MOXI_BLOCKING_CONNECT, err);
+    }
+
+    if (fd != -1) {
         conn *c = conn_new(fd, conn_pause, 0,
                            DATA_BUFFER_SIZE,
                            tcp_transport,
@@ -1488,7 +1486,8 @@ conn *cproxy_connect_downstream_conn(downstream *d,
             c->thread = thread;
             c->cmd_start_time = start;
 
-            if (err == EINPROGRESS) {
+            if (err == EINPROGRESS ||
+                err == EWOULDBLOCK) {
                 if (update_event_timed(c, EV_WRITE | EV_PERSIST,
                                        &behavior->connect_timeout)) {
                     conn_set_state(c, conn_connecting);
