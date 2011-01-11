@@ -1171,7 +1171,7 @@ void cproxy_on_config(void *data0, void *data1) {
 
             free(config);
         } else {
-            moxi_log_write("ERROR: invalid config from REST server\n");
+            moxi_log_write("ERROR: invalid, empty config from REST server\n");
             goto fail;
         }
     } else {
