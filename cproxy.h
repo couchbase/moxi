@@ -835,6 +835,11 @@ void key_stats_dec_ref(void *it);
 bool  add_conn_item(conn *c, item *it);
 char *add_conn_suffix(conn *c);
 
+void *cproxy_make_bin_header(conn *c, uint8_t magic);
+
+protocol_binary_response_header *cproxy_make_bin_error(conn *c,
+                                                       uint16_t status);
+
 size_t scan_tokens(char *command, token_t *tokens, const size_t max_tokens,
                    int *command_len);
 

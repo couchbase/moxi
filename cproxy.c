@@ -721,8 +721,18 @@ void cproxy_on_close_downstream_conn(conn *c) {
         //       - last downstream conn closes?  Current behavior.
         //
         if (d->upstream_suffix == NULL) {
-            d->upstream_suffix = "SERVER_ERROR proxy downstream closed\r\n";
-            d->upstream_suffix_len = 0;
+            if (settings.verbose > 2) {
+                moxi_log_write("<%d proxy downstream closed, upstream %d (%x)\n",
+                               c->sfd,
+                               d->upstream_conn->sfd,
+                               d->upstream_conn->protocol);
+            }
+
+            if (IS_ASCII(d->upstream_conn->protocol)) {
+                d->upstream_suffix = "SERVER_ERROR proxy downstream closed\r\n";
+                d->upstream_suffix_len = 0;
+            }
+
             d->upstream_retry = 0;
         }
 
@@ -756,6 +766,21 @@ void cproxy_on_close_downstream_conn(conn *c) {
                     d->upstream_suffix_len = 0;
                     d->upstream_retry = 0;
                 }
+            }
+        }
+
+        if (uc_retry == NULL &&
+            d->upstream_suffix == NULL &&
+            IS_BINARY(d->upstream_conn->protocol)) {
+            protocol_binary_response_header *rh =
+                cproxy_make_bin_error(d->upstream_conn,
+                                      PROTOCOL_BINARY_RESPONSE_ENOMEM);
+            if (rh != NULL) {
+                d->upstream_suffix = rh;
+                d->upstream_suffix_len = sizeof(protocol_binary_response_header);
+            } else {
+                d->ptd->stats.stats.err_oom++;
+                cproxy_close_conn(d->upstream_conn);
             }
         }
     }
@@ -1886,7 +1911,7 @@ void upstream_error(conn *uc) {
     upstream_error_msg(uc, NULL);
 }
 
- void upstream_error_msg(conn *uc, char *ascii_msg) {
+void upstream_error_msg(conn *uc, char *ascii_msg) {
     assert(uc);
     assert(uc->state == conn_pause);
 

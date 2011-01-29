@@ -34,10 +34,11 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
     assert(d->downstream_conns != NULL);
-    assert(d->downstream_used_start == 0);
     assert(d->downstream_used == 0);
     assert(d->multiget == NULL);
     assert(d->merger == NULL);
+
+    d->downstream_used_start = 0;
 
     conn *uc = d->upstream_conn;
 
@@ -401,7 +402,7 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     int      extlen  = header->response.extlen;
     int      keylen  = header->response.keylen;
     uint32_t bodylen = header->response.bodylen;
-    int      status  = header->response.status;
+    int      status  = ntohs(header->response.status);
     int      opcode  = header->response.opcode;
 
     if (settings.verbose > 2) {

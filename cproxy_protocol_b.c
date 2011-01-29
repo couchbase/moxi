@@ -440,3 +440,27 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     write_bin_error(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, 0);
 }
 
+void *cproxy_make_bin_header(conn *c, uint8_t magic) {
+    protocol_binary_response_header *rh =
+        (protocol_binary_response_header *) add_conn_suffix(c);
+    if (rh != NULL) {
+        memset(rh, 0, sizeof(protocol_binary_response_header));
+        rh->response.magic = magic;
+        rh->response.datatype = (uint8_t) PROTOCOL_BINARY_RAW_BYTES;
+        return rh;
+    }
+    return NULL;
+}
+
+protocol_binary_response_header *
+cproxy_make_bin_error(conn *c, uint16_t status) {
+    protocol_binary_response_header *rh =
+        cproxy_make_bin_header(c, PROTOCOL_BINARY_RES);
+    if (rh != NULL) {
+        rh->response.opcode = c->binary_header.request.opcode;
+        rh->response.status = (uint16_t) htons(status);
+        rh->response.opaque = c->opaque;
+        return rh;
+    }
+    return NULL;
+}
