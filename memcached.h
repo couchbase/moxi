@@ -663,3 +663,5 @@ extern void drop_privileges(void);
 
 // used by unit tests
 void start_main(char *arg0, ...);
+
+void process_bin_proxy_stats(conn *c);

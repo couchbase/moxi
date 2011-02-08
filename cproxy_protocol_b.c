@@ -138,6 +138,15 @@ void cproxy_process_upstream_binary_nread(conn *c) {
         return;
     }
 
+    if (c->binary_header.request.opcode == PROTOCOL_BINARY_CMD_STAT) {
+        char *subcommand = binary_get_key(c);
+        size_t nkey = c->binary_header.request.keylen;
+        if (nkey == 5 && memcmp(subcommand, "proxy", 5) == 0) {
+            process_bin_proxy_stats(c);
+            return;
+        }
+    }
+
     if (c->noreply) {
         if (settings.verbose > 2) {
             moxi_log_write("<%d cproxy_process_upstream_binary_nread "

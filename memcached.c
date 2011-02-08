@@ -1391,7 +1391,7 @@ static void append_stats(const char *key, const uint16_t klen,
 
     conn *c = (conn*)cookie;
 
-    if (c->protocol == binary_prot) {
+    if (IS_BINARY(c->protocol)) {
         size_t needed = vlen + klen + sizeof(protocol_binary_response_header);
         if (!grow_stats_buf(c, needed)) {
             return ;
@@ -1406,6 +1406,30 @@ static void append_stats(const char *key, const uint16_t klen,
     }
 
     assert(c->stats.offset <= c->stats.size);
+}
+
+void process_bin_proxy_stats(conn *c) {
+    struct proxy_stats_cmd_info psci = {
+        .do_info = false,
+        .do_settings = false,
+        .do_behaviors = false,
+        .do_frontcache = false,
+        .do_keystats = false,
+        .do_stats = true,
+        .do_zeros = true
+    };
+
+    /* proxy_stats_dump_proxy_main(&append_stats, c, &psci); */
+    proxy_stats_dump_proxies(&append_stats, c, &psci);
+
+    /* Append termination package and start the transfer */
+    append_stats(NULL, 0, NULL, 0, c);
+    if (c->stats.buffer == NULL) {
+        write_bin_error(c, PROTOCOL_BINARY_RESPONSE_ENOMEM, 0);
+    } else {
+        write_and_free(c, c->stats.buffer, c->stats.offset);
+        c->stats.buffer = NULL;
+    }
 }
 
 static void process_bin_stat(conn *c) {
