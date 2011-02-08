@@ -2179,6 +2179,8 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
                         const char *fmt, ...) {
     char val_str[STAT_VAL_LEN];
     int vlen;
+    char *val_free = 0;
+    char *val;
     va_list ap;
 
     assert(name);
@@ -2187,16 +2189,33 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
     assert(fmt);
 
     va_start(ap, fmt);
-    vlen = vsnprintf(val_str, sizeof(val_str) - 1, fmt, ap);
+    vlen = vsnprintf(val_str, sizeof(val_str), fmt, ap);
     va_end(ap);
 
+    if (vlen > (int)sizeof(val_str)-1) {
+        val_free = malloc(vlen+1);
+        if (val_free != 0) {
+            val = val_free;
+            va_start(ap, fmt);
+            vsnprintf(val_free, vlen+1, fmt, ap);
+            va_end(ap);
+        } else {
+            val = val_str;
+            vlen = sizeof(val_str)-1;
+        }
+    } else {
+        val = val_str;
+    }
+
     if (prefix == NULL) {
-        add_stats(name, strlen(name), val_str, vlen, c);
+        add_stats(name, strlen(name), val, vlen, c);
     } else {
         char key_str[STAT_KEY_LEN];
         strcpy(key_str, prefix); strcat(key_str, name);
-        add_stats(key_str, strlen(key_str), val_str, vlen, c);
+        add_stats(key_str, strlen(key_str), val, vlen, c);
     }
+
+    free(val_free);
 }
 
 inline static void process_stats_detail(conn *c, const char *command) {
