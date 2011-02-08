@@ -802,6 +802,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
         bool go = true;
 
         if (p->name != NULL &&
+            strcmp(p->name, NULL_BUCKET) != 0 &&
             p->config != NULL) {
             if (pscip->do_info) {
                 snprintf(prefix, sizeof(prefix), "%u:%s:info:", p->port, p->name);
