@@ -141,7 +141,7 @@ void cproxy_process_upstream_binary_nread(conn *c) {
     if (c->binary_header.request.opcode == PROTOCOL_BINARY_CMD_STAT) {
         char *subcommand = binary_get_key(c);
         size_t nkey = c->binary_header.request.keylen;
-        if (nkey == 5 && memcmp(subcommand, "proxy", 5) == 0) {
+        if (nkey == 13 && memcmp(subcommand, "proxy buckets", 13) == 0) {
             process_bin_proxy_stats(c);
             return;
         }
