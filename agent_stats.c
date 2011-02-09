@@ -647,6 +647,15 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
               "%llu", (long long unsigned int) pstats->err_upstream_write_prep);
     APPEND_PREFIX_STAT("err_downstream_write_prep",
               "%llu", (long long unsigned int) pstats->err_downstream_write_prep);
+    APPEND_PREFIX_STAT("tot_cmd_time",
+              "%llu", (long long unsigned int) pstats->tot_cmd_time);
+    APPEND_PREFIX_STAT("tot_cmd_count",
+              "%llu", (long long unsigned int) pstats->tot_cmd_count);
+    APPEND_PREFIX_STAT("tot_local_cmd_time",
+              "%llu", (long long unsigned int) pstats->tot_local_cmd_time);
+    APPEND_PREFIX_STAT("tot_local_cmd_count",
+              "%llu", (long long unsigned int) pstats->tot_local_cmd_count);
+
 }
 
 static void proxy_stats_dump_stats_cmd(ADD_STAT add_stats, conn *c,
@@ -1267,6 +1276,11 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
     agg->err_oom                  += x->err_oom;
     agg->err_upstream_write_prep   += x->err_upstream_write_prep;
     agg->err_downstream_write_prep += x->err_downstream_write_prep;
+
+    agg->tot_cmd_time             += x->tot_cmd_time;
+    agg->tot_cmd_count            += x->tot_cmd_count;
+    agg->tot_local_cmd_time       += x->tot_local_cmd_time;
+    agg->tot_local_cmd_count      += x->tot_local_cmd_count;
 }
 
 static void add_stats_cmd(proxy_stats_cmd *agg,
@@ -1544,6 +1558,16 @@ void map_pstd_foreach_emit(const void *k,
               pstd->stats.err_upstream_write_prep);
     more_stat("err_downstream_write_prep",
               pstd->stats.err_downstream_write_prep);
+
+    more_stat("tot_cmd_time",
+              pstd->stats.tot_cmd_time);
+    more_stat("tot_cmd_count",
+              pstd->stats.tot_cmd_count);
+
+    more_stat("tot_local_cmd_time",
+              pstd->stats.tot_local_cmd_time);
+    more_stat("tot_local_cmd_count",
+              pstd->stats.tot_local_cmd_count);
 
     snprintf(buf_key, sizeof(buf_key), "%s:stats_cmd_", name);
     emit_proxy_stats_cmd(emit->result, buf_key, "%s_%s_%s", pstd->stats_cmd);

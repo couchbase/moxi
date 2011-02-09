@@ -486,6 +486,10 @@ struct conn {
     uint64_t  cmd_start_time; // Snapshot of usec_now or msec_current_time.
     int       cmd_retries;
 
+    bool      hit_local;
+    bool      cmd_unpaused;
+    uint64_t  cmd_arrive_time;
+
     bin_cmd *corked;
 
     char *host_ident; // Uniquely identifies a memcached server, including

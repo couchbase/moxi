@@ -657,15 +657,10 @@ char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii) {
 
     char *buf = is_ascii ? msst->ident_a : msst->ident_b;
     if (buf[0] == '\0') {
-        const char *usr = mcs_server_st_usr(msst) != NULL ?
-            mcs_server_st_usr(msst) :
-            NULL;
+        const char *usr = mcs_server_st_usr(msst);
+        const char *pwd = mcs_server_st_pwd(msst);
 
-        const char *pwd = mcs_server_st_pwd(msst) != NULL ?
-            mcs_server_st_pwd(msst) :
-            NULL;
-
-        snprintf(buf, MCS_IDENT_SIZE - 1,
+        snprintf(buf, MCS_IDENT_SIZE,
                  "%s:%d:%s:%s:%d",
                  mcs_server_st_hostname(msst),
                  mcs_server_st_port(msst),

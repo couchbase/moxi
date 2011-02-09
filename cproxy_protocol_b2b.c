@@ -164,10 +164,14 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
     }
 
     int  vbucket = -1;
+    bool local;
 
     conn *c = cproxy_find_downstream_conn_ex(d, key, keylen,
-                                             NULL, &vbucket);
+                                             &local, &vbucket);
     if (c != NULL) {
+        if (local) {
+            uc->hit_local = true;
+        }
         if (b2b_forward_item_vbucket(uc, d, it, c, vbucket) == true) {
             d->downstream_used_start = 1;
             d->downstream_used = 1;

@@ -2942,9 +2942,32 @@ void cproxy_upstream_state_change(conn *c, enum conn_states next_state) {
     if (ptd != NULL) {
         if (c->state == conn_pause) {
             ptd->stats.stats.tot_upstream_unpaused++;
+            c->cmd_unpaused = true;
         }
         if (next_state == conn_pause) {
             ptd->stats.stats.tot_upstream_paused++;
+        }
+
+        if (next_state == conn_parse_cmd && c->cmd_arrive_time == 0) {
+            c->cmd_unpaused = false;
+            c->hit_local = false;
+            c->cmd_arrive_time = usec_now();
+        }
+
+        if (next_state == conn_closing || next_state == conn_new_cmd) {
+            uint64_t arrive_time = c->cmd_arrive_time;
+            if (c->cmd_unpaused && arrive_time != 0) {
+                uint64_t latency = usec_now() - c->cmd_arrive_time;
+
+                if (c->hit_local) {
+                    ptd->stats.stats.tot_local_cmd_time += latency;
+                    ptd->stats.stats.tot_local_cmd_count++;
+                }
+
+                ptd->stats.stats.tot_cmd_time += latency;
+                ptd->stats.stats.tot_cmd_count++;
+                c->cmd_arrive_time = 0;
+            }
         }
     }
 }

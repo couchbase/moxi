@@ -324,6 +324,10 @@ struct proxy_stats {
     uint64_t err_oom;
     uint64_t err_upstream_write_prep;
     uint64_t err_downstream_write_prep;
+    uint64_t tot_cmd_time;
+    uint64_t tot_cmd_count;
+    uint64_t tot_local_cmd_time;
+    uint64_t tot_local_cmd_count;
 };
 
 typedef struct {

@@ -1217,9 +1217,10 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     // Handle all other simple commands.
     //
     int  vbucket = -1;
+    bool local;
 
     conn *c = cproxy_find_downstream_conn_ex(d, key, key_len,
-                                             NULL, &vbucket);
+                                             &local, &vbucket);
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_VERSION) {
         key     = NULL;
@@ -1227,6 +1228,9 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     }
 
     if (c != NULL) {
+        if (local) {
+            uc->hit_local = true;
+        }
         if (cproxy_prep_conn_for_write(c)) {
             assert(c->state == conn_pause);
             assert(c->wbuf);
@@ -1512,10 +1516,14 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
     // Assuming we're already connected to downstream.
     //
     int  vbucket = -1;
+    bool local;
 
     conn *c = cproxy_find_downstream_conn_ex(d, ITEM_key(it), it->nkey,
-                                             NULL, &vbucket);
+                                             &local, &vbucket);
     if (c != NULL) {
+        if (local) {
+            uc->hit_local = true;
+        }
         if (cproxy_prep_conn_for_write(c)) {
             if (settings.verbose > 2) {
                 moxi_log_write("%d: a2b_item_forward, state: %s\n",

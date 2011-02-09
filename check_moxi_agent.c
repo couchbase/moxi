@@ -173,7 +173,11 @@ struct field_description proxy_stats_description[] = {
   describe_field(struct proxy_stats, tot_optimize_sets),
   describe_field(struct proxy_stats, err_oom),
   describe_field(struct proxy_stats, err_upstream_write_prep),
-  describe_field(struct proxy_stats, err_downstream_write_prep)
+  describe_field(struct proxy_stats, err_downstream_write_prep),
+  describe_field(struct proxy_stats, tot_cmd_time),
+  describe_field(struct proxy_stats, tot_cmd_count),
+  describe_field(struct proxy_stats, tot_local_cmd_time),
+  describe_field(struct proxy_stats, tot_local_cmd_count)
 };
 
 struct field_description proxy_stats_cmd_description[] = {

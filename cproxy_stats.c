@@ -440,6 +440,8 @@ void cproxy_reset_stats(proxy_stats *ps) {
     ps->err_oom = 0;
     ps->err_upstream_write_prep = 0;
     ps->err_downstream_write_prep = 0;
+    ps->tot_cmd_time = 0;
+    ps->tot_cmd_count = 0;
 }
 
 void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
