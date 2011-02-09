@@ -354,26 +354,14 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
 
     // Assuming we're already connected to downstream.
     //
-    bool self = false;
-
     if (!strcmp(command, "version")) {
         /* fake key for version command handling */
         key = "v";
         key_len = 1;
     }
 
-    conn *c = cproxy_find_downstream_conn(d, key, key_len,
-                                          &self);
+    conn *c = cproxy_find_downstream_conn(d, key, key_len, NULL);
     if (c != NULL) {
-        if (self) {
-            // TODO: This optimization could be done much earlier,
-            // even before the upstream conn was assigned
-            // to a downstream.
-            //
-            cproxy_optimize_to_self(d, uc, command);
-            process_command(uc, command);
-            return true;
-        }
 
         if (cproxy_prep_conn_for_write(c)) {
             assert(c->state == conn_pause);
@@ -532,16 +520,9 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
 
     // Assuming we're already connected to downstream.
     //
-    bool self = false;
 
-    conn *c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey,
-                                          &self);
+    conn *c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey, NULL);
     if (c != NULL) {
-        if (self) {
-            cproxy_optimize_to_self(d, uc, uc->cmd_start);
-            complete_nread_ascii(uc);
-            return true;
-        }
 
         if (cproxy_prep_conn_for_write(c)) {
             assert(c->state == conn_pause);

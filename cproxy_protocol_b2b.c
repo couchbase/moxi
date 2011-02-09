@@ -163,13 +163,12 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
         return false; // We don't know how to hash an empty key.
     }
 
-    bool self = false;
     int  vbucket = -1;
 
     conn *c = cproxy_find_downstream_conn_ex(d, key, keylen,
-                                             &self, &vbucket);
+                                             NULL, &vbucket);
     if (c != NULL) {
-        if (b2b_forward_item_vbucket(uc, d, it, c, self, vbucket) == true) {
+        if (b2b_forward_item_vbucket(uc, d, it, c, vbucket) == true) {
             d->downstream_used_start = 1;
             d->downstream_used = 1;
 
@@ -188,8 +187,7 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
 }
 
 bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
-                              conn *c, bool self, int vbucket) {
-    (void)self;
+                              conn *c, int vbucket) {
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(uc != NULL);
@@ -198,8 +196,6 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
     assert(c != NULL);
 
     // Assuming we're already connected to downstream.
-    //
-    // TODO: Optimize to self codepath.
     //
     if (settings.verbose > 2) {
         moxi_log_write("%d: b2b_forward_item_vbucket %x to %d, vbucket %d\n",
@@ -257,8 +253,7 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
         conn *c = d->downstream_conns[i];
         if (c != NULL &&
             c != NULL_CONN &&
-            b2b_forward_item_vbucket(uc, d, uc->item, c,
-                                     false, -1) == true) {
+            b2b_forward_item_vbucket(uc, d, uc->item, c, -1) == true) {
             nwrite++;
         }
     }

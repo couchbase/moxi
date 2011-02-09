@@ -2938,33 +2938,6 @@ int downstream_conn_index(downstream *d, conn *c) {
     return -1;
 }
 
-/**
- * Optimization when we're talking with ourselves,
- * so we don't need to go through network hop,
- * for a simple one-liner command.
- */
-void cproxy_optimize_to_self(downstream *d, conn *uc,
-                                   char *command) {
-    assert(d);
-    assert(d->ptd);
-    assert(uc);
-    assert(uc->next == NULL);
-
-    d->ptd->stats.stats.tot_optimize_self++;
-
-    if (command != NULL &&
-        settings.verbose > 2) {
-        moxi_log_write("%d: optimize to self: %s\n",
-                uc->sfd, command);
-    }
-
-    d->upstream_conn   = NULL;
-    d->upstream_suffix = NULL;
-    d->upstream_suffix_len = 0;
-
-    cproxy_release_downstream(d, false);
-}
-
 void cproxy_upstream_state_change(conn *c, enum conn_states next_state) {
     assert(c != NULL);
 

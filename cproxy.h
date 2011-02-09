@@ -637,7 +637,7 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc);
 bool b2b_forward_item(conn *uc, downstream *d, item *it);
 
 bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
-                              conn *c, bool self, int vbucket);
+                              conn *c, int vbucket);
 
 // ---------------------------------------------------------------
 
@@ -772,9 +772,6 @@ void protocol_stats_foreach_free(const void *key,
 void protocol_stats_foreach_write(const void *key,
                                   const void *value,
                                   void *user_data);
-
-void cproxy_optimize_to_self(downstream *d, conn *uc,
-                             char *command);
 
 bool cproxy_optimize_set_ascii(downstream *d, conn *uc,
                                char *key, int key_len);

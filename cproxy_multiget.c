@@ -220,63 +220,11 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                     }
                 }
 
-                bool self = false;
                 int  vbucket = -1;
 
                 conn *c = cproxy_find_downstream_conn_ex(d, key, key_len,
-                                                         &self, &vbucket);
+                                                         NULL, &vbucket);
                 if (c != NULL) {
-                    if (self) {
-                        // Optimization for talking with ourselves,
-                        // to avoid extra network hop.
-                        //
-                        ptd->stats.stats.tot_optimize_self++;
-
-                        item *it = item_get(key, key_len);
-                        if (it != NULL) {
-                            cproxy_upstream_ascii_item_response(it, uc_cur,
-                                                                cas_emit);
-
-                            psc_get_key->hits++;
-                            psc_get_key->write_bytes += it->nbytes;
-
-                            if (do_key_stats) {
-                                touch_key_stats(ptd, key, key_len,
-                                                msec_current_time_snapshot,
-                                                STATS_CMD_TYPE_REGULAR,
-                                                STATS_CMD_GET_KEY,
-                                                0, 1, 0,
-                                                0, it->nbytes);
-                            }
-
-                            // The refcount was inc'ed by item_get() for us.
-                            //
-                            item_remove(it);
-
-                            if (settings.verbose > 1) {
-                                moxi_log_write("optimize self multiget hit: %s\n",
-                                        key);
-                            }
-                        } else {
-                            psc_get_key->misses++;
-
-                            if (do_key_stats) {
-                                touch_key_stats(ptd, key, key_len,
-                                                msec_current_time_snapshot,
-                                                STATS_CMD_TYPE_REGULAR,
-                                                STATS_CMD_GET_KEY,
-                                                0, 0, 1,
-                                                0, 0);
-                            }
-
-                            if (settings.verbose > 1) {
-                                moxi_log_write("optimize self multiget miss: %s\n",
-                                        key);
-                            }
-                        }
-
-                        goto loop_next;
-                    }
 
                     // If there's more than one key, create a de-duplication map.
                     // This is used to handle not-my-vbucket errors

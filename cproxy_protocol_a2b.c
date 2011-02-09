@@ -1216,11 +1216,10 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     // Assuming we're already connected to downstream.
     // Handle all other simple commands.
     //
-    bool self = false;
     int  vbucket = -1;
 
     conn *c = cproxy_find_downstream_conn_ex(d, key, key_len,
-                                             &self, &vbucket);
+                                             NULL, &vbucket);
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_VERSION) {
         key     = NULL;
@@ -1228,16 +1227,6 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     }
 
     if (c != NULL) {
-        if (self) {
-            // TODO: This optimization could be done much earlier,
-            // even before the upstream conn was assigned
-            // to a downstream.
-            //
-            cproxy_optimize_to_self(d, uc, command);
-            process_command(uc, command);
-            return true;
-        }
-
         if (cproxy_prep_conn_for_write(c)) {
             assert(c->state == conn_pause);
             assert(c->wbuf);
@@ -1522,18 +1511,11 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
 
     // Assuming we're already connected to downstream.
     //
-    bool self = false;
     int  vbucket = -1;
 
     conn *c = cproxy_find_downstream_conn_ex(d, ITEM_key(it), it->nkey,
-                                             &self, &vbucket);
+                                             NULL, &vbucket);
     if (c != NULL) {
-        if (self) {
-            cproxy_optimize_to_self(d, uc, uc->cmd_start);
-            complete_nread_ascii(uc);
-            return true;
-        }
-
         if (cproxy_prep_conn_for_write(c)) {
             if (settings.verbose > 2) {
                 moxi_log_write("%d: a2b_item_forward, state: %s\n",
