@@ -171,7 +171,6 @@ struct field_description proxy_stats_description[] = {
   describe_field(struct proxy_stats, tot_multiget_keys_dedupe),
   describe_field(struct proxy_stats, tot_multiget_bytes_dedupe),
   describe_field(struct proxy_stats, tot_optimize_sets),
-  describe_field(struct proxy_stats, tot_optimize_self),
   describe_field(struct proxy_stats, err_oom),
   describe_field(struct proxy_stats, err_upstream_write_prep),
   describe_field(struct proxy_stats, err_downstream_write_prep)
