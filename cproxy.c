@@ -1589,21 +1589,21 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
 
 conn *cproxy_find_downstream_conn(downstream *d,
                                   char *key, int key_length,
-                                  bool *self) {
-    return cproxy_find_downstream_conn_ex(d, key, key_length, self, NULL);
+                                  bool *local) {
+    return cproxy_find_downstream_conn_ex(d, key, key_length, local, NULL);
 }
 
 conn *cproxy_find_downstream_conn_ex(downstream *d,
                                      char *key, int key_length,
-                                     bool *self,
+                                     bool *local,
                                      int *vbucket) {
     assert(d != NULL);
     assert(d->downstream_conns != NULL);
     assert(key != NULL);
     assert(key_length > 0);
 
-    if (self != NULL) {
-        *self = false;
+    if (local != NULL) {
+        *local = false;
     }
 
     int v = -1;
@@ -1624,12 +1624,9 @@ conn *cproxy_find_downstream_conn_ex(downstream *d,
         s < (int) mcs_server_count(&d->mst) &&
         d->downstream_conns[s] != NULL &&
         d->downstream_conns[s] != NULL_CONN) {
-        if (self != NULL &&
-            settings.port > 0 &&
-            settings.port == mcs_server_st_port(mcs_server_index(&d->mst, s)) &&
-            strcmp(mcs_server_st_hostname(mcs_server_index(&d->mst, s)),
-                   cproxy_hostname) == 0) {
-            *self = true;
+
+        if (local != NULL && s == 0) {
+            *local = true;
         }
 
         if (vbucket != NULL) {
