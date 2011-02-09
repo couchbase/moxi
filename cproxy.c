@@ -776,7 +776,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
                 cproxy_make_bin_error(d->upstream_conn,
                                       PROTOCOL_BINARY_RESPONSE_ENOMEM);
             if (rh != NULL) {
-                d->upstream_suffix = rh;
+                d->upstream_suffix = (char *)rh;
                 d->upstream_suffix_len = sizeof(protocol_binary_response_header);
             } else {
                 d->ptd->stats.stats.err_oom++;
