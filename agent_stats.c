@@ -86,7 +86,7 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
                                         const char *prefix,
                                         proxy_stats *stats);
 static void proxy_stats_dump_stats_cmd(ADD_STAT add_stats,
-                                       conn *c,
+                                       conn *c, bool do_zeros,
                                        const char *prefix,
                                        proxy_stats_cmd stats_cmd[][STATS_CMD_last]);
 static void map_key_stats_foreach_dump(const void *key,
@@ -658,44 +658,44 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
 
 }
 
-static void proxy_stats_dump_stats_cmd(ADD_STAT add_stats, conn *c,
+static void proxy_stats_dump_stats_cmd(ADD_STAT add_stats, conn *c, bool do_zeros,
                                        const char *prefix,
                                        proxy_stats_cmd stats_cmd[][STATS_CMD_last]) {
     char keybuf[128];
 
     for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
         for (int k = 0; k < STATS_CMD_last; k++) {
-            if (stats_cmd[j][k].seen != 0) {
+            if (do_zeros || stats_cmd[j][k].seen != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "seen");
                 APPEND_PREFIX_STAT(keybuf,
                          "%llu", (long long unsigned int) stats_cmd[j][k].seen);
             }
-            if (stats_cmd[j][k].hits != 0) {
+            if (do_zeros || stats_cmd[j][k].hits != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "hits");
                 APPEND_PREFIX_STAT(keybuf,
                          "%llu", (long long unsigned int) stats_cmd[j][k].hits);
             }
-            if (stats_cmd[j][k].misses != 0) {
+            if (do_zeros || stats_cmd[j][k].misses != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "misses");
                 APPEND_PREFIX_STAT(keybuf,
                          "%llu", (long long unsigned int) stats_cmd[j][k].misses);
             }
-            if (stats_cmd[j][k].read_bytes != 0) {
+            if (do_zeros || stats_cmd[j][k].read_bytes != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "read_bytes");
                 APPEND_PREFIX_STAT(keybuf,
                          "%llu", (long long unsigned int) stats_cmd[j][k].read_bytes);
             }
-            if (stats_cmd[j][k].write_bytes != 0) {
+            if (do_zeros || stats_cmd[j][k].write_bytes != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "write_bytes");
                 APPEND_PREFIX_STAT(keybuf,
                          "%llu", (long long unsigned int) stats_cmd[j][k].write_bytes);
             }
-            if (stats_cmd[j][k].cas != 0) {
+            if (do_zeros || stats_cmd[j][k].cas != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "cas");
                 APPEND_PREFIX_STAT(keybuf,
@@ -729,7 +729,7 @@ static void map_key_stats_foreach_dump(const void *key, const void *value,
     char prefix[200+KEY_MAX_LENGTH];
     snprintf(prefix, sizeof(prefix), "%s:%s", state->prefix, name);
 
-    proxy_stats_dump_stats_cmd(add_stats, c, prefix, kstats->stats_cmd);
+    proxy_stats_dump_stats_cmd(add_stats, c, false, prefix, kstats->stats_cmd);
 
     APPEND_PREFIX_STAT("added_at_msec", "%u", kstats->added_at);
 }
@@ -891,7 +891,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
                 proxy_stats_dump_pstd_stats(add_stats, c, prefix, &pstd->stats);
                 snprintf(prefix, sizeof(prefix), "%u:%s:pstd_stats_cmd:",
                          p->port, p->name);
-                proxy_stats_dump_stats_cmd(add_stats, c, prefix,
+                proxy_stats_dump_stats_cmd(add_stats, c, pscip->do_zeros, prefix,
                                            pstd->stats_cmd);
 
                 free(pstd);
