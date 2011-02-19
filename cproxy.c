@@ -1958,6 +1958,8 @@ void upstream_error_msg(conn *uc, char *ascii_msg) {
         assert(IS_BINARY(uc->protocol));
 
         write_bin_error(uc, PROTOCOL_BINARY_RESPONSE_ENOMEM, 0);
+
+        update_event(uc, EV_WRITE | EV_PERSIST);
     }
 }
 
