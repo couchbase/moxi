@@ -287,7 +287,7 @@ static void ping_server(char *server_name,
 
                 mcs_server_st *st = mcs_server_index((void *) &mst, i);
                 mcs_return rc = mcs_server_st_connect(st, NULL, true);
-                if (rc == MEMCACHED_SUCCESS) {
+                if (rc == MCS_SUCCESS) {
                     struct timeval tv_conn;
                     gettimeofday(&tv_conn, NULL);
                     tv_report("conn", start, tv_conn);
