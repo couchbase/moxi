@@ -1419,8 +1419,10 @@ void process_bin_proxy_stats(conn *c) {
         .do_zeros = true
     };
 
+#ifdef HAVE_CONFLATE_H
     /* proxy_stats_dump_proxy_main(&append_stats, c, &psci); */
     proxy_stats_dump_proxies(&append_stats, c, &psci);
+#endif
 
     /* Append termination package and start the transfer */
     append_stats(NULL, 0, NULL, 0, c);
@@ -3017,19 +3019,25 @@ void process_command(conn *c, char *command) {
 
 void process_stats_proxy_command(conn *c, token_t *tokens, const size_t ntokens) {
     if (ntokens == 4 && strcmp(tokens[2].value, "reset") == 0) {
+#ifdef HAVE_CONFLATE_H
         proxy_td *ptd = c->extra;
         if (ptd != NULL) {
             proxy_stats_reset(ptd->proxy->main);
         }
+#endif
 
         out_string(c, "OK");
         return;
     }
 
     if (ntokens == 4 && strcmp(tokens[2].value, "timings") == 0) {
+#ifdef HAVE_CONFLATE_H
         proxy_stats_dump_timings(&append_stats, c);
+#endif
     } else if (ntokens == 4 && strcmp(tokens[2].value, "config") == 0) {
+#ifdef HAVE_CONFLATE_H
         proxy_stats_dump_config(&append_stats, c);
+#endif
     } else {
         bool do_all = (ntokens == 3 || strcmp(tokens[2].value, "all") == 0);
         struct proxy_stats_cmd_info psci = {
