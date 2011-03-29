@@ -41,7 +41,7 @@ int cproxy_init_mcmux_mode(int proxy_port,
                            int nthreads);
 
 proxy_behavior behavior_default_g = {
-    .cycle = 0,
+    .cycle = 200, // Clock cycle or quantum, in milliseconds.
     .downstream_max = 4,
     .downstream_conn_max = 0, // Use 0 for unlimited.
     .downstream_weight = 0,
