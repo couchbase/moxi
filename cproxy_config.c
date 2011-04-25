@@ -42,34 +42,34 @@ int cproxy_init_mcmux_mode(int proxy_port,
 
 proxy_behavior behavior_default_g = {
     .cycle = 200, // Clock cycle or quantum, in milliseconds.
-    .downstream_max = 4,
-    .downstream_conn_max = 0, // Use 0 for unlimited.
+    .downstream_max = 1024,
+    .downstream_conn_max = 4, // Use 0 for unlimited.
     .downstream_weight = 0,
     .downstream_retry = 1,
     .downstream_protocol = proxy_downstream_ascii_prot,
     .downstream_timeout = {
-        .tv_sec  = 0,
+        .tv_sec  = 5,
         .tv_usec = 0
     },
     .downstream_conn_queue_timeout = {
         .tv_sec  = 0,
-        .tv_usec = 0
+        .tv_usec = 200000
     },
     .wait_queue_timeout = {
         .tv_sec  = 0,
-        .tv_usec = 0
+        .tv_usec = 200000
     },
     .connect_timeout = {
-        .tv_sec  = 5,
-        .tv_usec = 0
+        .tv_sec  = 0,
+        .tv_usec = 400000
     },
     .auth_timeout = {
         .tv_sec  = 0,
-        .tv_usec = 0
+        .tv_usec = 100000
     },
     .time_stats = false,
-    .connect_max_errors = 0,     // In zstored, 10.
-    .connect_retry_interval = 0, // In zstored, 30000.
+    .connect_max_errors = 5,         // In zstored, 10.
+    .connect_retry_interval = 30000, // In zstored, 30000.
     .front_cache_max = 200,
     .front_cache_lifespan = 0,
     .front_cache_spec = {0},
