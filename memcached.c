@@ -4147,8 +4147,10 @@ static void usage(char **argv) {
            "-vv           very verbose (also print client commands/reponses)\n"
            "-vvv          extremely verbose (also print internal state transitions)\n"
            "-h            print this help and exit\n"
-           "-i            print memcached and libevent license\n"
+           "-i            print moxi, memcached and libevent license\n"
            "-a <mask>     access mask for UNIX socket, in octal (default: 0700)\n"
+           "-l <addr>     interface to listen on\n"
+           "-d            run as a daemon\n"
            "-P <file>     save PID in <file>, only used with -d option\n");
     printf("-t <num>      number of threads to use (default: 4)\n");
     printf("-R            maximum number of requests per event, limits the number of\n"
@@ -4614,7 +4616,7 @@ int main (int argc, char **argv) {
             settings.verbose++;
             break;
         case 'l':
-            settings.inter= strdup(optarg);
+            settings.inter = strdup(optarg);
             break;
         case 'd':
             do_daemonize = true;
