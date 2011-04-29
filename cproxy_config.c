@@ -353,6 +353,10 @@ int cproxy_init(char *cfg_str,
     }
 
 #ifdef HAVE_CONFLATE_H
+    if (settings.verbose > 2) {
+        cproxy_dump_behavior(&behavior, "cproxy_init_agent", 2);
+    }
+
     return cproxy_init_agent(cfg_str,
                              behavior,
                              nthreads);

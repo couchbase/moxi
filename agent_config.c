@@ -151,7 +151,7 @@ int cproxy_init_agent(char *cfg_str,
                     }
                 }
             } else {
-                snprintf(buff, cfg_len + 50, "apikey=%s", cfg_str);
+                strcpy(buff, cfg_str);
             }
         }
         buff = trimstr(buff);
@@ -336,6 +336,14 @@ proxy_main *cproxy_init_agent_start(char *jid,
         config.userdata   = m;
         config.new_config = on_conflate_new_config;
         config.log        = agent_logger;
+
+        if (!config.host || config.host[0] == '\0') {
+            moxi_log_write("ERROR: missing -z configuration for url/host\n");
+            if (ml->log_mode != ERRORLOG_STDERR) {
+                fprintf(stderr, "ERROR: missing -z configuration for url/host\n");
+            }
+            exit(EXIT_FAILURE);
+        }
 
         if (start_conflate(config)) {
             if (settings.verbose > 2) {
