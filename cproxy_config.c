@@ -747,6 +747,8 @@ void cproxy_parse_behavior_key_val(char *key,
                 strcpy(behavior->default_bucket_name, val);
                 ok = true;
             }
+        } else if (key[0] == '#') { // Comment.
+            ok = true;
         } else {
             if (settings.verbose > 1) {
                 moxi_log_write("ERROR: unknown behavior key: %s\n", key);
