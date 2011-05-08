@@ -27,7 +27,7 @@ void cproxy_init_b2b() {
 }
 
 /* Do the actual work of forwarding the command from an
- * upstream ascii conn to its assigned binary downstream.
+ * upstream binary conn to its assigned binary downstream.
  */
 bool cproxy_forward_b2b_downstream(downstream *d) {
     assert(d != NULL);
@@ -49,6 +49,7 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
 
     assert(uc != NULL);
     assert(uc->state == conn_pause);
+    assert(uc->cmd >= 0);
     assert(uc->cmd_start == NULL);
     assert(uc->thread != NULL);
     assert(uc->thread->base != NULL);
@@ -58,7 +59,7 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
 
     int server_index = -1;
 
-    if (cproxy_is_broadcast_cmd(uc->cmd_curr) == false &&
+    if (cproxy_is_broadcast_cmd(uc->cmd) == false &&
         uc->corked == NULL) {
         item *it = uc->item;
         assert(it != NULL);
