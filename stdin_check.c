@@ -9,14 +9,16 @@
 
 static void* check_stdin_thread(void* arg)
 {
+    int ch;
+
     (void)arg;
     pthread_detach(pthread_self());
 
-    while (!feof(stdin)) {
-        getc(stdin);
-    }
+    do {
+        ch = getc(stdin);
+    } while (ch != EOF && ch != '\n' && ch != '\r');
 
-    moxi_log_write("EOF on stdin.  Exiting\n");
+    fprintf(stderr, "%s on stdin.  Exiting\n", (ch == EOF) ? "EOF" : "EOL");
     exit(0);
     /* NOTREACHED */
     return NULL;
