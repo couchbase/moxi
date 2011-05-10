@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include "memcached.h"
+#include "cproxy.h"
 #include "mcs.h"
 #include "log.h"
 
@@ -20,7 +21,8 @@
 //
 mcs_st  *lvb_create(mcs_st *ptr, const char *config,
                     const char *default_usr,
-                    const char *default_pwd);
+                    const char *default_pwd,
+                    const char *opts);
 void     lvb_free_data(mcs_st *ptr);
 bool     lvb_stable_update(mcs_st *curr_version, mcs_st *next_version);
 uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
@@ -32,7 +34,8 @@ void     lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
 //
 mcs_st  *lmc_create(mcs_st *ptr, const char *config,
                     const char *default_usr,
-                    const char *default_pwd);
+                    const char *default_pwd,
+                    const char *opts);
 void     lmc_free_data(mcs_st *ptr);
 uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length,
                       int *vbucket);
@@ -41,13 +44,14 @@ uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length,
 
 mcs_st *mcs_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
-                   const char *default_pwd) {
+                   const char *default_pwd,
+                   const char *opts) {
 #ifdef MOXI_USE_LIBVBUCKET
     if (config[0] == '{') {
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libvbucket\n");
         }
-        return lvb_create(ptr, config, default_usr, default_pwd);
+        return lvb_create(ptr, config, default_usr, default_pwd, opts);
     }
 #endif
 #ifdef MOXI_USE_LIBMEMCACHED
@@ -55,7 +59,7 @@ mcs_st *mcs_create(mcs_st *ptr, const char *config,
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libmemcached\n");
         }
-        return lmc_create(ptr, config, default_usr, default_pwd);
+        return lmc_create(ptr, config, default_usr, default_pwd, opts);
     }
 #endif
     moxi_log_write("ERROR: unconfigured hash library\n");
@@ -142,7 +146,10 @@ void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index,
 
 mcs_st *lvb_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
-                   const char *default_pwd) {
+                   const char *default_pwd,
+                   const char *opts) {
+    (void) opts;
+
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBVBUCKET;
@@ -295,15 +302,32 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
 
 mcs_st *lmc_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
-                   const char *default_pwd) {
+                   const char *default_pwd,
+                   const char *opts) {
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBMEMCACHED;
 
     memcached_st *mst = memcached_create(NULL);
     if (mst != NULL) {
+        memcached_behavior_t b = MEMCACHED_BEHAVIOR_KETAMA;
+        uint64_t             v = 1;
+
+        if (opts != NULL) {
+            if (strstr(opts, "distribution:ketama-weighted") != NULL) {
+                b = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
+                v = 1;
+            } else if (strstr(opts, "distribution:ketama") != NULL) {
+                b = MEMCACHED_BEHAVIOR_KETAMA;
+                v = 1;
+            } else if (strstr(opts, "distribution:modula") != NULL) {
+                b = MEMCACHED_BEHAVIOR_KETAMA;
+                v = 0;
+            }
+        }
+
+        memcached_behavior_set(mst, b, v);
         memcached_behavior_set(mst, MEMCACHED_BEHAVIOR_NO_BLOCK, 1);
-        memcached_behavior_set(mst, MEMCACHED_BEHAVIOR_KETAMA, 1);
         memcached_behavior_set(mst, MEMCACHED_BEHAVIOR_TCP_NODELAY, 1);
 
         memcached_server_st *mservers;

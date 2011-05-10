@@ -119,6 +119,7 @@ struct proxy_behavior {
     struct timeval connect_timeout;     // PL: Fields of 0 mean no timeout.
     struct timeval auth_timeout;        // PL: Fields of 0 mean no timeout.
     bool           time_stats;          // IL: Capture timing stats.
+    char           mcs_opts[80];        // PL: Extra options for mcs initialization.
 
     uint32_t connect_max_errors;      // IL: Pause when too many connect() errs.
     uint32_t connect_retry_interval;  // IL: Time in millisecs before retrying

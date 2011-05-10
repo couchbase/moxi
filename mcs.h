@@ -54,7 +54,8 @@ typedef struct {
 
 mcs_st *mcs_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
-                   const char *default_pwd);
+                   const char *default_pwd,
+                   const char *opts);
 
 void mcs_free(mcs_st *ptr);
 

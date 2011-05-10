@@ -68,6 +68,7 @@ proxy_behavior behavior_default_g = {
         .tv_usec = 100000
     },
     .time_stats = false,
+    .mcs_opts = {0},
     .connect_max_errors = 5,         // In zstored, 10.
     .connect_retry_interval = 30000, // In zstored, 30000.
     .front_cache_max = 200,
@@ -685,6 +686,11 @@ void cproxy_parse_behavior_key_val(char *key,
         } else if (wordeq(key, "time_stats")) {
             ok = safe_strtoul(val, &x);
             behavior->time_stats = x;
+        } else if (wordeq(key, "mcs_opts")) {
+            if (strlen(val) < sizeof(behavior->mcs_opts)) {
+                strcpy(behavior->mcs_opts, val);
+                ok = true;
+            }
         } else if (wordeq(key, "connect_max_errors")) {
             ok = safe_strtoul(val, &behavior->connect_max_errors);
         } else if (wordeq(key, "connect_retry_interval")) {
@@ -873,6 +879,7 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
               (b->auth_timeout.tv_sec * 1000 +
                b->auth_timeout.tv_usec / 1000));
         vdump("time_stats", "%d", b->time_stats);
+        vdump("mcs_opts", "%s", b->mcs_opts);
         vdump("connect_max_errors", "%u", b->connect_max_errors);
         vdump("connect_retry_interval", "%u", b->connect_retry_interval);
         vdump("front_cache_max", "%u", b->front_cache_max);

@@ -48,7 +48,8 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
 
 int init_mcs_st(mcs_st *mst, char *config,
                 const char *default_usr,
-                const char *default_pwd);
+                const char *default_pwd,
+                const char *opts);
 
 bool cproxy_on_connect_downstream_conn(conn *c);
 
@@ -1255,7 +1256,8 @@ downstream *cproxy_create_downstream(char *config,
                 behavior_pool->base.pwd :
                 NULL;
 
-            int nconns = init_mcs_st(&d->mst, d->config, usr, pwd);
+            int nconns = init_mcs_st(&d->mst, d->config, usr, pwd,
+                                     behavior_pool->base.mcs_opts);
             if (nconns > 0) {
                 d->downstream_conns = (conn **)
                     calloc(nconns, sizeof(conn *));
@@ -1277,12 +1279,13 @@ downstream *cproxy_create_downstream(char *config,
 
 int init_mcs_st(mcs_st *mst, char *config,
                 const char *default_usr,
-                const char *default_pwd) {
+                const char *default_pwd,
+                const char *opts) {
     assert(mst);
     assert(config);
 
     if (mcs_create(mst, config,
-                   default_usr, default_pwd) != NULL) {
+                   default_usr, default_pwd, opts) != NULL) {
         return mcs_server_count(mst);
     } else {
         if (settings.verbose > 1) {
@@ -1323,7 +1326,8 @@ bool cproxy_check_downstream_config(downstream *d) {
 
         mcs_st next;
 
-        int n = init_mcs_st(&next, d->ptd->config, usr, pwd);
+        int n = init_mcs_st(&next, d->ptd->config, usr, pwd,
+                            d->ptd->behavior_pool.base.mcs_opts);
         if (n > 0) {
             if (mcs_stable_update(&d->mst, &next)) {
                 if (settings.verbose > 2) {
