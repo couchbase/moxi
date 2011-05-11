@@ -4258,6 +4258,22 @@ static void usage(char **argv) {
            "      0 means no timeout.\n");
     printf("  cycle=%d\n", b->cycle);
     printf("      Millisec clock quantum for moxi.\n");
+    printf("  mcs_opts=<initialization options for the mcs layer>\n");
+    printf("      The mcs layer abstracts away the libmemcached and libvbucket\n"
+           "      hashing libraries, and mcs_opts allows 'pass-thru' initialization\n"
+           "      parameters.\n"
+           "      There are currently no extra libvbucket initialization options.\n"
+           "      The libmemcached-only initialization options are...\n"
+           "        distribution:ketama\n"
+           "            use KETAMA distribution behavior;\n"
+           "            this is the default.\n"
+           "        distribution:ketama-weighted\n"
+           "            use KETAMA_WEIGHTED distribution behavior; usually\n"
+           "            use this when you have >1 client language libraries\n"
+           "            as it provides compatibility with default libketama\n"
+           "            hashing.\n"
+           "        distribution:modula\n"
+           "            use mod hashing (non-ketama) distribution behavior.\n");
     printf("\n"
            "Example of a 'gateway' moxi:\n");
     printf("  ./moxi -Z usr=Administrator,pwd=password,port_listen=11311,"
