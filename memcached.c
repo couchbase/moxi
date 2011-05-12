@@ -992,6 +992,24 @@ void write_bin_error(conn *c, protocol_binary_response_status err, int swallow) 
     case PROTOCOL_BINARY_RESPONSE_AUTH_ERROR:
         errstr = "Auth failure";
         break;
+    case PROTOCOL_BINARY_RESPONSE_AUTH_CONTINUE:
+        errstr = "Auth continue";
+        break;
+    case PROTOCOL_BINARY_RESPONSE_NOT_MY_VBUCKET:
+        errstr = "Not my vbucket";
+        break;
+    case PROTOCOL_BINARY_RESPONSE_NOT_SUPPORTED:
+        errstr = "Not supported";
+        break;
+    case PROTOCOL_BINARY_RESPONSE_EINTERNAL:
+        errstr = "Internal error";
+        break;
+    case PROTOCOL_BINARY_RESPONSE_EBUSY:
+        errstr = "System is busy";
+        break;
+    case PROTOCOL_BINARY_RESPONSE_ETMPFAIL:
+        errstr = "Temporary failure";
+        break;
     default:
         assert(false);
         errstr = "UNHANDLED ERROR";

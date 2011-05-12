@@ -37,8 +37,8 @@ conn *conn_list_remove(conn *head, conn **tail,
 
 bool is_compatible_request(conn *existing, conn *candidate);
 
-void propagate_error(downstream *d);
-void propagate_error_msg(downstream *d, char *ascii_msg);
+void propagate_error_msg(downstream *d, char *ascii_msg,
+                         protocol_binary_response_status binary_status);
 
 void downstream_reserved_time_sample(proxy_stats_td *ptds, uint64_t duration);
 void downstream_connect_time_sample(proxy_stats_td *ptds, uint64_t duration);
@@ -569,6 +569,7 @@ void cproxy_on_close_upstream_conn(conn *c) {
         if (d->upstream_conn == NULL) {
             d->upstream_suffix = NULL;
             d->upstream_suffix_len = 0;
+            d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
             d->upstream_retry = 0;
 
             // Don't need to do anything else, as we'll now just
@@ -732,6 +733,8 @@ void cproxy_on_close_downstream_conn(conn *c) {
             if (IS_ASCII(d->upstream_conn->protocol)) {
                 d->upstream_suffix = "SERVER_ERROR proxy downstream closed\r\n";
                 d->upstream_suffix_len = 0;
+            } else {
+                d->upstream_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;
             }
 
             d->upstream_retry = 0;
@@ -765,6 +768,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
                     uc_retry = d->upstream_conn;
                     d->upstream_suffix = NULL;
                     d->upstream_suffix_len = 0;
+                    d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
                     d->upstream_retry = 0;
                 }
             }
@@ -775,9 +779,9 @@ void cproxy_on_close_downstream_conn(conn *c) {
             IS_BINARY(d->upstream_conn->protocol)) {
             protocol_binary_response_header *rh =
                 cproxy_make_bin_error(d->upstream_conn,
-                                      PROTOCOL_BINARY_RESPONSE_ENOMEM);
+                                      PROTOCOL_BINARY_RESPONSE_EINTERNAL);
             if (rh != NULL) {
-                d->upstream_suffix = (char *)rh;
+                d->upstream_suffix = (char *) rh;
                 d->upstream_suffix_len = sizeof(protocol_binary_response_header);
             } else {
                 d->ptd->stats.stats.err_oom++;
@@ -892,6 +896,7 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
         assert(d->upstream_conn == NULL);
         assert(d->upstream_suffix == NULL);
         assert(d->upstream_suffix_len == 0);
+        assert(d->upstream_status == PROTOCOL_BINARY_RESPONSE_SUCCESS);
         assert(d->upstream_retry == 0);
         assert(d->downstream_used == 0);
         assert(d->downstream_used_start == 0);
@@ -903,6 +908,7 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
         d->upstream_conn = NULL;
         d->upstream_suffix = NULL;
         d->upstream_suffix_len = 0;
+        d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
         d->upstream_retries = 0;
         d->usec_start = 0;
@@ -994,7 +1000,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
             } else {
                 d->ptd->stats.stats.tot_downstream_propagate_failed++;
 
-                propagate_error(d);
+                propagate_error_msg(d, NULL, d->upstream_status);
             }
         } else {
             if (settings.verbose > 2) {
@@ -1050,10 +1056,11 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         }
 
         if (settings.verbose > 2) {
-            moxi_log_write("%d: release_downstream upstream_suffix %s\n",
+            moxi_log_write("%d: release_downstream upstream_suffix %s status %x\n",
                            d->upstream_conn->sfd,
                            d->upstream_suffix_len == 0 ?
-                           d->upstream_suffix : "(binary)");
+                           d->upstream_suffix : "(binary)",
+                           d->upstream_status);
         }
 
         if (d->upstream_suffix != NULL) {
@@ -1117,6 +1124,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     d->upstream_conn = NULL;
     d->upstream_suffix = NULL; // No free(), expecting a static string.
     d->upstream_suffix_len = 0;
+    d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
     d->upstream_retry = 0;
     d->upstream_retries = 0;
     d->usec_start = 0;
@@ -1750,7 +1758,9 @@ void cproxy_assign_downstream(proxy_td *ptd) {
                     }
                     uc->next = NULL;
 
-                    upstream_error(uc);
+                    upstream_error_msg(uc,
+                                       "SERVER_ERROR proxy out of downstreams\r\n",
+                                       PROTOCOL_BINARY_RESPONSE_EINTERNAL);
                 }
             }
 
@@ -1826,7 +1836,7 @@ void cproxy_assign_downstream(proxy_td *ptd) {
                 break;
             }
 
-            propagate_error(d);
+            propagate_error_msg(d, NULL, d->upstream_status);
 
             cproxy_release_downstream(d, false);
         }
@@ -1837,11 +1847,8 @@ void cproxy_assign_downstream(proxy_td *ptd) {
     }
 }
 
-void propagate_error(downstream *d) {
-    propagate_error_msg(d, NULL);
-}
-
-void propagate_error_msg(downstream *d, char *ascii_msg) {
+void propagate_error_msg(downstream *d, char *ascii_msg,
+                         protocol_binary_response_status binary_status) {
     assert(d != NULL);
 
     while (d->upstream_conn != NULL) {
@@ -1852,7 +1859,7 @@ void propagate_error_msg(downstream *d, char *ascii_msg) {
                            uc->sfd);
         }
 
-        upstream_error_msg(uc, ascii_msg);
+        upstream_error_msg(uc, ascii_msg, binary_status);
 
         conn *curr = d->upstream_conn;
         d->upstream_conn = d->upstream_conn->next;
@@ -1899,7 +1906,7 @@ bool cproxy_forward(downstream *d) {
 bool cproxy_forward_or_error(downstream *d) {
     if (cproxy_forward(d) == false) {
         d->ptd->stats.stats.tot_downstream_propagate_failed++;
-        propagate_error(d);
+        propagate_error_msg(d, NULL, d->upstream_status);
         cproxy_release_downstream(d, false);
 
         return false;
@@ -1908,11 +1915,8 @@ bool cproxy_forward_or_error(downstream *d) {
     return true;
 }
 
-void upstream_error(conn *uc) {
-    upstream_error_msg(uc, NULL);
-}
-
-void upstream_error_msg(conn *uc, char *ascii_msg) {
+void upstream_error_msg(conn *uc, char *ascii_msg,
+                        protocol_binary_response_status binary_status) {
     assert(uc);
     assert(uc->state == conn_pause);
 
@@ -1958,7 +1962,13 @@ void upstream_error_msg(conn *uc, char *ascii_msg) {
     } else {
         assert(IS_BINARY(uc->protocol));
 
-        write_bin_error(uc, PROTOCOL_BINARY_RESPONSE_ENOMEM, 0);
+        if (binary_status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
+            // Default to our favorite catch-all binary protocol response.
+            //
+            binary_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;
+        }
+
+        write_bin_error(uc, binary_status, 0);
 
         update_event(uc, EV_WRITE | EV_PERSIST);
     }
@@ -2015,6 +2025,7 @@ bool cproxy_dettach_if_noreply(downstream *d, conn *uc) {
         d->upstream_conn   = NULL;
         d->upstream_suffix = NULL;
         d->upstream_suffix_len = 0;
+        d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry  = 0;
 
         cproxy_reset_upstream(uc);
@@ -2232,7 +2243,9 @@ void wait_queue_timeout(const int fd,
                                      &ptd->waiting_any_downstream_tail,
                                      uc, NULL); // TODO: O(N^2).
 
-                upstream_error(uc);
+                upstream_error_msg(uc,
+                                   "SERVER_ERROR proxy wait queue timeout",
+                                   PROTOCOL_BINARY_RESPONSE_EBUSY);
             }
         }
 
@@ -2610,7 +2623,8 @@ void downstream_timeout(const int fd,
             ptd->stats.stats.tot_downstream_timeout++;
         }
 
-        propagate_error_msg(d, "SERVER_ERROR proxy downstream timeout\r\n");
+        propagate_error_msg(d, "SERVER_ERROR proxy downstream timeout\r\n",
+                            PROTOCOL_BINARY_RESPONSE_EBUSY);
 
         int n = mcs_server_count(&d->mst);
 

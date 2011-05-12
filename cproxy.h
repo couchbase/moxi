@@ -465,6 +465,10 @@ struct downstream {
     conn  *upstream_conn;     // Non-NULL when downstream is reserved.
     char  *upstream_suffix;   // Last bit to write when downstreams are done.
     int    upstream_suffix_len; // When >0, overrides strlen(upstream_suffix) for binary.
+
+    // Used during an error when upstream is binary protocol.
+    protocol_binary_response_status upstream_status;
+
     int    upstream_retry;    // Will be >0 if we should retry the entire
                               // command again when all downstreams are done.
                               // Used in not-my-vbucket error case.  During
@@ -561,8 +565,8 @@ bool cproxy_update_event_write(downstream *d, conn *c);
 
 bool cproxy_forward(downstream *d);
 
-void upstream_error(conn *uc);
-void upstream_error_msg(conn *uc, char *ascii_msg);
+void upstream_error_msg(conn *uc, char *ascii_msg,
+                        protocol_binary_response_status binary_status);
 void upstream_retry(void *data0, void *data1);
 
 int downstream_conn_index(downstream *d, conn *c);
