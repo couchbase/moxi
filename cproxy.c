@@ -732,6 +732,16 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
             if (IS_ASCII(d->upstream_conn->protocol)) {
                 d->upstream_suffix = "SERVER_ERROR proxy downstream closed\r\n";
+
+                if (c->host_ident != NULL) {
+                    char *s = add_conn_suffix(d->upstream_conn);
+                    snprintf(s, SUFFIX_SIZE - 1,
+                             "SERVER_ERROR proxy downstream closed %s\r\n",
+                             c->host_ident);
+                    s[SUFFIX_SIZE - 1] = '\0';
+                    d->upstream_suffix = s;
+                }
+
                 d->upstream_suffix_len = 0;
             } else {
                 d->upstream_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;

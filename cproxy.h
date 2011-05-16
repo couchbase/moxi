@@ -464,7 +464,8 @@ struct downstream {
 
     conn  *upstream_conn;     // Non-NULL when downstream is reserved.
     char  *upstream_suffix;   // Last bit to write when downstreams are done.
-    int    upstream_suffix_len; // When >0, overrides strlen(upstream_suffix) for binary.
+    int    upstream_suffix_len; // When > 0, overrides strlen(upstream_suffix),
+                                // during binary protocol.
 
     // Used during an error when upstream is binary protocol.
     protocol_binary_response_status upstream_status;
