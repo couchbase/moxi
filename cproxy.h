@@ -478,6 +478,9 @@ struct downstream {
                               // asking for successful keys again.
     int    upstream_retries;  // Count number of upstream_retry attempts.
 
+    // Used when proxying a simple, single-key (non-broadcast) command.
+    char *target_host_ident;
+
     genhash_t *multiget; // Keyed by string.
     genhash_t *merger;   // Keyed by string, for merging replies like STATS.
 

@@ -490,6 +490,7 @@ bool cproxy_optimize_set_ascii(downstream *d, conn *uc,
         d->upstream_suffix_len = 0;
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
+        d->target_host_ident = NULL;
 
         out_string(uc, "STORED");
 
@@ -582,5 +583,6 @@ void cproxy_ascii_broadcast_suffix(downstream *d) {
         d->upstream_suffix_len = 0;
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
+        d->target_host_ident = NULL;
     }
 }

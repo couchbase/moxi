@@ -571,6 +571,7 @@ void cproxy_on_close_upstream_conn(conn *c) {
             d->upstream_suffix_len = 0;
             d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
             d->upstream_retry = 0;
+            d->target_host_ident = NULL;
 
             // Don't need to do anything else, as we'll now just
             // read and drop any remaining inflight downstream replies.
@@ -735,11 +736,18 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
                 if (c->host_ident != NULL) {
                     char *s = add_conn_suffix(d->upstream_conn);
-                    snprintf(s, SUFFIX_SIZE - 1,
-                             "SERVER_ERROR proxy downstream closed %s\r\n",
-                             c->host_ident);
-                    s[SUFFIX_SIZE - 1] = '\0';
-                    d->upstream_suffix = s;
+                    if (s != NULL) {
+                        snprintf(s, SUFFIX_SIZE - 1,
+                                 "SERVER_ERROR proxy downstream closed %s\r\n",
+                                 c->host_ident);
+                        s[SUFFIX_SIZE - 1] = '\0';
+                        d->upstream_suffix = s;
+
+                        s = strchr(s, ':'); // Clip to avoid sending user/pswd.
+                        if (s != NULL) {
+                            *s = '\0';
+                        }
+                    }
                 }
 
                 d->upstream_suffix_len = 0;
@@ -748,6 +756,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
             }
 
             d->upstream_retry = 0;
+            d->target_host_ident = NULL;
         }
 
         // We sometimes see that drive_machine/transmit will not see
@@ -780,6 +789,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
                     d->upstream_suffix_len = 0;
                     d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
                     d->upstream_retry = 0;
+                    d->target_host_ident = NULL;
                 }
             }
         }
@@ -908,6 +918,7 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
         assert(d->upstream_suffix_len == 0);
         assert(d->upstream_status == PROTOCOL_BINARY_RESPONSE_SUCCESS);
         assert(d->upstream_retry == 0);
+        assert(d->target_host_ident == NULL);
         assert(d->downstream_used == 0);
         assert(d->downstream_used_start == 0);
         assert(d->merger == NULL);
@@ -921,6 +932,7 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
         d->upstream_retries = 0;
+        d->target_host_ident = NULL;
         d->usec_start = 0;
         d->downstream_used = 0;
         d->downstream_used_start = 0;
@@ -1137,6 +1149,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
     d->upstream_retry = 0;
     d->upstream_retries = 0;
+    d->target_host_ident = NULL;
     d->usec_start = 0;
     d->downstream_used = 0;
     d->downstream_used_start = 0;
@@ -1446,6 +1459,20 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                                                 msst_actual,
                                                 &d->behaviors_arr[i],
                                                 &downstream_conn_max_reached);
+            if (c != NULL &&
+                i == server_index &&
+                d->downstream_conns[i] != NULL &&
+                d->downstream_conns[i] != NULL_CONN &&
+                d->target_host_ident == NULL) {
+                d->target_host_ident = add_conn_suffix(c);
+                if (d->target_host_ident != NULL) {
+                    strncpy(d->target_host_ident,
+                            msst_actual->hostname,
+                            SUFFIX_SIZE);
+                    d->target_host_ident[SUFFIX_SIZE - 1] = '\0';
+                }
+            }
+
             if (d->downstream_conns[i] != NULL &&
                 d->downstream_conns[i] != NULL_CONN &&
                 d->downstream_conns[i]->state == conn_connecting) {
@@ -1861,6 +1888,19 @@ void propagate_error_msg(downstream *d, char *ascii_msg,
                          protocol_binary_response_status binary_status) {
     assert(d != NULL);
 
+    if (ascii_msg == NULL &&
+        d->upstream_conn != NULL &&
+        d->target_host_ident != NULL) {
+        char *s = add_conn_suffix(d->upstream_conn);
+        if (s != NULL) {
+            snprintf(s, SUFFIX_SIZE - 1,
+                     "SERVER_ERROR proxy write to downstream %s\r\n",
+                     d->target_host_ident);
+            s[SUFFIX_SIZE - 1] = '\0';
+            ascii_msg = s;
+        }
+    }
+
     while (d->upstream_conn != NULL) {
         conn *uc = d->upstream_conn;
 
@@ -2044,6 +2084,7 @@ bool cproxy_dettach_if_noreply(downstream *d, conn *uc) {
         d->upstream_suffix_len = 0;
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry  = 0;
+        d->target_host_ident = NULL;
 
         cproxy_reset_upstream(uc);
 

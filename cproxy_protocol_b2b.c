@@ -292,6 +292,7 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
                 d->upstream_suffix     = ITEM_data(it);
                 d->upstream_suffix_len = it->nbytes;
                 d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
+                d->target_host_ident = NULL;
 
                 if (settings.verbose > 2) {
                     moxi_log_write("%d: b2b broadcast upstream_suffix", uc->sfd);

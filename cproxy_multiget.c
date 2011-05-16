@@ -361,6 +361,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         d->upstream_suffix_len = 0;
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
+        d->target_host_ident = NULL;
 
         cproxy_start_downstream_timeout(d, NULL);
     }

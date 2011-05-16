@@ -756,6 +756,8 @@ void a2b_process_downstream_response(conn *c) {
                 d->upstream_suffix = "LOCK_ERROR\r\n";
                 d->upstream_suffix_len = 0;
                 d->upstream_status = status;
+                d->upstream_retry = 0;
+                d->target_host_ident = NULL;
             }
 
             conn_set_state(c, conn_pause);
@@ -1107,6 +1109,7 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
         d->upstream_suffix_len = 0;
         d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
         d->upstream_retry = 0;
+        d->target_host_ident = NULL;
     }
 
     assert(uc->next == NULL);
@@ -1233,6 +1236,7 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
         if (local) {
             uc->hit_local = true;
         }
+
         if (cproxy_prep_conn_for_write(c)) {
             assert(c->state == conn_pause);
             assert(c->wbuf);
@@ -1308,6 +1312,7 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
                         d->upstream_suffix_len = 0;
                         d->upstream_status = PROTOCOL_BINARY_RESPONSE_ENOMEM;
                         d->upstream_retry = 0;
+                        d->target_host_ident = NULL;
                     }
                 }
             } else {
@@ -1323,6 +1328,7 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
                     d->upstream_suffix_len = 0;
                     d->upstream_status = PROTOCOL_BINARY_RESPONSE_EINVAL;
                     d->upstream_retry = 0;
+                    d->target_host_ident = NULL;
                 }
             }
 
@@ -1485,6 +1491,7 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
             d->upstream_suffix_len = 0;
             d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
             d->upstream_retry = 0;
+            d->target_host_ident = NULL;
 
             cproxy_start_downstream_timeout(d, NULL);
         } else {
