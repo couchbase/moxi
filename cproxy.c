@@ -1968,6 +1968,13 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
             binary_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;
         }
 
+        pthread_mutex_lock(&ptd->proxy->proxy_lock);
+        if (ptd->proxy->name != NULL &&
+            strcmp(ptd->proxy->name, NULL_BUCKET) == 0) {
+            binary_status = PROTOCOL_BINARY_RESPONSE_AUTH_ERROR;
+        }
+        pthread_mutex_unlock(&ptd->proxy->proxy_lock);
+
         write_bin_error(uc, binary_status, 0);
 
         update_event(uc, EV_WRITE | EV_PERSIST);

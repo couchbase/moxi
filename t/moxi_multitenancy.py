@@ -61,17 +61,17 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         """Test null bucket"""
         self.client_connect()
 
-        get_oom = self.packRes(memcacheConstants.CMD_GETK,
-                               status=memcacheConstants.ERR_ENOMEM,
-                               val="Out of memory")
+        get_err = self.packRes(memcacheConstants.CMD_GETK,
+                               status=memcacheConstants.ERR_AUTH_ERROR,
+                               val="Auth failure")
 
         get_req = self.packReq(memcacheConstants.CMD_GETK, key='keyNotThere0')
         self.client_send(get_req)
-        self.client_recv(get_oom)
+        self.client_recv(get_err)
 
         get_req = self.packReq(memcacheConstants.CMD_GETK, key='keyNotThere0')
         self.client_send(get_req)
-        self.client_recv(get_oom)
+        self.client_recv(get_err)
 
         self.assertTrue(self.mock_quiet())
 
@@ -82,15 +82,15 @@ class TestMultitenancy(moxi_mock_server.ProxyClientBase):
         set_req = self.packReq(memcacheConstants.CMD_SET, key='simpleSet',
                                extraHeader=struct.pack(memcacheConstants.SET_PKT_FMT, 0, 0),
                                val='123')
-        set_oom = self.packRes(memcacheConstants.CMD_SET,
-                               status=memcacheConstants.ERR_ENOMEM,
-                               val="Out of memory")
+        set_err = self.packRes(memcacheConstants.CMD_SET,
+                               status=memcacheConstants.ERR_AUTH_ERROR,
+                               val="Auth failure")
 
         self.client_send(set_req)
-        self.client_recv(set_oom)
+        self.client_recv(set_err)
 
         self.client_send(set_req)
-        self.client_recv(set_oom)
+        self.client_recv(set_err)
 
         self.assertTrue(self.mock_quiet())
 
