@@ -745,6 +745,8 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
                         s = strchr(s, ':'); // Clip to avoid sending user/pswd.
                         if (s != NULL) {
+                            *s++ = '\r';
+                            *s++ = '\n';
                             *s = '\0';
                         }
                     }
@@ -2681,7 +2683,26 @@ void downstream_timeout(const int fd,
             ptd->stats.stats.tot_downstream_timeout++;
         }
 
-        propagate_error_msg(d, "SERVER_ERROR proxy downstream timeout\r\n",
+        char *m = "SERVER_ERROR proxy downstream timeout\r\n";
+
+        if (d->target_host_ident != NULL) {
+            m = add_conn_suffix(d->upstream_conn);
+            if (m != NULL) {
+                snprintf(m, SUFFIX_SIZE - 1,
+                         "SERVER_ERROR proxy downstream timeout %s\r\n",
+                         d->target_host_ident);
+                m[SUFFIX_SIZE - 1] = '\0';
+
+                char *s = strchr(m, ':'); // Clip to avoid sending user/pswd.
+                if (s != NULL) {
+                    *s++ = '\r';
+                    *s++ = '\n';
+                    *s = '\0';
+                }
+            }
+        }
+
+        propagate_error_msg(d, m,
                             PROTOCOL_BINARY_RESPONSE_EBUSY);
 
         int n = mcs_server_count(&d->mst);

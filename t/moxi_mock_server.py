@@ -184,13 +184,13 @@ class ProxyClientBase(unittest.TestCase):
         session.client.send(what)
 
     def client_recv(self, what, idx=0, num_bytes=1024):
-        debug(1, "client_recv expect: " + what)
+        debug(1, "client_recv expect: '" + what + "'")
 
         s = self.clients[idx].recv(num_bytes)
 
-        debug(1, "client_recv actual: " + s);
+        debug(1, "client_recv actual: '" + s + "'");
 
-        self.assertTrue(what == s or re.match(what, s) is not None)
+        self.assertTrue(what == s or re.match(what, s))
 
     def mock_session(self, session_idx=0):
         wait_max = 5
