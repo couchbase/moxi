@@ -20,7 +20,8 @@ proxy_main *cproxy_init_agent_start(char *jid, char *jpw,
                                     int nthreads);
 
 #ifdef HAVE_CONFLATE_H
-void on_conflate_new_config(void *userdata, kvpair_t *config);
+conflate_result on_conflate_new_config(void *userdata, kvpair_t *config);
+
 enum conflate_mgmt_cb_result on_conflate_get_stats(void *opaque,
                                                    conflate_handle_t *handle,
                                                    const char *cmd,

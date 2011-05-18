@@ -384,7 +384,7 @@ static void cproxy_init_null_bucket(proxy_main *m) {
     }
 }
 
-void on_conflate_new_config(void *userdata, kvpair_t *config) {
+conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
     assert(config != NULL);
 
     proxy_main *m = userdata;
@@ -397,17 +397,53 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
         moxi_log_write("configuration received\n");
     }
 
-    kvpair_t *copy = dup_kvpair(config);
-    if (copy != NULL) {
-        if (!work_send(mthread->work_queue, cproxy_on_config, m, copy) &&
-            settings.verbose > 1) {
-            moxi_log_write("work_send failed\n");
+    char **urlv = get_key_values(config, "url"); // NULL delimited array of char *.
+    char  *url  = urlv != NULL ? urlv[0] : NULL;
+
+    char **contentsv = get_key_values(config, "contents");
+    char  *contents  = contentsv != NULL ? contentsv[0] : NULL;
+
+    if (url != NULL &&
+        contents != NULL &&
+        strlen(contents) > 0) {
+        // Must be a REST/JSON config.  Wastefully test parse it here,
+        // before we asynchronously invoke the real worker who can't
+        // respond nicely with an error code.
+        //
+        bool ok = false;
+
+        cJSON *c = cJSON_Parse(contents);
+        if (c != NULL) {
+            ok = true;
+            cJSON_Delete(c);
         }
-    } else {
-        if (settings.verbose > 1) {
-            moxi_log_write("agent_config ocnc failed dup_kvpair\n");
+
+        if (!ok) {
+            moxi_log_write("ERROR: parse JSON failed, from REST server: %s, %s\n",
+                           url, contents);
+
+            return CONFLATE_ERROR_BAD_SOURCE;
         }
     }
+
+    kvpair_t *copy = dup_kvpair(config);
+    if (copy != NULL) {
+        if (work_send(mthread->work_queue, cproxy_on_config, m, copy)) {
+            return CONFLATE_SUCCESS;
+        }
+
+        if (settings.verbose > 1) {
+            moxi_log_write("work_send failed\n");
+        }
+
+        return CONFLATE_ERROR;
+    }
+
+    if (settings.verbose > 1) {
+        moxi_log_write("agent_config ocnc failed dup_kvpair\n");
+    }
+
+    return CONFLATE_ERROR;
 }
 
 #ifdef MOXI_USE_LIBVBUCKET
