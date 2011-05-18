@@ -413,23 +413,27 @@ void on_conflate_new_config(void *userdata, kvpair_t *config) {
 #ifdef MOXI_USE_LIBVBUCKET
 
 static bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
-                                      char *config, char *name);
+                                      char *config, char *name, char *src);
 
 static bool cproxy_on_config_json_one_vbucket(proxy_main *m,
                                               uint32_t new_config_ver,
                                               char *config,
-                                              char *name);
+                                              char *name,
+                                              char *src);
 
 static bool cproxy_on_config_json_one_ketama(proxy_main *m,
                                              uint32_t new_config_ver,
                                              char *config,
-                                             char *name);
+                                             char *name,
+                                             char *src);
 
 static bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
-                                          cJSON *jBuckets, bool want_default);
+                                          cJSON *jBuckets, bool want_default,
+                                          char *src);
 
 static
-bool cproxy_on_config_json(proxy_main *m, uint32_t new_config_ver, char *config) {
+bool cproxy_on_config_json(proxy_main *m, uint32_t new_config_ver, char *config,
+                           char *src) {
     bool rv = false;
 
     cJSON *c = cJSON_Parse(config);
@@ -441,19 +445,22 @@ bool cproxy_on_config_json(proxy_main *m, uint32_t new_config_ver, char *config)
             // bucket on the 1st pass, so the default bucket gets
             // created earlier.
             //
-            bool rv1 = cproxy_on_config_json_buckets(m, new_config_ver, jBuckets, true);
-            bool rv2 = cproxy_on_config_json_buckets(m, new_config_ver, jBuckets, false);
+            bool rv1 = cproxy_on_config_json_buckets(m, new_config_ver, jBuckets,
+                                                     true, src);
+            bool rv2 = cproxy_on_config_json_buckets(m, new_config_ver, jBuckets,
+                                                     false, src);
 
             rv = rv1 || rv2;
         } else {
             // Just a single config.
             //
-            rv = cproxy_on_config_json_one(m, new_config_ver, config, "default");
+            rv = cproxy_on_config_json_one(m, new_config_ver, config, "default", src);
         }
 
         cJSON_Delete(c);
     } else {
-        moxi_log_write("ERROR: could not parse JSON from REST server: %s\n", config);
+        moxi_log_write("ERROR: could not parse JSON from REST server: %s, %s\n",
+                       src, config);
     }
 
     return rv;
@@ -461,7 +468,8 @@ bool cproxy_on_config_json(proxy_main *m, uint32_t new_config_ver, char *config)
 
 static
 bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
-                                   cJSON *jBuckets, bool want_default) {
+                                   cJSON *jBuckets, bool want_default,
+                                   char *src) {
     bool rv = false;
 
     int numBuckets = cJSON_GetArraySize(jBuckets);
@@ -483,7 +491,7 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
                 char *jBucketStr = cJSON_Print(jBucket);
                 if (jBucketStr != NULL) {
                     rv = cproxy_on_config_json_one(m, new_config_ver,
-                                                   jBucketStr, name) || rv;
+                                                   jBucketStr, name, src) || rv;
                     free(jBucketStr);
                 }
             }
@@ -495,7 +503,8 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
 
 static
 bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
-                               char *config, char *name) {
+                               char *config, char *name,
+                               char *src) {
     assert(m != NULL);
     assert(config != NULL);
     assert(name != NULL);
@@ -508,7 +517,7 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
         config != NULL &&
         strlen(config) > 0) {
         if (settings.verbose > 2) {
-            moxi_log_write("conjo contents config %s\n", config);
+            moxi_log_write("conjo contents config from %s: %s\n", src, config);
         }
 
         // The config should be JSON that should look like...
@@ -545,7 +554,7 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                 jNodeLocator->valuestring != NULL) {
                 if (strcmp(jNodeLocator->valuestring, "ketama") == 0) {
                     rv = cproxy_on_config_json_one_ketama(m, new_config_ver,
-                                                          config, name);
+                                                          config, name, src);
                     cJSON_Delete(jConfig);
 
                     return rv;
@@ -553,12 +562,12 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
             }
 
             rv = cproxy_on_config_json_one_vbucket(m, new_config_ver,
-                                                   config, name);
+                                                   config, name, src);
             cJSON_Delete(jConfig);
         }
     } else {
         if (settings.verbose > 1) {
-            moxi_log_write("ERROR: skipping empty config\n");
+            moxi_log_write("ERROR: skipping empty config from %s\n", src);
         }
     }
 
@@ -567,7 +576,8 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
 
 static
 bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
-                                       char *config, char *name) {
+                                       char *config, char *name,
+                                       char *src) {
     assert(m != NULL);
 
     bool rv = false;
@@ -643,8 +653,9 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
                 } else {
                     if (settings.verbose > 1) {
                         moxi_log_write("ERROR: error receiving host:port"
+                                       " from %s"
                                        " for server config %d in %s\n",
-                                       j, config);
+                                       src, j, config);
                     }
                 }
 
@@ -654,11 +665,11 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
 
         vbucket_config_destroy(vch);
     } else {
-        moxi_log_write("ERROR: bad JSON configuration: %s (%s)\n",
-                       vbucket_get_error(), config);
+        moxi_log_write("ERROR: bad JSON configuration from %s: %s (%s)\n",
+                       src, vbucket_get_error(), config);
         if (ml->log_mode != ERRORLOG_STDERR) {
-            fprintf(stderr, "ERROR: bad JSON configuration: %s (%s)\n",
-                    vbucket_get_error(), config);
+            fprintf(stderr, "ERROR: bad JSON configuration from %s: %s (%s)\n",
+                    src, vbucket_get_error(), config);
         }
 
         // Bug 1961 - don't exit() as we might be in a multitenant use case.
@@ -671,7 +682,8 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
 
 static
 bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
-                                      char *config, char *name) {
+                                      char *config, char *name,
+                                      char *src) {
     assert(m != NULL);
 
     bool rv = false;
@@ -863,8 +875,8 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                          behavior_pool.arr[j].port);
                             } else {
                                 if (settings.verbose > 1) {
-                                    moxi_log_write("ERROR: conjk missing host/port %d in %s\n",
-                                                   j, name);
+                                    moxi_log_write("ERROR: conjk missing host/port %d in %s from %s\n",
+                                                   j, name, src);
                                 }
                             }
 
@@ -894,8 +906,8 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                     }
                 } else {
                     if (settings.verbose > 1) {
-                        moxi_log_write("ERROR: conjk parse error for config %d in %s\n",
-                                       j, config);
+                        moxi_log_write("ERROR: conjk parse error for config %d from %s in %s\n",
+                                       j, src, config);
                     }
                 }
 
@@ -1169,21 +1181,26 @@ void cproxy_on_config(void *data0, void *data1) {
     }
 
 #ifdef MOXI_USE_LIBVBUCKET
+    char **urlv = get_key_values(kvs, "url"); // NULL delimited array of char *.
+    char  *url  = urlv != NULL ? (urlv[0] != NULL ? urlv[0] : "") : "";
+
     char **contents = get_key_values(kvs, "contents");
     if (contents != NULL &&
         contents[0] != NULL) {
         char *config = trimstrdup(contents[0]);
         if (config != NULL &&
             strlen(config) > 0) {
-            cproxy_on_config_json(m, new_config_ver, config);
+            cproxy_on_config_json(m, new_config_ver, config, url);
 
             free(config);
         } else {
-            moxi_log_write("ERROR: invalid, empty config from REST server\n");
+            moxi_log_write("ERROR: invalid, empty config from REST server %s\n",
+                           url);
             goto fail;
         }
     } else {
-        moxi_log_write("ERROR: invalid response from REST server\n");
+        moxi_log_write("ERROR: invalid response from REST server %s\n",
+                       url);
     }
 #else // !MOXI_USE_LIBVBUCKET
     if (cproxy_on_config_kvs(m, new_config_ver, kvs) == false) {
