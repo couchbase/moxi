@@ -303,7 +303,17 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
                (false == self_command) &&
                (c->cmd_curr = PROTOCOL_BINARY_CMD_UNL)) {
         cproxy_pause_upstream_for_downstream(ptd, c);
+
         SEEN(STATS_CMD_UNL, false, cmd_len);
+
+    } else if (ntokens == 4 && // Ex: "touch <key> <expiration>"
+               (false == self_command) &&
+               (strncmp(cmd, "touch", 5) == 0) &&
+               (c->cmd_curr = PROTOCOL_BINARY_CMD_TOUCH)) {
+        cproxy_pause_upstream_for_downstream(ptd, c);
+
+        // TODO: SEEN(STATS_CMD_TOUCH, false, cmd_len);
+
     } else {
         out_string(c, "ERROR");
 

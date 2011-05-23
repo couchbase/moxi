@@ -146,6 +146,14 @@ struct A2BSpec a2b_specs[] = {
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header)
     },
+    { .line = "touch <key> <xpiration>",
+      .cmd  = PROTOCOL_BINARY_CMD_TOUCH,
+      .cmdq = -1,
+      // The size should be...
+      //   sizeof(protocol_binary_request_header) [24 bytes] +
+      //   sizeof(protocol_binary_request_touch.message.body) [4 bytes]
+      .size = sizeof(protocol_binary_request_header) + 4,
+    },
     { .line = 0 } // NULL sentinel.
 };
 
@@ -830,6 +838,7 @@ void a2b_process_downstream_response(conn *c) {
     case PROTOCOL_BINARY_CMD_REPLACE:
     case PROTOCOL_BINARY_CMD_APPEND:
     case PROTOCOL_BINARY_CMD_PREPEND:
+    case PROTOCOL_BINARY_CMD_TOUCH:
         conn_set_state(c, conn_pause);
 
         if (uc != NULL) {
