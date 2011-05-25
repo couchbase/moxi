@@ -127,10 +127,10 @@ echo starting memcached simulant 11277...
 ./moxi -d -P /tmp/moxi-3076-test-memcached.pid -p 11277
 sleep 1
 echo -e "set a 0 0 1\r\na\r" | nc 127.0.0.1 11277
-echo -e "set x 0 0 1\r\nb\r" | nc 127.0.0.1 11277
+echo -e "set b 0 0 1\r\nb\r" | nc 127.0.0.1 11277
 
 echo get a x | nc 127.0.0.1 11266
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -138,7 +138,7 @@ else
     echo "OK expected some VALUE's"
 fi
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -153,9 +153,9 @@ echo starting memcached simulant 11288...
 ./moxi -d -P /tmp/moxi-3076-test-memcached.pid -p 11288
 sleep 1
 echo -e "set a 0 0 1\r\nA\r" | nc 127.0.0.1 11288
-echo -e "set x 0 0 1\r\nB\r" | nc 127.0.0.1 11288
+echo -e "set b 0 0 1\r\nB\r" | nc 127.0.0.1 11288
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -163,7 +163,7 @@ else
     echo "OK expected some VALUE's"
 fi
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -184,9 +184,9 @@ echo starting memcached simulant 11277...
 ./moxi -d -P /tmp/moxi-3076-test-memcached.pid -p 11277
 sleep 1
 echo -e "set a 0 0 1\r\na\r" | nc 127.0.0.1 11277
-echo -e "set x 0 0 1\r\nb\r" | nc 127.0.0.1 11277
+echo -e "set b 0 0 1\r\nb\r" | nc 127.0.0.1 11277
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -194,7 +194,7 @@ else
     echo "OK expected some VALUE's"
 fi
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -215,9 +215,9 @@ echo starting memcached simulant 11288...
 ./moxi -d -P /tmp/moxi-3076-test-memcached.pid -p 11288
 sleep 1
 echo -e "set a 0 0 1\r\nA\r" | nc 127.0.0.1 11288
-echo -e "set x 0 0 1\r\nB\r" | nc 127.0.0.1 11288
+echo -e "set b 0 0 1\r\nB\r" | nc 127.0.0.1 11288
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1
@@ -225,7 +225,7 @@ else
     echo "OK expected some VALUE's"
 fi
 
-count=$(echo get a x | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
+count=$(echo get a b | nc 127.0.0.1 11266 | grep "VALUE" | wc -l)
 if [[ $count -ne 1 ]] ; then
     echo "FAIL expected some VALUE's"
     ret=1

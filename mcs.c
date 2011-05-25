@@ -310,7 +310,7 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
 
     memcached_st *mst = memcached_create(NULL);
     if (mst != NULL) {
-        memcached_behavior_t b = MEMCACHED_BEHAVIOR_KETAMA;
+        memcached_behavior_t b = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
         uint64_t             v = 1;
 
         if (opts != NULL) {
