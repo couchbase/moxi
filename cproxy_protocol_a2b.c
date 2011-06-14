@@ -136,10 +136,10 @@ struct A2BSpec a2b_specs[] = {
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_version)
     },
-    { .line = "getl <key> [timeout]", // Single-key GETL.
+    { .line = "getl <key> <xpiration>", // Single-key GETL.
       .cmd  = PROTOCOL_BINARY_CMD_GETL,
       .cmdq = -1,
-      .size = sizeof(protocol_binary_request_header)
+      .size = sizeof(protocol_binary_request_header) + 4
     },
     { .line = "unl <key> <cas>", // Single-key UNL.
       .cmd  = PROTOCOL_BINARY_CMD_UNL,
@@ -387,13 +387,6 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
             htons((uint16_t) cmd_tokens[cur_token].length);
         break;
 
-   case 't': { // lock timeout for getl
-        uint32_t timeout = 0;
-        if (safe_strtoul(cmd_tokens[cur_token].value, &timeout)) {
-            header->request.opaque = htonl(timeout);
-        }
-        break;
-   }
    case 'c': { // cas value for unl
         uint64_t cas = 0;
         if (safe_strtoull(cmd_tokens[cur_token].value, &cas)) {
@@ -572,7 +565,6 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
         int   flags = 0;
 
         assert(key);
-        assert(keylen > 0);
         assert(vlen >= 0);
 
         if (c->cmd == PROTOCOL_BINARY_CMD_GET ||
@@ -729,7 +721,6 @@ void a2b_process_downstream_response(conn *c) {
 
     switch (c->cmd) {
     case PROTOCOL_BINARY_CMD_GETK:
-    case PROTOCOL_BINARY_CMD_GETL:
         if (settings.verbose > 2) {
             moxi_log_write("%d: cproxy_process_a2b_downstream_response GETK "
                     "noreply: %d\n", c->sfd, c->noreply);
@@ -754,18 +745,6 @@ void a2b_process_downstream_response(conn *c) {
                 }
 
                 item_remove(it);
-            } else if (PROTOCOL_BINARY_CMD_GETL == c->cmd &&
-                (status == PROTOCOL_BINARY_RESPONSE_ETMPFAIL ||
-                 status == PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND)) {
-                /*
-                 * currently membase does not send ETMPFAIL for
-                 * engine error code for ENGINE_TMPFAIL
-                 */
-                d->upstream_suffix = "LOCK_ERROR\r\n";
-                d->upstream_suffix_len = 0;
-                d->upstream_status = status;
-                d->upstream_retry = 0;
-                d->target_host_ident = NULL;
             }
 
             conn_set_state(c, conn_pause);
@@ -813,6 +792,48 @@ void a2b_process_downstream_response(conn *c) {
 
         item_remove(it);
         break;
+    case PROTOCOL_BINARY_CMD_GETL:
+        if (settings.verbose > 2) {
+            moxi_log_write("%d: cproxy_process_a2b_downstream_response GETL "
+                    "noreply: %d\n", c->sfd, c->noreply);
+        }
+
+        if (c->noreply == false) {
+            if (status == 0) {
+                assert(it != NULL);
+                assert(it->nbytes >= 2);
+                assert(extlen > 0);
+
+                if (bodylen >= keylen + extlen) {
+                    *(ITEM_data(it) + it->nbytes - 2) = '\r';
+                    *(ITEM_data(it) + it->nbytes - 1) = '\n';
+
+                    cproxy_upstream_ascii_item_response(it, uc, -1);
+                } else {
+                    assert(false); // TODO.
+                }
+
+                    item_remove(it);
+            } else if (PROTOCOL_BINARY_CMD_GETL == c->cmd &&
+                    (status == PROTOCOL_BINARY_RESPONSE_ETMPFAIL ||
+                    status == PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND)) {
+                /*
+                 * currently membase does not send ETMPFAIL for
+                 * engine error code for ENGINE_TMPFAIL
+                 */
+                d->upstream_suffix = "LOCK_ERROR\r\n";
+                d->upstream_suffix_len = 0;
+                d->upstream_status = status;
+                d->upstream_retry = 0;
+                d->target_host_ident = NULL;
+            }
+
+            conn_set_state(c, conn_pause);
+
+            cproxy_update_event_write(d, uc);
+
+            return;
+        }
 
     case PROTOCOL_BINARY_CMD_FLUSH:
         conn_set_state(c, conn_pause);

@@ -288,6 +288,8 @@ extern "C"
     uint8_t bytes[sizeof(protocol_binary_request_header) + 4];
   } protocol_binary_request_flush;
 
+  typedef protocol_binary_request_flush protocol_binary_request_getl;
+
   /**
    * Definition of the packet returned by the flush command
    * See section 4
