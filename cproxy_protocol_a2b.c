@@ -1010,8 +1010,8 @@ void a2b_process_downstream_response(conn *c) {
         assert(c->noreply == false);
 
         if (keylen > 0) {
-            assert(it != NULL); // Holds the stat value.
-            assert(it->nbytes > 2);
+            assert(it != NULL);      // Holds the stat value.
+            assert(it->nbytes >= 2); // Note: ep-engine-to-mc_couch can return empty STAT val.
             assert(bodylen > keylen);
             assert(d->merger != NULL);
 
