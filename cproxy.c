@@ -76,7 +76,7 @@ typedef struct {
     uint32_t   dc_acquired; // Count of acquired (in-use) downstream conns.
     char      *host_ident;
     uint32_t   error_count;
-    rel_time_t error_time;
+    uint64_t   error_time;
 
     // Head & tail of singly linked-list/queue, using
     // downstream->next_waiting pointers, where we've reached
@@ -2266,12 +2266,10 @@ void wait_queue_timeout(const int fd,
 
         struct timeval wqt = ptd->behavior_pool.base.wait_queue_timeout;
 
-        // TODO: Millisecond capacity in 32-bit field not enough?
-        //
-        uint32_t wqt_msec = (wqt.tv_sec * 1000) +
+        uint64_t wqt_msec = (wqt.tv_sec * 1000) +
                             (wqt.tv_usec / 1000);
 
-        uint32_t cut_msec = msec_current_time - wqt_msec;
+        uint64_t cut_msec = msec_current_time - wqt_msec;
 
         // Run through all the old upstream conn's in
         // the wait queue, remove them, and emit errors
@@ -3327,10 +3325,10 @@ conn *zstored_acquire_downstream_conn(downstream *d,
                 msec_current_time - conns->error_time;
 
             if (settings.verbose > 2) {
-                moxi_log_write("zacquire_dc, %s, %d, %d, (%d)\n",
+                moxi_log_write("zacquire_dc, %s, %d, %llu, (%d)\n",
                                host_ident,
                                conns->error_count,
-                               conns->error_time,
+                               (long long unsigned int) conns->error_time,
                                msecs_since_error);
             }
 

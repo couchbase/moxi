@@ -18,7 +18,7 @@
 //
 static char *readfile(char *path);
 
-volatile uint32_t  msec_current_time = 0;
+volatile uint64_t  msec_current_time = 0;
 int                msec_cycle = 0;
 struct event       msec_clockevent;
 struct event_base *msec_clockevent_base = NULL;

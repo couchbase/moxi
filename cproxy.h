@@ -22,9 +22,7 @@ int cproxy_init(char *cfg_str,
 
 #define CPROXY_NOT_CAS UINT64_MAX
 
-// TODO: Millisecond capacity in 32-bit field not enough?
-//
-extern volatile uint32_t msec_current_time;
+extern volatile uint64_t msec_current_time;
 
 uint64_t usec_now(void);
 
@@ -54,8 +52,8 @@ typedef struct {
     void  (*item_set_next)(void *it, void *next);
     void *(*item_get_prev)(void *it);
     void  (*item_set_prev)(void *it, void *prev);
-    uint32_t (*item_get_exptime)(void *it);
-    void     (*item_set_exptime)(void *it, uint32_t exptime);
+    uint64_t (*item_get_exptime)(void *it);
+    void     (*item_set_exptime)(void *it, uint64_t exptime);
 } mcache_funcs;
 
 extern mcache_funcs mcache_item_funcs;
@@ -381,8 +379,8 @@ typedef struct {
 struct key_stats {
     char key[KEY_MAX_LENGTH + 1];
     int  refcount;
-    uint32_t exptime;
-    uint32_t added_at;
+    uint64_t exptime;
+    uint64_t added_at;
     key_stats *next;
     key_stats *prev;
     proxy_stats_cmd stats_cmd[STATS_CMD_TYPE_last][STATS_CMD_last];
@@ -812,9 +810,9 @@ bool  mcache_started(mcache *m);
 void  mcache_stop(mcache *m);
 void  mcache_reset_stats(mcache *m);
 void *mcache_get(mcache *m, char *key, int key_len,
-                 uint32_t curr_time);
+                 uint64_t curr_time);
 void  mcache_set(mcache *m, void *it,
-                 uint32_t exptime,
+                 uint64_t exptime,
                  bool add_only,
                  bool mod_exptime_if_exists);
 void  mcache_delete(mcache *m, char *key, int key_len);
@@ -824,10 +822,10 @@ void  mcache_foreach(mcache *m, mcache_traversal_func f, void *userdata);
 // Functions for key stats.
 //
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
-                          uint32_t msec_time);
+                          uint64_t msec_time);
 
 void touch_key_stats(proxy_td *ptd, char *key, int key_len,
-                     uint32_t msec_current_time,
+                     uint64_t msec_current_time,
                      enum_stats_cmd_type cmd_type,
                      enum_stats_cmd cmd,
                      int delta_seen,

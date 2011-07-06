@@ -32,7 +32,7 @@
 
 #define MAX_LOGBUF_LEN 1000
 
-extern volatile uint32_t msec_current_time;
+extern volatile uint64_t msec_current_time;
 
 /**
  * open the errorlog

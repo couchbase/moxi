@@ -106,7 +106,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
 
     // Snapshot the volatile only once.
     //
-    uint32_t msec_current_time_snapshot = msec_current_time;
+    uint64_t msec_current_time_snapshot = msec_current_time;
 
     int   uc_num = 0;
     conn *uc_cur = uc;

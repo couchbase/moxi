@@ -49,8 +49,8 @@ static void *key_stats_get_next(void *it);
 static void key_stats_set_next(void *it, void *next);
 static void *key_stats_get_prev(void *it);
 static void key_stats_set_prev(void *it, void *prev);
-static uint32_t key_stats_get_exptime(void *it);
-static void key_stats_set_exptime(void *it, uint32_t exptime);
+static uint64_t key_stats_get_exptime(void *it);
+static void key_stats_set_exptime(void *it, uint64_t exptime);
 
 mcache_funcs mcache_key_stats_funcs = {
     .item_key         = key_stats_key,
@@ -452,7 +452,7 @@ void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
 // -------------------------------------------------
 
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
-                          uint32_t msec_time) {
+                          uint64_t msec_time) {
     assert(ptd);
     assert(key);
     assert(key_len > 0);
@@ -478,7 +478,7 @@ key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
 }
 
 void touch_key_stats(proxy_td *ptd, char *key, int key_len,
-                     uint32_t msec_time,
+                     uint64_t msec_time,
                      enum_stats_cmd_type cmd_type,
                      enum_stats_cmd cmd,
                      int delta_seen,
@@ -561,13 +561,13 @@ static void key_stats_set_prev(void *it, void *prev) {
     i->prev = (key_stats *) prev;
 }
 
-static uint32_t key_stats_get_exptime(void *it) {
+static uint64_t key_stats_get_exptime(void *it) {
     key_stats *i = it;
     assert(i);
     return i->exptime;
 }
 
-static void key_stats_set_exptime(void *it, uint32_t exptime) {
+static void key_stats_set_exptime(void *it, uint64_t exptime) {
     key_stats *i = it;
     assert(i);
     i->exptime = exptime;

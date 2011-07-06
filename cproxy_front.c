@@ -20,8 +20,8 @@ static void *item_get_next(void *it);
 static void item_set_next(void *it, void *next);
 static void *item_get_prev(void *it);
 static void item_set_prev(void *it, void *prev);
-static uint32_t item_get_exptime(void *it);
-static void item_set_exptime(void *it, uint32_t exptime);
+static uint64_t item_get_exptime(void *it);
+static void item_set_exptime(void *it, uint64_t exptime);
 
 void mcache_item_unlink(mcache *m, void *it);
 void mcache_item_touch(mcache *m, void *it);
@@ -162,7 +162,7 @@ void mcache_stop(mcache *m) {
 }
 
 void *mcache_get(mcache *m, char *key, int key_len,
-                 uint32_t curr_time) {
+                 uint64_t curr_time) {
     (void)key_len;
     assert(key);
 
@@ -181,7 +181,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
         if (it != NULL) {
             mcache_item_unlink(m, it);
 
-            uint32_t exptime = m->funcs->item_get_exptime(it);
+            uint64_t exptime = m->funcs->item_get_exptime(it);
             if ((exptime <= 0) ||
                 (exptime >= curr_time &&
                  exptime >= m->oldest_live)) {
@@ -229,7 +229,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
 }
 
 void mcache_set(mcache *m, void *it,
-                uint32_t exptime,
+                uint64_t exptime,
                 bool add_only,
                 bool mod_exptime_if_exists) {
     assert(it);
@@ -524,13 +524,13 @@ static void item_set_prev(void *it, void *prev) {
     i->prev = (item *) prev;
 }
 
-static uint32_t item_get_exptime(void *it) {
+static uint64_t item_get_exptime(void *it) {
     item *i = it;
     assert(i);
     return i->exptime;
 }
 
-static void item_set_exptime(void *it, uint32_t exptime) {
+static void item_set_exptime(void *it, uint64_t exptime) {
     item *i = it;
     assert(i);
     i->exptime = exptime;

@@ -1329,7 +1329,7 @@ static void add_key_stats_inner(const void *data, void *userdata) {
         return;
     }
 
-    uint32_t current_time_msec = msec_current_time;
+    uint64_t current_time_msec = msec_current_time;
     float rescale_factor_dest = 1.0, rescale_factor_src = 1.0;
     if (dest_stats->added_at < kstats->added_at) {
         rescale_factor_src = (float)(current_time_msec - dest_stats->added_at)/(current_time_msec - kstats->added_at);
@@ -1597,7 +1597,8 @@ static void map_key_stats_foreach_emit_inner(const void *_key,
         char buf_val[32];
         snprintf(buf, sizeof(buf), "%s:keys_stats:%s:added_at_msec",
                  state->name, key);
-        snprintf(buf_val, sizeof(buf_val), "%u", kstats->added_at);
+        snprintf(buf_val, sizeof(buf_val), "%llu",
+                 (long long unsigned int) kstats->added_at);
         conflate_add_field(state->emit->result, buf, buf_val);
     }
 }
