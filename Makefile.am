@@ -47,6 +47,10 @@ if BUILD_DAEMON
 moxi_SOURCES += daemon.c
 endif
 
+if BUILD_STRSEP
+moxi_SOURCES += strsep.c
+endif
+
 timedrun_SOURCES = timedrun.c
 
 htgram_test_SOURCES = htgram_test.c htgram.c htgram.h

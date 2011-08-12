@@ -151,6 +151,9 @@ AC_CHECK_FUNCS(mlockall)
 AC_CHECK_FUNCS(getpagesizes)
 AC_CHECK_FUNCS(memcntl)
 AC_CHECK_FUNCS(sigignore)
+AC_CHECK_FUNCS(strsep)
+
+AM_CONDITIONAL(BUILD_STRSEP, test "x$ac_cv_func_strsep" != "xyes")
 
 AC_DEFUN([AC_C_ALIGNMENT],
 [AC_CACHE_CHECK(for alignment, ac_cv_c_alignment,
