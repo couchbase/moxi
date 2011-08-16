@@ -18,6 +18,7 @@
 #define CONFIG_STATIC_H 1
 
 // The intention of this file is to avoid cluttering the code with #ifdefs
+#include <sys/types.h>
 
 #ifdef WIN32
 // HAVE_CONFIG_H is causing problems with pthreads.h on in32
