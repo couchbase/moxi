@@ -1935,8 +1935,12 @@ bool cproxy_forward(downstream *d) {
     if (IS_ASCII(d->upstream_conn->protocol)) {
         // ASCII upstream.
         //
-        if (IS_ASCII(d->upstream_conn->peer_protocol) ||
-            IS_ASCII(d->ptd->behavior_pool.base.downstream_protocol)) {
+        unsigned int peer_protocol =
+            d->upstream_conn->peer_protocol ?
+            d->upstream_conn->peer_protocol :
+            d->ptd->behavior_pool.base.downstream_protocol;
+
+        if (IS_ASCII(peer_protocol)) {
             return cproxy_forward_a2a_downstream(d);
         } else {
             return cproxy_forward_a2b_downstream(d);
