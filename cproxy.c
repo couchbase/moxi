@@ -1410,7 +1410,6 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
 
     int s = 0; // Number connected.
     int n = mcs_server_count(&d->mst);
-    mcs_server_st msst;
     mcs_server_st *msst_actual;
 
     assert(d->behaviors_num >= n);
@@ -1444,14 +1443,15 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
             conn *c = d->upstream_conn;
             /*
              * mcmux compatiblity mode, one downstream struct will be associated
-             * with downstream connection
+             * with downstream connection. So overwrite the default msst with the
+             * value.
              */
             if (c && c->peer_host && c->peer_port) {
-                bzero(&msst, sizeof(mcs_server_st));
-                memcpy(msst.hostname, c->peer_host, strlen(c->peer_host));
-                msst.port = c->peer_port;
-                msst.fd = -1;
-                msst_actual = &msst;
+                assert(i == 0);
+                strncpy(msst_actual->hostname, c->peer_host, MCS_IDENT_SIZE);
+                msst_actual->port = c->peer_port;
+                msst_actual->fd = -1;
+                msst_actual->ident_a[0] = msst_actual->ident_b[0] = 0;
             }
 
             bool downstream_conn_max_reached = false;
@@ -3460,6 +3460,8 @@ bool zstored_downstream_waiting_remove(downstream *d) {
         mcs_server_st *msst = mcs_server_index(&d->mst, i);
 
         enum protocol downstream_protocol =
+            d->upstream_conn && d->upstream_conn->peer_protocol ?
+            d->upstream_conn->peer_protocol :
             d->behaviors_arr[i].downstream_protocol;
 
         assert(IS_PROXY(downstream_protocol));
