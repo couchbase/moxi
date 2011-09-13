@@ -164,6 +164,13 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
         d->target_host_ident = NULL;
 
         conn_set_state(c, conn_pause);
+    } else if (strncmp(line, "NOT_FOUND", 9) == 0) {
+        d->upstream_suffix = "NOT_FOUND\r\n";
+        d->upstream_suffix_len = 0;
+        d->upstream_retry = 0;
+        d->target_host_ident = NULL;
+
+        conn_set_state(c, conn_pause);
     } else {
         conn_set_state(c, conn_pause);
 
