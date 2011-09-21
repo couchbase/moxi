@@ -799,33 +799,44 @@ void a2b_process_downstream_response(conn *c) {
         }
 
         if (c->noreply == false) {
-            if (status == 0) {
-                assert(it != NULL);
-                assert(it->nbytes >= 2);
-                assert(extlen > 0);
+            switch (status) {
+                case PROTOCOL_BINARY_RESPONSE_SUCCESS:
+                    assert(it != NULL);
+                    assert(it->nbytes >= 2);
+                    assert(extlen > 0);
 
-                if (bodylen >= keylen + extlen) {
-                    *(ITEM_data(it) + it->nbytes - 2) = '\r';
-                    *(ITEM_data(it) + it->nbytes - 1) = '\n';
+                    if (bodylen >= keylen + extlen) {
+                        *(ITEM_data(it) + it->nbytes - 2) = '\r';
+                        *(ITEM_data(it) + it->nbytes - 1) = '\n';
 
-                    cproxy_upstream_ascii_item_response(it, uc, -1);
-                } else {
-                    assert(false); // TODO.
-                }
+                        cproxy_upstream_ascii_item_response(it, uc, -1);
+                    } else {
+                        assert(false); // TODO.
+                    }
 
                     item_remove(it);
-            } else if (PROTOCOL_BINARY_CMD_GETL == c->cmd &&
-                    (status == PROTOCOL_BINARY_RESPONSE_ETMPFAIL ||
-                    status == PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND)) {
-                /*
-                 * currently membase does not send ETMPFAIL for
-                 * engine error code for ENGINE_TMPFAIL
-                 */
-                d->upstream_suffix = "LOCK_ERROR\r\n";
-                d->upstream_suffix_len = 0;
-                d->upstream_status = status;
-                d->upstream_retry = 0;
-                d->target_host_ident = NULL;
+                    break;
+
+                case PROTOCOL_BINARY_RESPONSE_ETMPFAIL:
+                case PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND:
+                    /*
+                     * currently membase does not send ETMPFAIL for
+                     * engine error code for ENGINE_TMPFAIL
+                     */
+                    d->upstream_suffix = "LOCK_ERROR\r\n";
+                    d->upstream_suffix_len = 0;
+                    d->upstream_status = status;
+                    d->upstream_retry = 0;
+                    d->target_host_ident = NULL;
+                    break;
+
+                case PROTOCOL_BINARY_RESPONSE_KEY_ENOENT:
+                    d->upstream_suffix = "NOT_FOUND\r\n";
+                    d->upstream_suffix_len = 0;
+                    d->upstream_status = status;
+                    d->upstream_retry = 0;
+                    d->target_host_ident = NULL;
+                    break;
             }
 
             conn_set_state(c, conn_pause);
