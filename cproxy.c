@@ -2155,14 +2155,44 @@ void cproxy_on_pause_downstream_conn(conn *c) {
     }
 
     downstream *d = c->extra;
-    assert(d != NULL);
+
+    if (!d || c->rbytes > 0) {
+        if (settings.verbose) {
+            moxi_log_write("%d: Closed the downstream since got"
+                    "an event on downstream or extra data on downstream\n",
+                    c->sfd);
+        }
+
+        zstored_downstream_conns *conns =
+            zstored_get_downstream_conns(c->thread, c->host_ident);
+        if (conns) {
+            bool found = false;
+            conns->dc = conn_list_remove(conns->dc, NULL, c, &found);
+            if (!found) {
+                assert(0);
+                if (settings.verbose) {
+                    moxi_log_write("<%d Not able to find in zstore conns\n",
+                            c->sfd);
+                }
+            }
+        } else {
+            assert(0);
+            if (settings.verbose) {
+                moxi_log_write("<%d Not able to find zstore conns\n",
+                        c->sfd);
+            }
+        }
+        cproxy_close_conn(c);
+        return;
+    }
+
     assert(d->ptd != NULL);
 
     // Must update_event() before releasing the downstream conn,
     // because the release might call udpate_event(), too,
     // and we don't want to override its work.
     //
-    if (update_event(c, 0)) {
+    if (update_event(c, EV_READ | EV_PERSIST)) {
         cproxy_release_downstream_conn(d, c);
     } else {
         d->ptd->stats.stats.err_oom++;
@@ -3131,7 +3161,6 @@ bool cproxy_on_connect_downstream_conn(conn *c) {
             }
 
             conn_set_state(c, conn_pause);
-            update_event(c, 0);
             cproxy_forward_or_error(d);
 
             return true;
@@ -3403,8 +3432,6 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
 
     bool keep = dc->state == conn_pause;
 
-    conn_set_state(dc, conn_pause);
-    update_event(dc, 0);
     dc->extra = NULL;
 
     zstored_downstream_conns *conns =
