@@ -999,6 +999,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     // be released.
     //
     if (!force &&
+        d->upstream_conn != NULL &&
         d->upstream_retry > 0) {
         d->upstream_retry = 0;
         d->upstream_retries++;
