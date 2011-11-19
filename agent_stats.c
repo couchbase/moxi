@@ -21,6 +21,8 @@
 
 // Local declarations.
 //
+void xpassword(char *p);
+
 static void add_stat_prefix(const void *dump_opaque,
                             const char *prefix,
                             const char *key,
@@ -781,6 +783,28 @@ void proxy_stats_dump_proxy_main(ADD_STAT add_stats, conn *c,
     }
 }
 
+void xpassword(char *p) {
+    // X out passwords in input string.
+    // Example: ..."nodeLocator": "vbucket", "saslPassword": "test", "nodes":...
+    // Becomes: ..."nodeLocator": "vbucket", "saslPassword": "XXXX", "nodes":...
+    while (true) {
+        p = strstr(p, "assword\"");
+        if (p == NULL) {
+            return;
+        }
+
+        p = p + 8;
+        p = strchr(p, '"');
+        if (p != NULL) {
+            p = p + 1;
+            while (p != NULL && *p != '\0' && *p != '"') {
+                *p = 'X';
+                p = p + 1;
+            }
+        }
+    }
+}
+
 void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
                               struct proxy_stats_cmd_info *pscip) {
     assert(c != NULL);
@@ -827,6 +851,8 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
                         }
                     }
                     *slow = '\0';
+
+                    xpassword(buf);
 
                     APPEND_PREFIX_STAT("config", "%s", buf);
 
