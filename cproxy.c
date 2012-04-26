@@ -1180,6 +1180,11 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         }
     }
 
+    cproxy_clear_timeout(d); // For MB-4334.
+
+    assert(d->timeout_tv.tv_sec == 0);
+    assert(d->timeout_tv.tv_usec == 0);
+
     // If this downstream still has the same configuration as our top-level
     // proxy config, go back onto the available, released downstream list.
     //
