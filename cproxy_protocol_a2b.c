@@ -849,6 +849,16 @@ void a2b_process_downstream_response(conn *c) {
     case PROTOCOL_BINARY_CMD_FLUSH:
         conn_set_state(c, conn_pause);
 
+        if (uc != NULL) {
+            if (status == PROTOCOL_BINARY_RESPONSE_NOT_SUPPORTED) {
+                if (d->upstream_suffix != NULL &&
+                    d->upstream_suffix_len == 0 &&
+                    strncmp(d->upstream_suffix, "OK\r\n", 4) == 0) {
+                    d->upstream_suffix = "SERVER_ERROR flush_all not supported\r\n";
+                }
+            }
+        }
+
         // TODO: Handle flush_all's expiration parameter against
         // the front_cache.
         //
