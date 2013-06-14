@@ -3,9 +3,7 @@
 #ifndef AGENT_H
 #define AGENT_H
 
-#ifdef HAVE_CONFLATE_H
 #include <libconflate/conflate.h>
-#endif
 #ifdef REDIRECTS_FOR_MOCKS
 #include "redirects.h"
 #endif
@@ -19,7 +17,6 @@ proxy_main *cproxy_init_agent_start(char *jid, char *jpw,
                                     proxy_behavior behavior,
                                     int nthreads);
 
-#ifdef HAVE_CONFLATE_H
 conflate_result on_conflate_new_config(void *userdata, kvpair_t *config);
 
 enum conflate_mgmt_cb_result on_conflate_get_stats(void *opaque,
@@ -40,7 +37,6 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *opaque,
                                                    bool direct,
                                                    kvpair_t *form,
                                                    conflate_form_result *);
-#endif
 
 void cproxy_on_config_pool(proxy_main *m,
                            char *name, int port,
@@ -48,9 +44,7 @@ void cproxy_on_config_pool(proxy_main *m,
                            uint32_t config_ver,
                            proxy_behavior_pool *behavior_pool);
 
-#ifdef HAVE_CONFLATE_H
 char **get_key_values(kvpair_t *kvs, char *key);
-#endif
 
 void proxy_stats_dump_basic(ADD_STAT add_stats, conn *c,
                             const char *prefix);

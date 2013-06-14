@@ -351,7 +351,6 @@ int cproxy_init(char *cfg_str,
                                   nthreads);
     }
 
-#ifdef HAVE_CONFLATE_H
     if (settings.verbose > 2) {
         cproxy_dump_behavior(&behavior, "cproxy_init_agent", 2);
     }
@@ -359,11 +358,6 @@ int cproxy_init(char *cfg_str,
     return cproxy_init_agent(cfg_str,
                              behavior,
                              nthreads);
-#else
-    moxi_log_write("missing conflate\n");
-    exit(EXIT_FAILURE);
-    return 1;
-#endif
 }
 
 int cproxy_init_mcmux_mode(int proxy_port,

@@ -41,7 +41,8 @@ moxi_SOURCES = memcached.c memcached.h \
            log.c log.h \
            cJSON.c cJSON.h \
            config_static.h \
-           htgram.c htgram.h
+           htgram.c htgram.h \
+           agent.h agent_config.c agent_ping.c agent_stats.c
 
 if BUILD_DAEMON
 moxi_SOURCES += daemon.c
@@ -55,18 +56,12 @@ timedrun_SOURCES = timedrun.c
 
 htgram_test_SOURCES = htgram_test.c htgram.c htgram.h
 
-TESTS = check_util check_moxi check_work
-if HAVE_LIBCONFLATE
-TESTS += check_moxi_agent
-endif
+TESTS = check_util check_moxi check_work check_moxi_agent
 
 check_PROGRAMS = check_util \
                  check_moxi \
-                 check_work
-
-if HAVE_LIBCONFLATE
-check_PROGRAMS += check_moxi_agent
-endif
+                 check_work \
+                 check_moxi_agent
 
 test_moxi:
 	./t/moxi_all.pl
@@ -78,10 +73,6 @@ check_util_LDADD = @CHECK_LIBS@
 if BUILD_CACHE
 moxi_SOURCES += cache.c
 testapp_SOURCES += cache.c
-endif
-
-if HAVE_LIBCONFLATE
-moxi_SOURCES += agent.h agent_config.c agent_ping.c agent_stats.c
 endif
 
 if BUILD_SOLARIS_PRIVS
@@ -165,11 +156,9 @@ check_moxi_SOURCES = check_moxi.c $(moxi_SOURCES)
 check_moxi_CFLAGS = @CHECK_CFLAGS@ $(moxi_CPPFLAGS) -DMAIN_CHECK
 check_moxi_LDADD = @CHECK_LIBS@ $(moxi_LDADD)
 
-if HAVE_LIBCONFLATE
 check_moxi_agent_SOURCES = check_moxi_agent.c redirects.c $(moxi_SOURCES)
 check_moxi_agent_CFLAGS = @CHECK_CFLAGS@ $(moxi_CPPFLAGS) -DMAIN_CHECK -DREDIRECTS_FOR_MOCKS
 check_moxi_agent_LDADD = @CHECK_LIBS@ $(moxi_LDADD)
-endif
 
 check-syntax:
 	$(COMPILE) $(moxi_CPPFLAGS) -o /dev/null -S ${CHK_SOURCES}
