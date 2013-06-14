@@ -4126,17 +4126,14 @@ static void usage(char **argv) {
     printf(PACKAGE " " VERSION "\n");
     printf("\n");
     printf("Usage:\n");
-#ifdef MOXI_USE_LIBVBUCKET
     printf("  %s [FLAGS] URL1[,URL2[,URLn]]\n", m);
     printf("  %s [FLAGS] -z url=URL1[,URL2[,URLn]]\n", m);
-#endif
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("  %s [FLAGS] -z LOCAL_PORT=MCHOST[:MCPORT][,MCHOST2[:MCPORT2][,*]]\n", m);
 #endif
     printf("\n");
     printf("The -z parameter specifies a 'cluster configuration' that tells\n");
     printf("moxi which servers to communicate with.\n");
-#ifdef MOXI_USE_LIBVBUCKET
     printf("\n");
     printf("The URL approach allows you to specify the cluster configuration\n"
            "via dynamic HTTP/REST-based lookup.  Example:\n"
@@ -4145,7 +4142,6 @@ static void usage(char **argv) {
            "You can also specify multiple cluster configuration URL's for higher\n"
            "availability, using comma-separated URL's (no whitespace).  A URL list\n"
            "as the last parameter is also assumed to be a -z cluster configuration.\n");
-#endif
 #ifdef MOXI_USE_LIBMEMCACHED
     printf("\n");
     printf("The MCHOST:MCPORT approach allows you to specify the cluster\n"
@@ -4222,13 +4218,11 @@ static void usage(char **argv) {
            "configuration keys include the following, with their default values...\n");
     printf("  port_listen=%d\n", b->port_listen);
     printf("      Port number that moxi will listen on, if not otherwise specified.\n");
-#ifdef MOXI_USE_LIBVBUCKET
     printf("  usr=<USR, none by default>\n");
     printf("  pwd=<PWD, none by default>\n");
     printf("      User/password that moxi will use for SASL plain or HTTP basic auth.\n");
     printf("      You can also define these using the MOXI_SASL_PLAIN_USR\n"
            "      and MOXI_SASL_PLAIN_PWD environment variables.\n");
-#endif
     printf("  default_bucket_name=<use the first bucket>\n"
            "      When unspecified, moxi will treat the first bucket it sees as\n"
            "      the default bucket.  This is the bucket that new clients will\n"

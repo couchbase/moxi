@@ -105,7 +105,6 @@ int mcs_connect(const char *hostname, int portnum,
 
 // ----------------------------------------
 
-#ifdef MOXI_USE_LIBVBUCKET
 
 #include <libvbucket/vbucket.h>
 
@@ -114,7 +113,5 @@ int mcs_connect(const char *hostname, int portnum,
 
 #undef  MEMCACHED_DEFAULT_LISTEN_PORT
 #define MEMCACHED_DEFAULT_LISTEN_PORT 0
-
-#endif // MOXI_USE_LIBVBUCKET
 
 #endif // MCS_H

@@ -446,8 +446,6 @@ conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
     return CONFLATE_ERROR;
 }
 
-#ifdef MOXI_USE_LIBVBUCKET
-
 static bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                                       char *config, char *name, char *src);
 
@@ -1002,189 +1000,6 @@ static void cproxy_parse_json_auth(char *config,
     }
 }
 
-#else // !MOXI_USE_LIBVBUCKET
-
-static
-bool cproxy_on_config_kvs(proxy_main *m, uint32_t new_config_ver, kvpair_t *kvs) {
-    // The kvs key-multivalues look roughly like...
-    //
-    //  pool-customer1-a
-    //    svrname3
-    //  pool-customer1-b
-    //    svrname1
-    //    svrname2
-    //  svr-svrname1
-    //    host=mc1.foo.net
-    //    port=11211
-    //    weight=1
-    //    bucket=buck1
-    //    usr=test1
-    //    pwd=password
-    //  svr-svrnameX
-    //    host=mc2.foo.net
-    //    port=11211
-    //  behavior-customer1-a
-    //    wait_queue_timeout=1000
-    //    downstream_max=10
-    //  behavior-customer1-b
-    //    wait_queue_timeout=1000
-    //    downstream_max=10
-    //  pool_drain-customer1-b
-    //    svrname1
-    //    svrname3
-    //  pools
-    //    customer1-a
-    //    customer1-b
-    //  bindings
-    //    11221
-    //    11331
-    //
-    char **pools    = get_key_values(kvs, "pools");
-    char **bindings = get_key_values(kvs, "bindings");
-
-    if (pools == NULL) {
-        return false;
-    }
-
-    int npools    = 0;
-    int nbindings = 0;
-
-    while (pools && pools[npools])
-        npools++;
-
-    while (bindings && bindings[nbindings])
-        nbindings++;
-
-    if (nbindings > 0 &&
-        nbindings != npools) {
-        if (settings.verbose > 1) {
-            moxi_log_write("npools does not match nbindings\n");
-        }
-        return false;
-    }
-
-    char **behavior_kvs = get_key_values(kvs, "behavior");
-    if (behavior_kvs != NULL) {
-        // Update the default behavior.
-        //
-        proxy_behavior m_behavior = m->behavior;
-
-        for (int k = 0; behavior_kvs[k]; k++) {
-            char *bstr = trimstrdup(behavior_kvs[k]);
-            if (bstr != NULL) {
-                cproxy_parse_behavior_key_val_str(bstr, &m_behavior);
-                free(bstr);
-            }
-        }
-
-        m->behavior = m_behavior;
-    }
-
-    for (int i = 0; i < npools; i++) {
-        char *pool_name = skipspace(pools[i]);
-        if (pool_name != NULL &&
-            pool_name[0] != '\0') {
-            char buf[200];
-
-            snprintf(buf, sizeof(buf), "pool-%s", pool_name);
-
-            char **servers = get_key_values(kvs, trimstr(buf));
-            if (servers != NULL) {
-                // Parse proxy-level behavior.
-                //
-                proxy_behavior proxyb = m->behavior;
-
-                if (parse_kvs_behavior(kvs, "behavior", pool_name, &proxyb)) {
-                    if (settings.verbose > 1) {
-                        cproxy_dump_behavior(&proxyb,
-                                             "conc proxy_behavior", 1);
-                    }
-                }
-
-                // The legacy way to get a port is through the bindings,
-                // but they're also available as an inheritable
-                // proxy_behavior field of port_listen.
-                //
-                int pool_port = proxyb.port_listen;
-
-                if (i < nbindings &&
-                    bindings != NULL &&
-                    bindings[i]) {
-                    pool_port = atoi(skipspace(bindings[i]));
-                }
-
-                if (pool_port > 0) {
-                    // Number of servers in this pool.
-                    //
-                    int s = 0;
-                    while (servers[s]) {
-                        s++;
-                    }
-
-                    if (s > 0) {
-                        // Parse server-level behaviors, so we'll have an
-                        // array of behaviors, one entry for each server.
-                        //
-                        proxy_behavior_pool behavior_pool = {
-                            .base = proxyb,
-                            .num  = s,
-                            .arr  = calloc(s, sizeof(proxy_behavior))
-                        };
-
-                        if (behavior_pool.arr != NULL) {
-                            char *config_str =
-                                parse_kvs_servers("svr", pool_name, kvs,
-                                                  servers, &behavior_pool);
-                            if (config_str != NULL &&
-                                config_str[0] != '\0') {
-                                if (settings.verbose > 2) {
-                                    moxi_log_write("conc config: %s\n",
-                                            config_str);
-                                }
-
-                                cproxy_on_config_pool(m, pool_name, pool_port,
-                                                      config_str, new_config_ver,
-                                                      &behavior_pool);
-
-                                free(config_str);
-                            }
-
-                            free(behavior_pool.arr);
-                        } else {
-                            if (settings.verbose > 1) {
-                                moxi_log_write("ERROR: oom on re-config malloc\n");;
-                            }
-                            return false;
-                        }
-                    } else {
-                        // Note: ignore when no servers for an existing pool.
-                        // Because the config_ver won't be updated, we'll
-                        // fall into the empty_pool code path below.
-                    }
-                } else {
-                    if (settings.verbose > 1) {
-                        moxi_log_write("ERROR: conc missing pool port\n");
-                    }
-                    return false;
-                }
-            } else {
-                // Note: ignore when no servers for an existing pool.
-                // Because the config_ver won't be updated, we'll
-                // fall into the empty_pool code path below.
-            }
-        } else {
-            if (settings.verbose > 1) {
-                moxi_log_write("ERROR: conc missing pool name\n");
-            }
-            return false;
-        }
-    }
-
-    return true;
-}
-
-#endif // !MOXI_USE_LIBVBUCKET
-
 static
 void cproxy_on_config(void *data0, void *data1) {
     proxy_main *m = data0;
@@ -1216,7 +1031,6 @@ void cproxy_on_config(void *data0, void *data1) {
         moxi_log_write("conc new_config_ver %u\n", new_config_ver);
     }
 
-#ifdef MOXI_USE_LIBVBUCKET
     char **urlv = get_key_values(kvs, "url"); // NULL delimited array of char *.
     char  *url  = urlv != NULL ? (urlv[0] != NULL ? urlv[0] : "") : "";
 
@@ -1238,11 +1052,6 @@ void cproxy_on_config(void *data0, void *data1) {
         moxi_log_write("ERROR: invalid response from REST server %s\n",
                        url);
     }
-#else // !MOXI_USE_LIBVBUCKET
-    if (cproxy_on_config_kvs(m, new_config_ver, kvs) == false) {
-        goto fail;
-    }
-#endif // !MOXI_USE_LIBVBUCKET
 
     // If there were any proxies that weren't updated in the
     // previous loop, we need to shut them down.  We mark the
@@ -1779,4 +1588,3 @@ char **get_key_values(kvpair_t *kvs, char *key) {
     }
     return NULL;
 }
-

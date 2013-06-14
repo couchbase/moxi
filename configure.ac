@@ -24,7 +24,7 @@ PANDORA_HAVE_LIBCONFLATE
 AS_IF([test "x${ac_cv_libconflate}" = "xyes"], [
       AC_DEFINE([HAVE_CONFLATE_H], 1,
           [Defined if building with libconflate management])])
-PANDORA_HAVE_LIBVBUCKET
+PANDORA_REQUIRE_LIBVBUCKET
 
 AC_SUBST(PROFILER_FLAGS)
 AC_SUBST(PROFILER_LDFLAGS)
@@ -51,17 +51,6 @@ AH_BOTTOM([
 #include "config_static.h"
 #endif
 ])
-
-dnl ----------------------------------------------------------------------------
-
-AC_ARG_ENABLE(moxi-libvbucket,
-  [AS_HELP_STRING([--enable-moxi-libvbucket], [use libvbucket @<:@default=off@:>@])],
-  [ac_cv_enable_moxi_libvbucket="$enableval"],
-  [ac_cv_enable_moxi_libvbucket="no"])
-
-AS_IF(test "x$ac_cv_enable_moxi_libvbucket" = "xyes",
-      AC_DEFINE([MOXI_USE_LIBVBUCKET], 1, [Defined moxi to use libvbucket]))
-AM_CONDITIONAL(MOXI_USE_LIBVBUCKET, test "x$ac_cv_enable_moxi_libvbucket" = "xyes")
 
 dnl ----------------------------------------------------------------------------
 

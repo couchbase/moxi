@@ -46,14 +46,12 @@ mcs_st *mcs_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
                    const char *default_pwd,
                    const char *opts) {
-#ifdef MOXI_USE_LIBVBUCKET
     if (config[0] == '{') {
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libvbucket\n");
         }
         return lvb_create(ptr, config, default_usr, default_pwd, opts);
     }
-#endif
 #ifdef MOXI_USE_LIBMEMCACHED
     if (config[0] != '{') {
         if (settings.verbose > 2) {
@@ -69,11 +67,9 @@ mcs_st *mcs_create(mcs_st *ptr, const char *config,
 }
 
 void mcs_free(mcs_st *ptr) {
-#ifdef MOXI_USE_LIBVBUCKET
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         lvb_free_data(ptr);
     }
-#endif
 #ifdef MOXI_USE_LIBMEMCACHED
     if (ptr->kind == MCS_KIND_LIBMEMCACHED) {
         lmc_free_data(ptr);
@@ -97,11 +93,9 @@ void mcs_free(mcs_st *ptr) {
 }
 
 bool mcs_stable_update(mcs_st *curr_version, mcs_st *next_version) {
-#ifdef MOXI_USE_LIBVBUCKET
     if (curr_version->kind == MCS_KIND_LIBVBUCKET) {
         return lvb_stable_update(curr_version, next_version);
     }
-#endif
 
     // TODO: MCS_KIND_LIBMEMCACHED impl for stable update.
 
@@ -118,11 +112,9 @@ mcs_server_st *mcs_server_index(mcs_st *ptr, int i) {
 
 uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length,
                       int *vbucket) {
-#ifdef MOXI_USE_LIBVBUCKET
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         return lvb_key_hash(ptr, key, key_length, vbucket);
     }
-#endif
 #ifdef MOXI_USE_LIBMEMCACHED
     if (ptr->kind == MCS_KIND_LIBMEMCACHED) {
         return lmc_key_hash(ptr, key, key_length, vbucket);
@@ -133,16 +125,12 @@ uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length,
 
 void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index,
                                 int vbucket) {
-#ifdef MOXI_USE_LIBVBUCKET
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         lvb_server_invalid_vbucket(ptr, server_index, vbucket);
     }
-#endif
 }
 
 // ----------------------------------------------------------------------
-
-#ifdef MOXI_USE_LIBVBUCKET
 
 mcs_st *lvb_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
@@ -294,7 +282,6 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
     vbucket_found_incorrect_master(vch, vbucket, server_index);
 }
 
-#endif // MOXI_USE_LIBVBUCKET
 
 // ----------------------------------------------------------------------
 
@@ -694,4 +681,3 @@ char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii) {
 
     return buf;
 }
-
