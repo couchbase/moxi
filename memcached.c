@@ -4128,9 +4128,7 @@ static void usage(char **argv) {
     printf("Usage:\n");
     printf("  %s [FLAGS] URL1[,URL2[,URLn]]\n", m);
     printf("  %s [FLAGS] -z url=URL1[,URL2[,URLn]]\n", m);
-#ifdef MOXI_USE_LIBMEMCACHED
     printf("  %s [FLAGS] -z LOCAL_PORT=MCHOST[:MCPORT][,MCHOST2[:MCPORT2][,*]]\n", m);
-#endif
     printf("\n");
     printf("The -z parameter specifies a 'cluster configuration' that tells\n");
     printf("moxi which servers to communicate with.\n");
@@ -4142,7 +4140,6 @@ static void usage(char **argv) {
            "You can also specify multiple cluster configuration URL's for higher\n"
            "availability, using comma-separated URL's (no whitespace).  A URL list\n"
            "as the last parameter is also assumed to be a -z cluster configuration.\n");
-#ifdef MOXI_USE_LIBMEMCACHED
     printf("\n");
     printf("The MCHOST:MCPORT approach allows you to specify the cluster\n"
            "configuration for libmemcached/ketama hashing, where moxi listens\n"
@@ -4150,7 +4147,6 @@ static void usage(char **argv) {
            "running at MCHOST:MCPORT.  More than one MCHOST:MCPORT can be listed,\n"
            "separated by commas.  Example:\n"
            "  %s -z 11211=mc_server1:11211,mc_server2:11211\n", m);
-#endif
     printf("\n");
     printf("The -z cluster configuration can be also specified in a config file:\n");
     printf("  %s [FLAGS] -z /path/to/absolute/configFile\n", m);

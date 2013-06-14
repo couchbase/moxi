@@ -97,11 +97,7 @@ int mcs_connect(const char *hostname, int portnum,
 
 // ----------------------------------------
 
-#ifdef MOXI_USE_LIBMEMCACHED
-
 #include <libmemcached/memcached.h>
-
-#endif // MOXI_USE_LIBMEMCACHED
 
 // ----------------------------------------
 

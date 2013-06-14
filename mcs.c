@@ -52,14 +52,12 @@ mcs_st *mcs_create(mcs_st *ptr, const char *config,
         }
         return lvb_create(ptr, config, default_usr, default_pwd, opts);
     }
-#ifdef MOXI_USE_LIBMEMCACHED
     if (config[0] != '{') {
         if (settings.verbose > 2) {
             moxi_log_write("mcs_create using libmemcached\n");
         }
         return lmc_create(ptr, config, default_usr, default_pwd, opts);
     }
-#endif
     moxi_log_write("ERROR: unconfigured hash library\n");
     exit(1);
 
@@ -70,11 +68,9 @@ void mcs_free(mcs_st *ptr) {
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         lvb_free_data(ptr);
     }
-#ifdef MOXI_USE_LIBMEMCACHED
     if (ptr->kind == MCS_KIND_LIBMEMCACHED) {
         lmc_free_data(ptr);
     }
-#endif
     ptr->kind = MCS_KIND_UNKNOWN;
 
     if (ptr->servers) {
@@ -115,11 +111,9 @@ uint32_t mcs_key_hash(mcs_st *ptr, const char *key, size_t key_length,
     if (ptr->kind == MCS_KIND_LIBVBUCKET) {
         return lvb_key_hash(ptr, key, key_length, vbucket);
     }
-#ifdef MOXI_USE_LIBMEMCACHED
     if (ptr->kind == MCS_KIND_LIBMEMCACHED) {
         return lmc_key_hash(ptr, key, key_length, vbucket);
     }
-#endif
     return 0;
 }
 
@@ -285,8 +279,6 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
 
 // ----------------------------------------------------------------------
 
-#ifdef MOXI_USE_LIBMEMCACHED
-
 mcs_st *lmc_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
                    const char *default_pwd,
@@ -391,8 +383,6 @@ uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbuc
 
     return memcached_generate_hash((memcached_st *) ptr->data, key, key_length);
 }
-
-#endif // MOXI_USE_LIBMEMCACHED
 
 // ----------------------------------------------------------------------
 

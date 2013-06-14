@@ -722,8 +722,6 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
 
     bool rv = false;
 
-#ifdef MOXI_USE_LIBMEMCACHED
-
     if (settings.verbose > 2) {
         moxi_log_write("parsing config nodeLocator:ketama\n");
     }
@@ -963,17 +961,6 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
     }
 
     cJSON_Delete(jConfig);
-
-#else // !MOXI_USE_LIBMEMCACHED
-
-    (void) m;
-    (void) new_config_ver;
-    (void) config;
-    (void) name;
-
-    moxi_log_write("ERROR: not compiled with libmemcached support\n");
-
-#endif // !MOXI_USE_LIBMEMCACHED
 
     return rv;
 }

@@ -54,17 +54,6 @@ AH_BOTTOM([
 
 dnl ----------------------------------------------------------------------------
 
-AC_ARG_ENABLE(moxi-libmemcached,
-  [AS_HELP_STRING([--enable-moxi-libmemcached], [use libmemcached @<:@default=off@:>@])],
-  [ac_cv_enable_moxi_libmemcached="$enableval"],
-  [ac_cv_enable_moxi_libmemcached="no"])
-
-AS_IF(test "x$ac_cv_enable_moxi_libmemcached" = "xyes",
-      AC_DEFINE([MOXI_USE_LIBMEMCACHED], 1, [Defined moxi to use libmemcached]))
-AM_CONDITIONAL(MOXI_USE_LIBMEMCACHED, test "x$ac_cv_enable_moxi_libmemcached" = "xyes")
-
-dnl ----------------------------------------------------------------------------
-
 AC_ARG_ENABLE(moxi-malloc,
   [AS_HELP_STRING([--enable-moxi-malloc], [use malloc for items instead of slabber])])
 

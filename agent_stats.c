@@ -154,7 +154,6 @@ static
 #endif
 void collect_memcached_stats_for_proxy(struct main_stats_collect_info *msci,
                                        const char *proxy_name, int proxy_port) {
-#ifdef MOXI_USE_LIBMEMCACHED
     memcached_st mst;
 
     memcached_create(&mst);
@@ -193,11 +192,6 @@ void collect_memcached_stats_for_proxy(struct main_stats_collect_info *msci,
 
 out_free:
     memcached_free(&mst);
-#else // MOXI_USE_LIBMEMCACHED
-    (void) msci;
-    (void) proxy_name;
-    (void) proxy_port;
-#endif // !MOXI_USE_LIBMEMCACHED
 }
 
 #ifdef REDIRECTS_FOR_MOCKS
