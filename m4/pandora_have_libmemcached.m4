@@ -17,7 +17,7 @@ AC_DEFUN([_PANDORA_SEARCH_LIBMEMCACHED],[
     [ac_enable_libmemcached="yes"])
 
   AS_IF([test "x$ac_enable_libmemcached" = "xyes"],[
-    AC_LIB_HAVE_LINKFLAGS(memcached,,[
+    AC_LIB_HAVE_LINKFLAGS(mcd,,[
       #include <libmemcached/memcached.h>
     ],[
       memcached_st memc;
@@ -27,9 +27,9 @@ AC_DEFUN([_PANDORA_SEARCH_LIBMEMCACHED],[
   ],[
     ac_cv_libmemcached="no"
   ])
-  
+
   AM_CONDITIONAL(HAVE_LIBMEMCACHED, [test "x${ac_cv_libmemcached}" = "xyes"])
-  
+
   AS_IF([test "x${ac_cv_libmemcached}" = "xyes"], [ PANDORA_WITH_MEMCACHED ])
 ])
 
