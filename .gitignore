@@ -17,6 +17,7 @@
 /check_moxi_agent
 /check_util
 /check_work
+/config/test-driver
 /debian/changelog
 /doc/doxy
 /m4/version.m4
