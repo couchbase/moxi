@@ -18,8 +18,8 @@
 #define MOXI_BLOCKING_CONNECT false
 #endif
 
-// Internal forward declarations.
-//
+/* Internal forward declarations. */
+
 downstream *downstream_list_remove(downstream *head, downstream *d);
 downstream *downstream_list_waiting_remove(downstream *head,
                                            downstream **tail,
@@ -72,16 +72,16 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
 bool zstored_downstream_waiting_remove(downstream *d);
 
 typedef struct {
-    conn      *dc;          // Linked-list of available downstream conns.
-    uint32_t   dc_acquired; // Count of acquired (in-use) downstream conns.
+    conn      *dc;          /* Linked-list of available downstream conns. */
+    uint32_t   dc_acquired; /* Count of acquired (in-use) downstream conns. */
     char      *host_ident;
     uint32_t   error_count;
     uint64_t   error_time;
 
-    // Head & tail of singly linked-list/queue, using
-    // downstream->next_waiting pointers, where we've reached
-    // downstream_conn_max, so there are waiting downstreams.
-    //
+    /* Head & tail of singly linked-list/queue, using */
+    /* downstream->next_waiting pointers, where we've reached */
+    /* downstream_conn_max, so there are waiting downstreams. */
+
     downstream *downstream_waiting_head;
     downstream *downstream_waiting_tail;
 } zstored_downstream_conns;
@@ -95,8 +95,8 @@ int delink_from_downstream_conns(conn *c);
 
 int cproxy_num_active_proxies(proxy_main *m);
 
-// Function tables.
-//
+/* Function tables. */
+
 conn_funcs cproxy_listen_funcs = {
     .conn_init                   = cproxy_init_upstream_conn,
     .conn_close                  = NULL,
@@ -157,7 +157,7 @@ proxy *cproxy_create(proxy_main *main,
     assert(port > 0 || settings.socketpath != NULL);
     assert(config != NULL);
     assert(behavior_pool);
-    assert(nthreads > 1); // Main thread + at least one worker.
+    assert(nthreads > 1); /* Main thread + at least one worker. */
     assert(nthreads == settings.num_threads);
 
     proxy *p = (proxy *) calloc(1, sizeof(proxy));
@@ -214,10 +214,10 @@ proxy *cproxy_create(proxy_main *main,
             p->name != NULL &&
             p->config != NULL &&
             p->behavior_pool.arr != NULL) {
-            // We start at 1, because thread[0] is the main listen/accept
-            // thread, and not a true worker thread.  Too lazy to save
-            // the wasted thread[0] slot memory.
-            //
+            /* We start at 1, because thread[0] is the main listen/accept */
+            /* thread, and not a true worker thread.  Too lazy to save */
+            /* the wasted thread[0] slot memory. */
+
             for (int i = 1; i < p->thread_data_num; i++) {
                 proxy_td *ptd = &p->thread_data[i];
                 ptd->proxy = p;
@@ -292,8 +292,8 @@ int cproxy_listen(proxy *p) {
                 p->port, p->config);
     }
 
-    // Idempotent, remembers if it already created listening socket(s).
-    //
+    /* Idempotent, remembers if it already created listening socket(s). */
+
     if (p->listening == 0) {
         enum protocol listen_protocol = negotiating_proxy_prot;
 
@@ -381,15 +381,15 @@ int cproxy_listen_port(int port,
     }
 
     if (listening > 0) {
-        // If we're already listening on the required port, then
-        // we don't need to start a new server_socket().  This happens
-        // in the multi-bucket case with binary protocol buckets.
-        // There will be multiple proxy struct's (one per bucket), but
-        // only one proxy struct will actually be pointed at by a
-        // listening conn->extra (usually 11211).
-        //
-        // TODO: Add a refcount to handle shutdown properly?
-        //
+        /* If we're already listening on the required port, then */
+        /* we don't need to start a new server_socket().  This happens */
+        /* in the multi-bucket case with binary protocol buckets. */
+        /* There will be multiple proxy struct's (one per bucket), but */
+        /* only one proxy struct will actually be pointed at by a */
+        /* listening conn->extra (usually 11211). */
+
+        /* TODO: Add a refcount to handle shutdown properly? */
+
         return listening;
     }
 #ifdef HAVE_SYS_UN_H
@@ -401,14 +401,14 @@ int cproxy_listen_port(int port,
 #endif
         assert(listen_conn != NULL);
 
-        // The listen_conn global list is changed by server_socket(),
-        // which adds a new listening conn on port for each bindable
-        // host address.
-        //
-        // For example, after the call to server_socket(), there
-        // might be two new listening conn's -- one for localhost,
-        // another for 127.0.0.1.
-        //
+        /* The listen_conn global list is changed by server_socket(), */
+        /* which adds a new listening conn on port for each bindable */
+        /* host address. */
+
+        /* For example, after the call to server_socket(), there */
+        /* might be two new listening conn's -- one for localhost, */
+        /* another for 127.0.0.1. */
+
         conn *c = listen_conn;
         while (c != NULL &&
                c != listen_conn_orig) {
@@ -420,10 +420,10 @@ int cproxy_listen_port(int port,
 
             listening++;
 
-            // TODO: Listening conn's never seem to close,
-            //       but need to handle cleanup if they do,
-            //       such as if we handle graceful shutdown one day.
-            //
+            /* TODO: Listening conn's never seem to close, */
+            /*       but need to handle cleanup if they do, */
+            /*       such as if we handle graceful shutdown one day. */
+
             c->extra = conn_extra;
             c->funcs = funcs;
             c->protocol = protocol;
@@ -440,7 +440,7 @@ proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id) {
     if (p != NULL) {
         int i = thread_index(thread_id);
 
-        // 0 is the main listen thread, not a worker thread.
+        /* 0 is the main listen thread, not a worker thread. */
         assert(i > 0);
         assert(i < p->thread_data_num);
 
@@ -455,10 +455,10 @@ proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id) {
 bool cproxy_init_upstream_conn(conn *c) {
     assert(c != NULL);
 
-    // We're called once per client/upstream conn early in its
-    // lifecycle, on the worker thread, so it's a good place
-    // to record the proxy_td into the conn->extra.
-    //
+    /* We're called once per client/upstream conn early in its */
+    /* lifecycle, on the worker thread, so it's a good place */
+    /* to record the proxy_td into the conn->extra. */
+
     assert(!is_listen_thread());
 
     proxy *p = c->extra;
@@ -478,10 +478,10 @@ bool cproxy_init_upstream_conn(conn *c) {
     proxy_td *ptd = cproxy_find_thread_data(p, pthread_self());
     assert(ptd != NULL);
 
-    // Reassign the client/upstream conn to a different bucket
-    // if the default_bucket_name isn't the special FIRST_BUCKET
-    // value.
-    //
+    /* Reassign the client/upstream conn to a different bucket */
+    /* if the default_bucket_name isn't the special FIRST_BUCKET */
+    /* value. */
+
     char *default_name = ptd->behavior_pool.base.default_bucket_name;
     if (strcmp(default_name, FIRST_BUCKET) != 0) {
         if (settings.verbose > 2) {
@@ -492,9 +492,9 @@ bool cproxy_init_upstream_conn(conn *c) {
         proxy *default_proxy =
             cproxy_find_proxy_by_auth(p->main, default_name, "");
 
-        // If the ostensible default bucket is missing (possibly deleted),
-        // assign the client/upstream conn to the NULL BUCKET.
-        //
+        /* If the ostensible default bucket is missing (possibly deleted), */
+        /* assign the client/upstream conn to the NULL BUCKET. */
+
         if (default_proxy == NULL) {
             default_proxy =
                 cproxy_find_proxy_by_auth(p->main, NULL_BUCKET, "");
@@ -559,8 +559,8 @@ void cproxy_on_close_upstream_conn(conn *c) {
         ptd->stats.stats.num_upstream--;
     }
 
-    // Delink from any reserved downstream.
-    //
+    /* Delink from any reserved downstream. */
+
     for (downstream *d = ptd->downstream_reserved; d != NULL; d = d->next) {
         bool found = false;
 
@@ -573,30 +573,30 @@ void cproxy_on_close_upstream_conn(conn *c) {
             d->upstream_retry = 0;
             d->target_host_ident = NULL;
 
-            // Don't need to do anything else, as we'll now just
-            // read and drop any remaining inflight downstream replies.
-            // Eventually, the downstream will be released.
+            /* Don't need to do anything else, as we'll now just */
+            /* read and drop any remaining inflight downstream replies. */
+            /* Eventually, the downstream will be released. */
         }
 
-        // If the downstream was reserved for this upstream conn,
-        // also clear the upstream from any multiget de-duplication
-        // tracking structures.
-        //
+        /* If the downstream was reserved for this upstream conn, */
+        /* also clear the upstream from any multiget de-duplication */
+        /* tracking structures. */
+
         if (found) {
             if (d->multiget != NULL) {
                 genhash_iter(d->multiget, multiget_remove_upstream, c);
             }
 
-            // The downstream conn's might have iov's that
-            // point to the upstream conn's buffers.  Also, the
-            // downstream conn might be in all sorts of states
-            // (conn_read, write, mwrite, pause), and we want
-            // to be careful about the downstream channel being
-            // half written.
-            //
-            // The safest, but inefficient, thing to do then is
-            // to close any conn_mwrite downstream conns.
-            //
+            /* The downstream conn's might have iov's that */
+            /* point to the upstream conn's buffers.  Also, the */
+            /* downstream conn might be in all sorts of states */
+            /* (conn_read, write, mwrite, pause), and we want */
+            /* to be careful about the downstream channel being */
+            /* half written. */
+
+            /* The safest, but inefficient, thing to do then is */
+            /* to close any conn_mwrite downstream conns. */
+
             ptd->stats.stats.tot_downstream_close_on_upstream_close++;
 
             int n = mcs_server_count(&d->mst);
@@ -616,8 +616,8 @@ void cproxy_on_close_upstream_conn(conn *c) {
         }
     }
 
-    // Delink from wait queue.
-    //
+    /* Delink from wait queue. */
+
     ptd->waiting_any_downstream_head =
         conn_list_remove(ptd->waiting_any_downstream_head,
                          &ptd->waiting_any_downstream_tail,
@@ -636,7 +636,7 @@ int delink_from_downstream_conns(conn *c) {
     }
 
     int n = mcs_server_count(&d->mst);
-    int k = -1; // Index of conn.
+    int k = -1; /* Index of conn. */
 
     for (int i = 0; i < n; i++) {
         if (d->downstream_conns[i] == c) {
@@ -671,15 +671,15 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
     downstream *d = c->extra;
 
-    // Might have been set to NULL during cproxy_free_downstream().
-    // Or, when a downstream conn is in the thread-based free pool, it
-    // is not associated with any particular downstream.
-    //
+    /* Might have been set to NULL during cproxy_free_downstream(). */
+    /* Or, when a downstream conn is in the thread-based free pool, it */
+    /* is not associated with any particular downstream. */
+
     if (d == NULL) {
-        // TODO: See if we need to remove the downstream conn from the
-        // thread-based free pool.  This shouldn't happen, but we
-        // should then figure out how to put an assert() here.
-        //
+        /* TODO: See if we need to remove the downstream conn from the */
+        /* thread-based free pool.  This shouldn't happen, but we */
+        /* should then figure out how to put an assert() here. */
+
         return;
     }
 
@@ -700,11 +700,11 @@ void cproxy_on_close_downstream_conn(conn *c) {
     }
 
     if (k < 0) {
-        // If this downstream conn wasn't linked into the
-        // downstream, it was delinked already during connect error
-        // handling (where its slot was set to NULL_CONN already),
-        // or during downstream_timeout/conn_queue_timeout.
-        //
+        /* If this downstream conn wasn't linked into the */
+        /* downstream, it was delinked already during connect error */
+        /* handling (where its slot was set to NULL_CONN already), */
+        /* or during downstream_timeout/conn_queue_timeout. */
+
         if (settings.verbose > 2) {
             moxi_log_write("%d: skipping release dc in on_close_dc\n",
                            c->sfd);
@@ -717,12 +717,12 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
     if (d->upstream_conn != NULL &&
         d->downstream_used == 1) {
-        // TODO: Revisit downstream close error handling.
-        //       Should we propagate error when...
-        //       - any downstream conn closes?
-        //       - all downstream conns closes?
-        //       - last downstream conn closes?  Current behavior.
-        //
+        /* TODO: Revisit downstream close error handling. */
+        /*       Should we propagate error when... */
+        /*       - any downstream conn closes? */
+        /*       - all downstream conns closes? */
+        /*       - last downstream conn closes?  Current behavior. */
+
         if (d->upstream_suffix == NULL) {
             if (settings.verbose > 2) {
                 moxi_log_write("<%d proxy downstream closed, upstream %d (%x)\n",
@@ -743,7 +743,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
                         s[SUFFIX_SIZE - 1] = '\0';
                         d->upstream_suffix = s;
 
-                        s = strchr(s, ':'); // Clip to avoid sending user/pswd.
+                        s = strchr(s, ':'); /* Clip to avoid sending user/pswd. */
                         if (s != NULL) {
                             *s++ = '\r';
                             *s++ = '\n';
@@ -761,21 +761,21 @@ void cproxy_on_close_downstream_conn(conn *c) {
             d->target_host_ident = NULL;
         }
 
-        // We sometimes see that drive_machine/transmit will not see
-        // a closed connection error during conn_mwrite, possibly
-        // due to non-blocking sockets.  Because of this, drive_machine
-        // thinks it has a successful downstream request send and
-        // moves the state forward trying to read a response from
-        // the downstream conn (conn_new_cmd, conn_read, etc), and
-        // only then do we finally see the conn close situation,
-        // ending up here.  That is, drive_machine only
-        // seems to move to conn_closing from conn_read.
-        //
-        // If we haven't received any reply yet, we retry based
-        // on our cmd_retries counter.
-        //
-        // TODO: Reconsider retry behavior, is it right in all situations?
-        //
+        /* We sometimes see that drive_machine/transmit will not see */
+        /* a closed connection error during conn_mwrite, possibly */
+        /* due to non-blocking sockets.  Because of this, drive_machine */
+        /* thinks it has a successful downstream request send and */
+        /* moves the state forward trying to read a response from */
+        /* the downstream conn (conn_new_cmd, conn_read, etc), and */
+        /* only then do we finally see the conn close situation, */
+        /* ending up here.  That is, drive_machine only */
+        /* seems to move to conn_closing from conn_read. */
+
+        /* If we haven't received any reply yet, we retry based */
+        /* on our cmd_retries counter. */
+
+        /* TODO: Reconsider retry behavior, is it right in all situations? */
+
         if (c->rcurr != NULL &&
             c->rbytes == 0 &&
             d->downstream_used_start == d->downstream_used &&
@@ -812,28 +812,28 @@ void cproxy_on_close_downstream_conn(conn *c) {
         }
     }
 
-    // Are we over-decrementing here, and in handling conn_pause?
-    //
-    // Case 1: we're in conn_pause, and socket is closed concurrently.
-    // We unpause due to reserve, we move to conn_write/conn_mwrite,
-    // fail and move to conn_closing.  So, no over-decrement.
-    //
-    // Case 2: we're waiting for a downstream response in conn_new_cmd,
-    // and socket is closed concurrently.  State goes to conn_closing,
-    // so, no over-decrement.
-    //
-    // Case 3: we've finished processing downstream response (in
-    // conn_parse_cmd or conn_nread), and the downstream socket
-    // is closed concurrently.  We then move to conn_pause,
-    // and same as Case 1.
-    //
+    /* Are we over-decrementing here, and in handling conn_pause? */
+
+    /* Case 1: we're in conn_pause, and socket is closed concurrently. */
+    /* We unpause due to reserve, we move to conn_write/conn_mwrite, */
+    /* fail and move to conn_closing.  So, no over-decrement. */
+
+    /* Case 2: we're waiting for a downstream response in conn_new_cmd, */
+    /* and socket is closed concurrently.  State goes to conn_closing, */
+    /* so, no over-decrement. */
+
+    /* Case 3: we've finished processing downstream response (in */
+    /* conn_parse_cmd or conn_nread), and the downstream socket */
+    /* is closed concurrently.  We then move to conn_pause, */
+    /* and same as Case 1. */
+
     cproxy_release_downstream_conn(d, c);
 
-    // Setup a retry after unwinding the call stack.
-    // We use the work_queue, because our caller, conn_close(),
-    // is likely to blow away our fd if we try to reconnect
-    // right now.
-    //
+    /* Setup a retry after unwinding the call stack. */
+    /* We use the work_queue, because our caller, conn_close(), */
+    /* is likely to blow away our fd if we try to reconnect */
+    /* right now. */
+
     if (uc_retry != NULL) {
         if (settings.verbose > 2) {
             moxi_log_write("%d cproxy retrying\n", uc_retry->sfd);
@@ -871,9 +871,9 @@ void cproxy_add_downstream(proxy_td *ptd) {
                     ptd->downstream_max);
         }
 
-        // The config/behaviors will be NULL if the
-        // proxy is shutting down.
-        //
+        /* The config/behaviors will be NULL if the */
+        /* proxy is shutting down. */
+
         if (ptd->config != NULL &&
             ptd->behavior_pool.arr != NULL) {
             downstream *d =
@@ -897,9 +897,9 @@ void cproxy_add_downstream(proxy_td *ptd) {
 downstream *cproxy_reserve_downstream(proxy_td *ptd) {
     assert(ptd != NULL);
 
-    // Loop in case we need to clear out downstreams
-    // that have outdated configs.
-    //
+    /* Loop in case we need to clear out downstreams */
+    /* that have outdated configs. */
+
     while (true) {
         downstream *d;
 
@@ -989,23 +989,23 @@ bool cproxy_release_downstream(downstream *d, bool force) {
                        d->upstream_conn->sfd : -1);
     }
 
-    // Always release the timeout_event, even if we're going to retry,
-    // to avoid pegging CPU with leaked timeout_events.
-    //
+    /* Always release the timeout_event, even if we're going to retry, */
+    /* to avoid pegging CPU with leaked timeout_events. */
+
     cproxy_clear_timeout(d);
 
-    // If we need to retry the command, we do so here,
-    // keeping the same downstream that would otherwise
-    // be released.
-    //
+    /* If we need to retry the command, we do so here, */
+    /* keeping the same downstream that would otherwise */
+    /* be released. */
+
     if (!force &&
         d->upstream_conn != NULL &&
         d->upstream_retry > 0) {
         d->upstream_retry = 0;
         d->upstream_retries++;
 
-        // But, we can stop retrying if we've tried each server twice.
-        //
+        /* But, we can stop retrying if we've tried each server twice. */
+
         int max_retries = cproxy_max_retries(d);
 
         if (d->upstream_retries <= max_retries) {
@@ -1038,8 +1038,8 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         }
     }
 
-    // Record reserved_time histogram timings.
-    //
+    /* Record reserved_time histogram timings. */
+
     if (d->usec_start > 0) {
         uint64_t ux = usec_now() - d->usec_start;
 
@@ -1062,12 +1062,12 @@ bool cproxy_release_downstream(downstream *d, bool force) {
 
     d->ptd->stats.stats.tot_downstream_released++;
 
-    // Delink upstream conns.
-    //
+    /* Delink upstream conns. */
+
     while (d->upstream_conn != NULL) {
         if (d->merger != NULL) {
-            // TODO: Allow merger callback to be func pointer.
-            //
+            /* TODO: Allow merger callback to be func pointer. */
+
             genhash_iter(d->merger,
                         protocol_stats_foreach_write,
                         d->upstream_conn);
@@ -1089,11 +1089,11 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         }
 
         if (d->upstream_suffix != NULL) {
-            // Do a last write on the upstream.  For example,
-            // the upstream_suffix might be "END\r\n" or other
-            // way to mark the end of a scatter-gather or
-            // multiline response.
-            //
+            /* Do a last write on the upstream.  For example, */
+            /* the upstream_suffix might be "END\r\n" or other */
+            /* way to mark the end of a scatter-gather or */
+            /* multiline response. */
+
             if (settings.verbose > 2) {
                 if (d->upstream_suffix_len > 0) {
                     moxi_log_write("%d: release_downstream"
@@ -1132,8 +1132,8 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         curr->next = NULL;
     }
 
-    // Free extra hash tables.
-    //
+    /* Free extra hash tables. */
+
     if (d->multiget != NULL) {
         genhash_iter(d->multiget, multiget_foreach_free, d);
         genhash_free(d->multiget);
@@ -1147,7 +1147,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     }
 
     d->upstream_conn = NULL;
-    d->upstream_suffix = NULL; // No free(), expecting a static string.
+    d->upstream_suffix = NULL; /* No free(), expecting a static string. */
     d->upstream_suffix_len = 0;
     d->upstream_status = PROTOCOL_BINARY_RESPONSE_SUCCESS;
     d->upstream_retry = 0;
@@ -1159,9 +1159,9 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     d->multiget = NULL;
     d->merger = NULL;
 
-    // TODO: Consider adding a downstream->prev backpointer
-    //       or doubly-linked list to save on this scan.
-    //
+    /* TODO: Consider adding a downstream->prev backpointer */
+    /*       or doubly-linked list to save on this scan. */
+
     d->ptd->downstream_reserved =
         downstream_list_remove(d->ptd->downstream_reserved, d);
     d->ptd->downstream_released =
@@ -1180,14 +1180,14 @@ bool cproxy_release_downstream(downstream *d, bool force) {
         }
     }
 
-    cproxy_clear_timeout(d); // For MB-4334.
+    cproxy_clear_timeout(d); /* For MB-4334. */
 
     assert(d->timeout_tv.tv_sec == 0);
     assert(d->timeout_tv.tv_usec == 0);
 
-    // If this downstream still has the same configuration as our top-level
-    // proxy config, go back onto the available, released downstream list.
-    //
+    /* If this downstream still has the same configuration as our top-level */
+    /* proxy config, go back onto the available, released downstream list. */
+
     if (cproxy_check_downstream_config(d) || force) {
         d->next = d->ptd->downstream_released;
         d->ptd->downstream_released = d;
@@ -1237,10 +1237,10 @@ void cproxy_free_downstream(downstream *d) {
         }
     }
 
-    // This will close sockets, which will force associated conn's
-    // to go to conn_closing state.  Since we've already cleared
-    // the conn->extra pointers, there's no extra release/free.
-    //
+    /* This will close sockets, which will force associated conn's */
+    /* to go to conn_closing state.  Since we've already cleared */
+    /* the conn->extra pointers, there's no extra release/free. */
+
     mcs_free(&d->mst);
 
     cproxy_clear_timeout(d);
@@ -1276,8 +1276,8 @@ downstream *cproxy_create_downstream(char *config,
         d->behaviors_arr = cproxy_copy_behaviors(behavior_pool->num,
                                                  behavior_pool->arr);
 
-        // TODO: Handle non-uniform downstream protocols.
-        //
+        /* TODO: Handle non-uniform downstream protocols. */
+
         assert(IS_PROXY(behavior_pool->base.downstream_protocol));
 
         if (settings.verbose > 2) {
@@ -1354,9 +1354,9 @@ bool cproxy_check_downstream_config(downstream *d) {
                                       d->behaviors_arr,
                                       d->ptd->behavior_pool.num,
                                       d->ptd->behavior_pool.arr)) {
-        // Parse the proxy/parent's config to see if we can
-        // reuse our existing downstream connections.
-        //
+        /* Parse the proxy/parent's config to see if we can */
+        /* reuse our existing downstream connections. */
+
         char *usr = d->ptd->behavior_pool.base.usr[0] != '\0' ?
             d->ptd->behavior_pool.base.usr :
             NULL;
@@ -1391,31 +1391,31 @@ bool cproxy_check_downstream_config(downstream *d) {
     return rv;
 }
 
-// Returns -1 if the connections aren't fully assigned and ready.
-// In that case, the downstream has to wait for a downstream connection
-// to get out of the conn_connecting state.
-//
-// The downstream connection might leave the conn_connecting state
-// with an error (unable to connect).  That case is handled by
-// tracking a NULL_CONN sentinel value.
-//
-// Also, in the -1 result case, the d->upstream_conn should remain in
-// conn_pause state.
-//
-// A server_index of -1 means to connect all downstreams, as the
-// caller probably needs to proxy a broadcast command.
-//
+/* Returns -1 if the connections aren't fully assigned and ready. */
+/* In that case, the downstream has to wait for a downstream connection */
+/* to get out of the conn_connecting state. */
+
+/* The downstream connection might leave the conn_connecting state */
+/* with an error (unable to connect).  That case is handled by */
+/* tracking a NULL_CONN sentinel value. */
+
+/* Also, in the -1 result case, the d->upstream_conn should remain in */
+/* conn_pause state. */
+
+/* A server_index of -1 means to connect all downstreams, as the */
+/* caller probably needs to proxy a broadcast command. */
+
 int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                               int server_index) {
     assert(d != NULL);
     assert(d->ptd != NULL);
-    assert(d->ptd->downstream_released != d); // Should not be in free list.
+    assert(d->ptd->downstream_released != d); /* Should not be in free list. */
     assert(d->downstream_conns != NULL);
     assert(mcs_server_count(&d->mst) > 0);
     assert(thread != NULL);
     assert(thread->base != NULL);
 
-    int s = 0; // Number connected.
+    int s = 0; /* Number connected. */
     int n = mcs_server_count(&d->mst);
     mcs_server_st *msst_actual;
 
@@ -1440,12 +1440,12 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
 
         msst_actual = mcs_server_index(&d->mst, i);
 
-        // Connect to downstream servers, if not already.
-        //
-        // A NULL_CONN means that we tried to connect, but failed,
-        // which is different than NULL (which means that we haven't
-        // tried to connect yet).
-        //
+        /* Connect to downstream servers, if not already. */
+
+        /* A NULL_CONN means that we tried to connect, but failed, */
+        /* which is different than NULL (which means that we haven't */
+        /* tried to connect yet). */
+
         if (d->downstream_conns[i] == NULL) {
             conn *c = d->upstream_conn;
             /*
@@ -1498,9 +1498,9 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                 if (zstored_downstream_waiting_add(d, thread,
                                                    msst_actual,
                                                    &d->behaviors_arr[i]) == true) {
-                    // Since we're waiting on the downstream conn queue,
-                    // start a downstream timer per configuration.
-                    //
+                    /* Since we're waiting on the downstream conn queue, */
+                    /* start a downstream timer per configuration. */
+
                     cproxy_start_downstream_timeout_ex(d, c,
                         d->behaviors_arr[i].downstream_conn_queue_timeout);
 
@@ -1527,7 +1527,7 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                                      proxy_behavior *behavior) {
     assert(d);
     assert(d->ptd);
-    assert(d->ptd->downstream_released != d); // Should not be in free list.
+    assert(d->ptd->downstream_released != d); /* Should not be in free list. */
     assert(thread);
     assert(thread->base);
     assert(msst);
@@ -1638,8 +1638,8 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
         }
     }
 
-    // Treat a auth/bucket error as a blacklistable error.
-    //
+    /* Treat a auth/bucket error as a blacklistable error. */
+
     zstored_error_count(c->thread, host_ident, true);
 
     return false;
@@ -1711,7 +1711,7 @@ bool cproxy_prep_conn_for_write(conn *c) {
         c->suffixcurr = c->suffixlist;
         c->suffixleft = 0;
 
-        c->msgcurr = 0; // TODO: Mem leak just by blowing these to 0?
+        c->msgcurr = 0; /* TODO: Mem leak just by blowing these to 0? */
         c->msgused = 0;
         c->iovused = 0;
 
@@ -1771,14 +1771,14 @@ void cproxy_assign_downstream(proxy_td *ptd) {
 
     uint64_t da = ptd->downstream_assigns;
 
-    // Key loop that tries to reserve any available, released
-    // downstream resources to waiting upstream conns.
-    //
-    // Remember the wait list tail when we start, in case more
-    // upstream conns are tacked onto the wait list while we're
-    // processing.  This helps avoid infinite loop where upstream
-    // conns just keep on moving to the tail.
-    //
+    /* Key loop that tries to reserve any available, released */
+    /* downstream resources to waiting upstream conns. */
+
+    /* Remember the wait list tail when we start, in case more */
+    /* upstream conns are tacked onto the wait list while we're */
+    /* processing.  This helps avoid infinite loop where upstream */
+    /* conns just keep on moving to the tail. */
+
     conn *tail = ptd->waiting_any_downstream_tail;
     bool  stop = false;
 
@@ -1790,9 +1790,9 @@ void cproxy_assign_downstream(proxy_td *ptd) {
         downstream *d = cproxy_reserve_downstream(ptd);
         if (d == NULL) {
             if (ptd->downstream_num <= 0) {
-                // Absolutely no downstreams connected, so
-                // might as well error out.
-                //
+                /* Absolutely no downstreams connected, so */
+                /* might as well error out. */
+
                 while (ptd->waiting_any_downstream_head != NULL) {
                     ptd->stats.stats.tot_downstream_propagate_failed++;
 
@@ -1810,7 +1810,7 @@ void cproxy_assign_downstream(proxy_td *ptd) {
                 }
             }
 
-            break; // If no downstreams are available, stop loop.
+            break; /* If no downstreams are available, stop loop. */
         }
 
         assert(d->upstream_conn == NULL);
@@ -1821,9 +1821,9 @@ void cproxy_assign_downstream(proxy_td *ptd) {
         assert(d->timeout_tv.tv_sec == 0);
         assert(d->timeout_tv.tv_usec == 0);
 
-        // We have a downstream reserved, so assign the first
-        // waiting upstream conn to it.
-        //
+        /* We have a downstream reserved, so assign the first */
+        /* waiting upstream conn to it. */
+
         d->upstream_conn = ptd->waiting_any_downstream_head;
         ptd->waiting_any_downstream_head =
             ptd->waiting_any_downstream_head->next;
@@ -1835,10 +1835,10 @@ void cproxy_assign_downstream(proxy_td *ptd) {
         ptd->stats.stats.tot_assign_downstream++;
         ptd->stats.stats.tot_assign_upstream++;
 
-        // Add any compatible upstream conns to the downstream.
-        // By compatible, for example, we mean multi-gets from
-        // different upstreams so we can de-deplicate get keys.
-        //
+        /* Add any compatible upstream conns to the downstream. */
+        /* By compatible, for example, we mean multi-gets from */
+        /* different upstreams so we can de-deplicate get keys. */
+
         conn *uc_last = d->upstream_conn;
 
         while (is_compatible_request(uc_last,
@@ -1854,9 +1854,9 @@ void cproxy_assign_downstream(proxy_td *ptd) {
             uc_last = uc_last->next;
             uc_last->next = NULL;
 
-            // Note: tot_assign_upstream - tot_assign_downstream
-            // should get us how many requests we've piggybacked together.
-            //
+            /* Note: tot_assign_upstream - tot_assign_downstream */
+            /* should get us how many requests we've piggybacked together. */
+
             ptd->stats.stats.tot_assign_upstream++;
         }
 
@@ -1866,17 +1866,17 @@ void cproxy_assign_downstream(proxy_td *ptd) {
         }
 
         if (cproxy_forward(d) == false) {
-            // TODO: This stat is incorrect, as we might reach here
-            // when we have entire front cache hit or talk-to-self
-            // optimization hit on multiget.
-            //
+            /* TODO: This stat is incorrect, as we might reach here */
+            /* when we have entire front cache hit or talk-to-self */
+            /* optimization hit on multiget. */
+
             ptd->stats.stats.tot_downstream_propagate_failed++;
 
-            // During cproxy_forward(), we might have recursed,
-            // especially in error situation if a downstream
-            // conn got closed and released.  Check for recursion
-            // before we touch d anymore.
-            //
+            /* During cproxy_forward(), we might have recursed, */
+            /* especially in error situation if a downstream */
+            /* conn got closed and released.  Check for recursion */
+            /* before we touch d anymore. */
+
             if (da != ptd->downstream_assigns) {
                 ptd->stats.stats.tot_assign_recursion++;
                 break;
@@ -1940,8 +1940,8 @@ bool cproxy_forward(downstream *d) {
     }
 
     if (IS_ASCII(d->upstream_conn->protocol)) {
-        // ASCII upstream.
-        //
+        /* ASCII upstream. */
+
         unsigned int peer_protocol =
             d->upstream_conn->peer_protocol ?
             d->upstream_conn->peer_protocol :
@@ -1953,13 +1953,13 @@ bool cproxy_forward(downstream *d) {
             return cproxy_forward_a2b_downstream(d);
         }
     } else {
-        // BINARY upstream.
-        //
+        /* BINARY upstream. */
+
         if (IS_BINARY(d->ptd->behavior_pool.base.downstream_protocol)) {
             return cproxy_forward_b2b_downstream(d);
         } else {
-            // TODO: No binary upstream to ascii downstream support.
-            //
+            /* TODO: No binary upstream to ascii downstream support. */
+
             assert(0);
             return false;
         }
@@ -1999,8 +1999,8 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
         }
         pthread_mutex_unlock(&ptd->proxy->proxy_lock);
 
-        // Send an END on get/gets instead of generic SERVER_ERROR.
-        //
+        /* Send an END on get/gets instead of generic SERVER_ERROR. */
+
         if (uc->cmd == -1 &&
             uc->cmd_start != NULL &&
             strncmp(uc->cmd_start, "get", 3) == 0 &&
@@ -2026,8 +2026,8 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
         assert(IS_BINARY(uc->protocol));
 
         if (binary_status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
-            // Default to our favorite catch-all binary protocol response.
-            //
+            /* Default to our favorite catch-all binary protocol response. */
+
             binary_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;
         }
 
@@ -2058,26 +2058,26 @@ void cproxy_reset_upstream(conn *uc) {
             cproxy_close_conn(uc);
         }
 
-        return; // Return either way.
+        return; /* Return either way. */
     }
 
-    // We may have already read incoming bytes into the uc's buffer,
-    // so the issue is that libevent may never see (or expect) any
-    // EV_READ events (and hence, won't fire event callbacks) for the
-    // upstream connection.  This can leave the uc seemingly stuck,
-    // never hitting drive_machine() loop.
-    //
+    /* We may have already read incoming bytes into the uc's buffer, */
+    /* so the issue is that libevent may never see (or expect) any */
+    /* EV_READ events (and hence, won't fire event callbacks) for the */
+    /* upstream connection.  This can leave the uc seemingly stuck, */
+    /* never hitting drive_machine() loop. */
+
     if (settings.verbose > 2) {
         moxi_log_write("%d: cproxy_reset_upstream with bytes available: %d\n",
                        uc->sfd, uc->rbytes);
     }
 
-    // So, we copy the drive_machine()/conn_new_cmd handling to
-    // schedule uc into drive_machine() execution, where the uc
-    // conn is likely to be writable.  We need to do this
-    // because we're currently on the drive_machine() execution
-    // loop for the downstream connection, not for the uc.
-    //
+    /* So, we copy the drive_machine()/conn_new_cmd handling to */
+    /* schedule uc into drive_machine() execution, where the uc */
+    /* conn is likely to be writable.  We need to do this */
+    /* because we're currently on the drive_machine() execution */
+    /* loop for the downstream connection, not for the uc. */
+
     if (!update_event(uc, EV_WRITE | EV_PERSIST)) {
         if (settings.verbose > 0) {
             moxi_log_write("Couldn't update event\n");
@@ -2114,8 +2114,8 @@ void cproxy_wait_any_downstream(proxy_td *ptd, conn *uc) {
     assert(!ptd->waiting_any_downstream_tail ||
            !ptd->waiting_any_downstream_tail->next);
 
-    // Add the upstream conn to the wait list.
-    //
+    /* Add the upstream conn to the wait list. */
+
     uc->next = NULL;
     if (ptd->waiting_any_downstream_tail != NULL) {
         ptd->waiting_any_downstream_tail->next = uc;
@@ -2143,11 +2143,11 @@ void cproxy_release_downstream_conn(downstream *d, conn *c) {
 
     d->downstream_used--;
     if (d->downstream_used <= 0) {
-        // The downstream_used count might go < 0 when if there's
-        // an early error and we decide to close the downstream
-        // conn, before anything gets sent or before the
-        // downstream_used was able to be incremented.
-        //
+        /* The downstream_used count might go < 0 when if there's */
+        /* an early error and we decide to close the downstream */
+        /* conn, before anything gets sent or before the */
+        /* downstream_used was able to be incremented. */
+
         cproxy_release_downstream(d, false);
         cproxy_assign_downstream(ptd);
     }
@@ -2195,10 +2195,10 @@ void cproxy_on_pause_downstream_conn(conn *c) {
 
     assert(d->ptd != NULL);
 
-    // Must update_event() before releasing the downstream conn,
-    // because the release might call udpate_event(), too,
-    // and we don't want to override its work.
-    //
+    /* Must update_event() before releasing the downstream conn, */
+    /* because the release might call udpate_event(), too, */
+    /* and we don't want to override its work. */
+
     if (update_event(c, EV_READ | EV_PERSIST)) {
         cproxy_release_downstream_conn(d, c);
     } else {
@@ -2291,9 +2291,9 @@ void wait_queue_timeout(const int fd,
         moxi_log_write("wait_queue_timeout\n");
     }
 
-    // This timer callback is invoked when an upstream conn
-    // has been in the wait queue for too long.
-    //
+    /* This timer callback is invoked when an upstream conn */
+    /* has been in the wait queue for too long. */
+
     if (ptd->timeout_tv.tv_sec != 0 ||
         ptd->timeout_tv.tv_usec != 0) {
         evtimer_del(&ptd->timeout_event);
@@ -2312,18 +2312,18 @@ void wait_queue_timeout(const int fd,
 
         uint64_t cut_msec = msec_current_time - wqt_msec;
 
-        // Run through all the old upstream conn's in
-        // the wait queue, remove them, and emit errors
-        // on them.  And then start a new timer if needed.
-        //
+        /* Run through all the old upstream conn's in */
+        /* the wait queue, remove them, and emit errors */
+        /* on them.  And then start a new timer if needed. */
+
         conn *uc_curr = ptd->waiting_any_downstream_head;
         while (uc_curr != NULL) {
             conn *uc = uc_curr;
 
             uc_curr = uc_curr->next;
 
-            // Check if upstream conn is old and should be removed.
-            //
+            /* Check if upstream conn is old and should be removed. */
+
             if (settings.verbose > 2) {
                 moxi_log_write("wait_queue_timeout compare %u to %u cutoff\n",
                         uc->cmd_start_time, cut_msec);
@@ -2340,7 +2340,7 @@ void wait_queue_timeout(const int fd,
                 ptd->waiting_any_downstream_head =
                     conn_list_remove(ptd->waiting_any_downstream_head,
                                      &ptd->waiting_any_downstream_tail,
-                                     uc, NULL); // TODO: O(N^2).
+                                     uc, NULL); /* TODO: O(N^2). */
 
                 upstream_error_msg(uc,
                                    "SERVER_ERROR proxy wait queue timeout",
@@ -2356,18 +2356,18 @@ void wait_queue_timeout(const int fd,
 }
 
 rel_time_t cproxy_realtime(const time_t exptime) {
-    // Input is a long...
-    //
-    // 0       | (0...REALIME_MAXDELTA] | (REALTIME_MAXDELTA...
-    // forever | delta                  | unix_time
-    //
-    // Storage is an unsigned int.
-    //
-    // TODO: Handle resolution loss.
-    //
-    // The cproxy version of realtime doesn't do any
-    // time math munging, just pass through.
-    //
+    /* Input is a long... */
+
+    /* 0       | (0...REALIME_MAXDELTA] | (REALTIME_MAXDELTA... */
+    /* forever | delta                  | unix_time */
+
+    /* Storage is an unsigned int. */
+
+    /* TODO: Handle resolution loss. */
+
+    /* The cproxy version of realtime doesn't do any */
+    /* time math munging, just pass through. */
+
     return (rel_time_t) exptime;
 }
 
@@ -2382,9 +2382,9 @@ void cproxy_close_conn(conn *c) {
 
     update_event(c, 0);
 
-    // Run through drive_machine just once,
-    // to go through close code paths.
-    //
+    /* Run through drive_machine just once, */
+    /* to go through close code paths. */
+
     drive_machine(c);
 }
 
@@ -2639,10 +2639,10 @@ bool is_compatible_request(conn *existing, conn *candidate) {
     (void)existing;
     (void)candidate;
 
-    // The not-my-vbucket error handling requires us to not
-    // squash ascii multi-GET requests, due to reusing the
-    // multiget-deduplication machinery during retries and
-    // to simplify the later codepaths.
+    /* The not-my-vbucket error handling requires us to not */
+    /* squash ascii multi-GET requests, due to reusing the */
+    /* multiget-deduplication machinery during retries and */
+    /* to simplify the later codepaths. */
     /*
     assert(existing);
     assert(existing->state == conn_pause);
@@ -2650,7 +2650,7 @@ bool is_compatible_request(conn *existing, conn *candidate) {
 
     if (IS_BINARY(existing->protocol)) {
         // TODO: Revisit multi-get squashing for binary another day.
-        //
+
         return false;
     }
 
@@ -2662,7 +2662,7 @@ bool is_compatible_request(conn *existing, conn *candidate) {
         assert(candidate->state == conn_pause);
 
         // TODO: Allow gets (CAS) for de-duplication.
-        //
+
         if (existing->cmd == -1 &&
             candidate->cmd == -1 &&
             existing->cmd_retries <= 0 &&
@@ -2694,17 +2694,17 @@ void downstream_timeout(const int fd,
     proxy_td *ptd = d->ptd;
     assert(ptd != NULL);
 
-    // This timer callback is invoked when one or more of
-    // the downstream conns must be really slow.  Handle by
-    // closing downstream conns, which might help by
-    // freeing up downstream resources.
-    //
+    /* This timer callback is invoked when one or more of */
+    /* the downstream conns must be really slow.  Handle by */
+    /* closing downstream conns, which might help by */
+    /* freeing up downstream resources. */
+
     if (cproxy_clear_timeout(d) == true) {
-        // The downstream_timeout() callback is invoked for
-        // two cases (downstream_conn_queue_timeouts and
-        // downstream_timeouts), so cleanup and track stats
-        // accordingly.
-        //
+        /* The downstream_timeout() callback is invoked for */
+        /* two cases (downstream_conn_queue_timeouts and */
+        /* downstream_timeouts), so cleanup and track stats */
+        /* accordingly. */
+
         bool was_conn_queue_waiting =
             zstored_downstream_waiting_remove(d);
 
@@ -2732,7 +2732,7 @@ void downstream_timeout(const int fd,
                          d->target_host_ident);
                 m[SUFFIX_SIZE - 1] = '\0';
 
-                char *s = strchr(m, ':'); // Clip to avoid sending user/pswd.
+                char *s = strchr(m, ':'); /* Clip to avoid sending user/pswd. */
                 if (s != NULL) {
                     *s++ = '\r';
                     *s++ = '\n';
@@ -2750,10 +2750,10 @@ void downstream_timeout(const int fd,
             conn *dc = d->downstream_conns[i];
             if (dc != NULL &&
                 dc != NULL_CONN) {
-                // We have to de-link early, because we don't want
-                // to have cproxy_close_conn() release the downstream
-                // while we're in the middle of this loop.
-                //
+                /* We have to de-link early, because we don't want */
+                /* to have cproxy_close_conn() release the downstream */
+                /* while we're in the middle of this loop. */
+
                 delink_from_downstream_conns(dc);
 
                 cproxy_close_conn(dc);
@@ -2810,8 +2810,8 @@ bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
     return (evtimer_add(&d->timeout_event, &d->timeout_tv) == 0);
 }
 
-// Return 0 on success, -1 on general failure, 1 on timeout failure.
-//
+/* Return 0 on success, -1 on general failure, 1 on timeout failure. */
+
 int cproxy_auth_downstream(mcs_server_st *server,
                            proxy_behavior *behavior,
                            int fd) {
@@ -2849,15 +2849,15 @@ int cproxy_auth_downstream(mcs_server_st *server,
             moxi_log_write("auth failure args\n");
         }
 
-        return -1; // Probably misconfigured.
+        return -1; /* Probably misconfigured. */
     }
 
-    // The key should look like "PLAIN", or the sasl mech string.
-    // The data should look like "\0usr\0pwd".  So, the body buf
-    // should look like "PLAIN\0usr\0pwd".
-    //
-    // TODO: Allow binary passwords.
-    //
+    /* The key should look like "PLAIN", or the sasl mech string. */
+    /* The data should look like "\0usr\0pwd".  So, the body buf */
+    /* should look like "PLAIN\0usr\0pwd". */
+
+    /* TODO: Allow binary passwords. */
+
     int buf_len = snprintf(buf, sizeof(buf), "PLAIN%c%s%c%s",
                            0, usr,
                            0, pwd);
@@ -2867,7 +2867,7 @@ int cproxy_auth_downstream(mcs_server_st *server,
 
     req.request.magic    = PROTOCOL_BINARY_REQ;
     req.request.opcode   = PROTOCOL_BINARY_CMD_SASL_AUTH;
-    req.request.keylen   = htons((uint16_t) 5); // 5 == strlen("PLAIN").
+    req.request.keylen   = htons((uint16_t) 5); /* 5 == strlen("PLAIN"). */
     req.request.datatype = PROTOCOL_BINARY_RAW_BYTES;
     req.request.bodylen  = htonl(buf_len);
 
@@ -2899,8 +2899,8 @@ int cproxy_auth_downstream(mcs_server_st *server,
         res.response.keylen  = ntohs(res.response.keylen);
         res.response.bodylen = ntohl(res.response.bodylen);
 
-        // Swallow whatever body comes.
-        //
+        /* Swallow whatever body comes. */
+
         int len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
@@ -2922,11 +2922,11 @@ int cproxy_auth_downstream(mcs_server_st *server,
             len -= amt;
         }
 
-        // The res status should be either...
-        // - SUCCESS         - sasl aware server and good credentials.
-        // - AUTH_ERROR      - wrong credentials.
-        // - UNKNOWN_COMMAND - sasl-unaware server.
-        //
+        /* The res status should be either... */
+        /* - SUCCESS         - sasl aware server and good credentials. */
+        /* - AUTH_ERROR      - wrong credentials. */
+        /* - UNKNOWN_COMMAND - sasl-unaware server. */
+
         if (res.response.status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
             if (settings.verbose > 2) {
                 moxi_log_write("auth_downstream success for %s\n", usr);
@@ -2953,8 +2953,8 @@ int cproxy_auth_downstream(mcs_server_st *server,
     return -1;
 }
 
-// Return 0 on success, -1 on general failure, 1 on timeout failure.
-//
+/* Return 0 on success, -1 on general failure, 1 on timeout failure. */
+
 int cproxy_bucket_downstream(mcs_server_st *server,
                              proxy_behavior *behavior,
                              int fd) {
@@ -2969,7 +2969,7 @@ int cproxy_bucket_downstream(mcs_server_st *server,
 
     int bucket_len = strlen(behavior->bucket);
     if (bucket_len <= 0) {
-        return 0; // When no bucket.
+        return 0; /* When no bucket. */
     }
 
     protocol_binary_request_header req = { .bytes = {0} };
@@ -3008,8 +3008,8 @@ int cproxy_bucket_downstream(mcs_server_st *server,
         res.response.keylen  = ntohs(res.response.keylen);
         res.response.bodylen = ntohl(res.response.bodylen);
 
-        // Swallow whatever body comes.
-        //
+        /* Swallow whatever body comes. */
+
         char buf[300];
 
         int len = res.response.bodylen;
@@ -3028,11 +3028,11 @@ int cproxy_bucket_downstream(mcs_server_st *server,
             len -= amt;
         }
 
-        // The res status should be either...
-        // - SUCCESS         - we got the bucket.
-        // - AUTH_ERROR      - not allowed to use that bucket.
-        // - UNKNOWN_COMMAND - bucket-unaware server.
-        //
+        /* The res status should be either... */
+        /* - SUCCESS         - we got the bucket. */
+        /* - AUTH_ERROR      - not allowed to use that bucket. */
+        /* - UNKNOWN_COMMAND - bucket-unaware server. */
+
         if (res.response.status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
             if (settings.verbose > 2) {
                 moxi_log_write("bucket_downstream success, %s\n",
@@ -3110,7 +3110,7 @@ void cproxy_upstream_state_change(conn *c, enum conn_states next_state) {
     }
 }
 
-// -------------------------------------------------
+/* ------------------------------------------------- */
 
 bool cproxy_on_connect_downstream_conn(conn *c) {
     int k;
@@ -3214,11 +3214,11 @@ void downstream_connect_time_sample(proxy_stats_td *pstd, uint64_t duration) {
     }
 }
 
-// A histogram for tracking timings, such as for usec request timings.
-//
+/* A histogram for tracking timings, such as for usec request timings. */
+
 HTGRAM_HANDLE cproxy_create_timing_histogram(void) {
-    // TODO: Make histogram bins more configurable one day.
-    //
+    /* TODO: Make histogram bins more configurable one day. */
+
     HTGRAM_HANDLE h1 = htgram_mk(2000, 100, 2.0, 20, NULL);
     HTGRAM_HANDLE h0 = htgram_mk(0, 100, 1.0, 20, h1);
 
@@ -3277,20 +3277,20 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
         }
 
         if (has_error) {
-            // We reach here when a non-blocking connect() has failed
-            // or when an acquired downstream conn had an error.
-            // The downstream conn is just going to be closed
-            // rather than be released back to the thread->conn_hash,
-            // so update the dc_acquired here.
-            //
+            /* We reach here when a non-blocking connect() has failed */
+            /* or when an acquired downstream conn had an error. */
+            /* The downstream conn is just going to be closed */
+            /* rather than be released back to the thread->conn_hash, */
+            /* so update the dc_acquired here. */
+
             if (conns->dc_acquired > 0) {
                 conns->dc_acquired--;
             }
 
-            // When zero downstream conns are available, wake up all
-            // waiting downstreams so they can proceed (possibly by
-            // just returning ERROR's to upstream clients).
-            //
+            /* When zero downstream conns are available, wake up all */
+            /* waiting downstreams so they can proceed (possibly by */
+            /* just returning ERROR's to upstream clients). */
+
             if (conns->dc_acquired <= 0 &&
                 conns->dc == NULL) {
                 downstream *head = conns->downstream_waiting_head;
@@ -3320,7 +3320,7 @@ conn *zstored_acquire_downstream_conn(downstream *d,
                                       bool *downstream_conn_max_reached) {
     assert(d);
     assert(d->ptd);
-    assert(d->ptd->downstream_released != d); // Should not be in free list.
+    assert(d->ptd->downstream_released != d); /* Should not be in free list. */
     assert(thread);
     assert(msst);
     assert(behavior);
@@ -3413,7 +3413,7 @@ conn *zstored_acquire_downstream_conn(downstream *d,
     return dc;
 }
 
-// new fn by jsh
+/* new fn by jsh */
 void zstored_release_downstream_conn(conn *dc, bool closing) {
     assert(dc != NULL);
 
@@ -3454,9 +3454,9 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
             dc->next = conns->dc;
             conns->dc = dc;
 
-            // Since one downstream conn was released, process a single
-            // waiting downstream, if any.
-            //
+            /* Since one downstream conn was released, process a single */
+            /* waiting downstream, if any. */
+
             downstream *d_head = conns->downstream_waiting_head;
             if (d_head != NULL) {
                 assert(conns->downstream_waiting_tail != NULL);
@@ -3482,9 +3482,9 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
     cproxy_close_conn(dc);
 }
 
-// Returns true if the downstream was found on any
-// conns->downstream_waiting_head/tail queues and was removed.
-//
+/* Returns true if the downstream was found on any */
+/* conns->downstream_waiting_head/tail queues and was removed. */
+
 bool zstored_downstream_waiting_remove(downstream *d) {
     bool found = false;
 
@@ -3510,9 +3510,9 @@ bool zstored_downstream_waiting_remove(downstream *d) {
             zstored_get_downstream_conns(thread, host_ident);
 
         if (conns != NULL) {
-            // Linked-list removal, on the next_waiting pointer,
-            // and keep head and tail pointers updated.
-            //
+            /* Linked-list removal, on the next_waiting pointer, */
+            /* and keep head and tail pointers updated. */
+
             downstream *prev = NULL;
             downstream *curr = conns->downstream_waiting_head;
 
@@ -3588,8 +3588,8 @@ bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
     return false;
 }
 
-// Find an appropriate proxy struct or NULL.
-//
+/* Find an appropriate proxy struct or NULL. */
+
 proxy *cproxy_find_proxy_by_auth(proxy_main *m,
                                  const char *usr,
                                  const char *pwd) {
@@ -3679,7 +3679,7 @@ void diag_downstream_chain(FILE *out, downstream *head, int indent) {
     }
 }
 
-// this is supposed to be called from gdb when other threads are suspended
+/* this is supposed to be called from gdb when other threads are suspended */
 void connections_diag(FILE *out);
 
 void connections_diag(FILE *out) {
@@ -3729,4 +3729,3 @@ void cproxy_front_cache_delete(proxy_td *ptd, char *key, int key_len) {
         }
     }
 }
-

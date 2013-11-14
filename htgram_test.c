@@ -101,15 +101,15 @@ static void testChained(void) {
     int64_t width;
     uint64_t count;
 
-    // Have 200 bins from [0 to 2000), with bin widths of 10.
-    // Have 36 bins from 2000 onwards, with bin width growing at 1.5, chained.
+    /* Have 200 bins from [0 to 2000), with bin widths of 10. */
+    /* Have 36 bins from 2000 onwards, with bin width growing at 1.5, chained. */
     h1 = htgram_mk(2000, 10, 1.5, 36, NULL);
     h0 = htgram_mk(0, 10, 1.0, 200, h1);
 
     int i;
     for (i = 0; i < (int) (htgram_get_num_bins(h0) + htgram_get_num_bins(h1)); i++) {
         assert(htgram_get_bin_data(h0, i, &start, &width, &count) == true);
-        // printf("%d %d %d %d\n", i, start, width, count);
+        /* printf("%d %d %d %d\n", i, start, width, count); */
     }
 
     htgram_incr(h0, 28000000, 111);

@@ -12,8 +12,8 @@
 #include "work.h"
 #include "log.h"
 
-// Internal declarations.
-//
+/* Internal declarations. */
+
 static protocol_binary_request_noop req_noop = {
     .bytes = {0}
 };
@@ -109,8 +109,8 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
             }
         }
 
-        // Uncork the saved-up quiet binary commands.
-        //
+        /* Uncork the saved-up quiet binary commands. */
+
         cproxy_binary_uncork_cmds(d, uc);
 
         if (uc->cmd == PROTOCOL_BINARY_CMD_FLUSH ||
@@ -161,7 +161,7 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
 
     if (key == NULL ||
         keylen <= 0) {
-        return false; // We don't know how to hash an empty key.
+        return false; /* We don't know how to hash an empty key. */
     }
 
     int  vbucket = -1;
@@ -200,8 +200,8 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
     assert(uc->noreply == false);
     assert(c != NULL);
 
-    // Assuming we're already connected to downstream.
-    //
+    /* Assuming we're already connected to downstream. */
+
     if (settings.verbose > 2) {
         moxi_log_write("%d: b2b_forward_item_vbucket %x to %d, vbucket %d\n",
                 uc->sfd, uc->cmd, c->sfd, vbucket);
@@ -215,8 +215,8 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
     }
 
     if (add_conn_item(c, it) == true) {
-        // The caller keeps its refcount, and we need our own.
-        //
+        /* The caller keeps its refcount, and we need our own. */
+
         it->refcount++;
 
         if (add_iov(c, ITEM_data(it), it->nbytes) == 0) {
@@ -269,8 +269,8 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
     }
 
     if (nwrite > 0) {
-        // TODO: Handle binary 'stats reset' sub-command.
-        //
+        /* TODO: Handle binary 'stats reset' sub-command. */
+
         if (uc->cmd == PROTOCOL_BINARY_CMD_STAT &&
             d->merger == NULL) {
             d->merger = genhash_init(128, skeyhash_ops);
@@ -299,8 +299,8 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
                     cproxy_dump_header(uc->sfd, ITEM_data(it));
                 }
 
-                // TODO: Handle FLUSHQ (quiet binary flush_all).
-                //
+                /* TODO: Handle FLUSHQ (quiet binary flush_all). */
+
                 d->downstream_used_start = nwrite;
                 d->downstream_used       = nwrite;
 
@@ -347,16 +347,16 @@ void cproxy_process_b2b_downstream(conn *c) {
 
     assert(bodylen >= (uint32_t) keylen + extlen);
 
-    process_bin_noreply(c); // Map quiet c->cmd values into non-quiet.
+    process_bin_noreply(c); /* Map quiet c->cmd values into non-quiet. */
 
-    // Our approach is to read everything we can before
-    // getting into big switch/case statements for the
-    // actual processing.
-    //
-    // Alloc an item and continue with an rest-of-body nread if
-    // necessary.  The item will hold the entire response message
-    // (the header + body).
-    //
+    /* Our approach is to read everything we can before */
+    /* getting into big switch/case statements for the */
+    /* actual processing. */
+
+    /* Alloc an item and continue with an rest-of-body nread if */
+    /* necessary.  The item will hold the entire response message */
+    /* (the header + body). */
+
     char *ikey    = "q";
     int   ikeylen = 1;
 
@@ -377,9 +377,9 @@ void cproxy_process_b2b_downstream(conn *c) {
 
             conn_set_state(c, conn_nread);
         } else {
-            // Since we have no body bytes, we can go immediately to
-            // the nread completed processing step.
-            //
+            /* Since we have no body bytes, we can go immediately to */
+            /* the nread completed processing step. */
+
             cproxy_process_b2b_downstream_nread(c);
         }
     } else {
@@ -417,16 +417,16 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
 
-    // TODO: Need to handle quiet binary command error response,
-    //       in the right order.
-    // TODO: Need to handle not-my-vbucket error during a quiet cmd.
-    //
+    /* TODO: Need to handle quiet binary command error response, */
+    /*       in the right order. */
+    /* TODO: Need to handle not-my-vbucket error during a quiet cmd. */
+
     conn *uc = d->upstream_conn;
     item *it = c->item;
 
-    // Clear c->item because we either move it to the upstream or
-    // item_remove() it on error.
-    //
+    /* Clear c->item because we either move it to the upstream or */
+    /* item_remove() it on error. */
+
     c->item = NULL;
 
     assert(it != NULL);
@@ -458,16 +458,16 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
                                                       val, bodylen - keylen - extlen);
                     }
 
-                    conn_set_state(c, conn_new_cmd); // Get next STATS response.
+                    conn_set_state(c, conn_new_cmd); /* Get next STATS response. */
                 }
             }
 
             goto done;
         }
 
-        // If the client is still there, we should handle
-        // a not-my-vbucket error with a possible retry.
-        //
+        /* If the client is still there, we should handle */
+        /* a not-my-vbucket error with a possible retry. */
+
         if (uc != NULL &&
             status == PROTOCOL_BINARY_RESPONSE_NOT_MY_VBUCKET) {
             if (settings.verbose > 2) {
@@ -493,9 +493,9 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
 
             mcs_server_invalid_vbucket(&d->mst, sindex, vbucket);
 
-            // As long as the upstream is still open and we haven't
-            // retried too many times already.
-            //
+            /* As long as the upstream is still open and we haven't */
+            /* retried too many times already. */
+
             int max_retries = cproxy_max_retries(d);
 
             if (uc->cmd_retries < max_retries) {
@@ -516,8 +516,8 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
         }
     }
 
-    // Write the response to the upstream connection.
-    //
+    /* Write the response to the upstream connection. */
+
     if (uc != NULL) {
         if (settings.verbose > 2) {
             moxi_log_write("<%d cproxy_process_b2b_downstream_nread got %u\n",
@@ -530,12 +530,12 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
             it->refcount++;
 
             if (add_iov(uc, ITEM_data(it), it->nbytes) == 0) {
-                // If we got a quiet response, however, don't change the
-                // upstream connection's state (should be in paused state),
-                // as we expect the downstream server to provide a
-                // verbal/non-quiet response that moves the downstream
-                // conn through the conn_pause countdown codepath.
-                //
+                /* If we got a quiet response, however, don't change the */
+                /* upstream connection's state (should be in paused state), */
+                /* as we expect the downstream server to provide a */
+                /* verbal/non-quiet response that moves the downstream */
+                /* conn through the conn_pause countdown codepath. */
+
                 if (c->noreply == false) {
                     cproxy_update_event_write(d, uc);
 

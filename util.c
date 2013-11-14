@@ -139,17 +139,17 @@ void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
 
     double sum = 0;
 
-    // min, max and sum
+    /* min, max and sum */
     for (int i = 0; i < num_vals; i++) {
         sum += vals[i];
         out->min = fmin(out->min, vals[i]);
         out->max = fmax(out->max, vals[i]);
     }
 
-    // avg
+    /* avg */
     out->avg = sum / (double)num_vals;
 
-    // stddev
+    /* stddev */
     sum = 0;
     for (int i = 0; i < num_vals; i++) {
         sum += pow(vals[i] - out->avg, 2);
@@ -157,7 +157,7 @@ void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
 
     out->stddev = sqrt(sum / num_vals);
 
-    // 95th %ile
+    /* 95th %ile */
     qsort(vals, num_vals, sizeof(double), cmp_doubles);
     out->ninetyfifth = vals[(int)((float)num_vals * 0.95)];
 }
@@ -176,7 +176,7 @@ void vperror(const char *fmt, ...) {
     perror(buf);
 }
 
-// The following are from libmemcached/byteorder.c
+/* The following are from libmemcached/byteorder.c */
 
 /* Byte swap a 64-bit number. */
 #ifndef swap64

@@ -115,8 +115,8 @@ START_TEST(test_parse_behavior) {
     fail_unless(strcmp(w.bucket, "buck") == 0, "tpb");
     fail_unless(w.port_listen == 443322, "tpb");
 
-    // Test that things get zero'ed out.
-    //
+    /* Test that things get zero'ed out. */
+
     proxy_behavior u =
       cproxy_parse_behavior(" ,,,"
                             " cycle =  , "
@@ -247,8 +247,8 @@ START_TEST(test_mcache) {
     fail_if(NULL == mcache_get(&m, s_len("ks9"), 0),
             "hit on non-deleted key");
 
-    // Test with tiny capacity of 1 item.
-    //
+    /* Test with tiny capacity of 1 item. */
+
     fail_unless(mcache_started(&m), "still started");
     mcache_stop(&m);
     fail_if(mcache_started(&m), "stopped");
@@ -275,8 +275,8 @@ START_TEST(test_mcache) {
     fail_if(NULL == mcache_get(&m, s_len("ks9"), 0),
             "hit after set");
 
-    // Test with tiny capacity of 2 items.
-    //
+    /* Test with tiny capacity of 2 items. */
+
     fail_unless(mcache_started(&m), "still started");
     mcache_stop(&m);
     fail_if(mcache_started(&m), "stopped");
@@ -295,8 +295,8 @@ START_TEST(test_mcache) {
     fail_if(NULL == mcache_get(&m, s_len("ks9"), 0),
             "hit after set");
 
-    fail_if(NULL == mcache_get(&m, s_len("ks1"), 0), // We last touched ks1,
-            "hit after set");                        // so ks9 is LRU.
+    fail_if(NULL == mcache_get(&m, s_len("ks1"), 0), /* We last touched ks1, */
+            "hit after set");                        /* so ks9 is LRU. */
 
     key_stats ks8 = {
       .key = "ks8",

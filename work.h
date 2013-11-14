@@ -21,13 +21,13 @@ struct work_item {
 };
 
 struct work_queue {
-    int send_fd; // Pipe to notify thread.
+    int send_fd; /* Pipe to notify thread. */
     int recv_fd;
 
     work_item *work_head;
     work_item *work_tail;
 
-    uint64_t num_items; // Current number of items in queue.
+    uint64_t num_items; /* Current number of items in queue. */
     uint64_t tot_sends;
     uint64_t tot_recvs;
 
@@ -43,7 +43,7 @@ struct work_collect {
     void *data;
 
     pthread_mutex_t collect_lock;
-    pthread_cond_t  collect_cond; // Signaled when count drops to 0.
+    pthread_cond_t  collect_cond; /* Signaled when count drops to 0. */
 };
 
 bool work_queue_init(work_queue *m, struct event_base *base);
@@ -59,4 +59,4 @@ int work_collect_wait(work_collect *c);
 int work_collect_count(work_collect *c, int count);
 int work_collect_one(work_collect *c);
 
-#endif // WORK_H
+#endif /* WORK_H */

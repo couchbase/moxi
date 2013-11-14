@@ -23,12 +23,12 @@ struct htgram_st {
 
     struct htgram_bin_st *bins;
 
-    uint64_t lt_count; // For data points < the bins.
-    uint64_t gt_count; // For data points > the bins.
+    uint64_t lt_count; /* For data points < the bins. */
+    uint64_t gt_count; /* For data points > the bins. */
 
-    // For data points > the bins, there may be another
-    // histogram instead of using gt_count.
-    //
+    /* For data points > the bins, there may be another */
+    /* histogram instead of using gt_count. */
+
     HTGRAM_HANDLE next;
 };
 
@@ -201,10 +201,10 @@ void htgram_dump(HTGRAM_HANDLE h,
     int64_t  max_start = 0;
     int64_t  max_width = 0;
     uint64_t max_count = 0;
-    int      end_num_bins = 0; // Max non-zero bin.
+    int      end_num_bins = 0; /* Max non-zero bin. */
     int      beg_bin = INT_MAX;
     uint64_t tot_count = 0;
-    uint64_t run_count; // Cummulative count.
+    uint64_t run_count; /* Cummulative count. */
 
     int64_t  start;
     int64_t  width;
@@ -234,11 +234,11 @@ void htgram_dump(HTGRAM_HANDLE h,
         }
     }
 
-    // Columns in a row look like "START+WIDTH=COUNT PCT% BAR_GRAPH_LINE"
-    //
-    int  max_plus = 0;  // Width of the 'plus' column ('+').
-    int  max_equal = 0; // Width of the 'equal' column ('=').
-    int  max_space = 0; // Width of the 'space' column (' ').
+    /* Columns in a row look like "START+WIDTH=COUNT PCT% BAR_GRAPH_LINE" */
+
+    int  max_plus = 0;  /* Width of the 'plus' column ('+'). */
+    int  max_equal = 0; /* Width of the 'equal' column ('='). */
+    int  max_space = 0; /* Width of the 'space' column (' '). */
 
     char buf[2000];
 

@@ -10,8 +10,8 @@
 #include "work.h"
 #include "log.h"
 
-// Internal declarations.
-//
+/* Internal declarations. */
+
 #define COMMAND_TOKEN 0
 #define MAX_TOKENS    8
 
@@ -34,8 +34,8 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
                        c->sfd, line);
     }
 
-    // Snapshot rcurr, because the caller, try_read_command(), changes it.
-    //
+    /* Snapshot rcurr, because the caller, try_read_command(), changes it. */
+
     c->cmd_curr       = -1;
     c->cmd_start      = c->rcurr;
     c->cmd_start_time = msec_current_time;
@@ -132,21 +132,21 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
         if (cmd[3] == 'l') {
             c->cmd_curr = PROTOCOL_BINARY_CMD_GETL;
         } else if (ntokens == 3) {
-            // Single-key get/gets optimization.
-            //
+            /* Single-key get/gets optimization. */
+
             c->cmd_curr = PROTOCOL_BINARY_CMD_GETK;
         } else {
             c->cmd_curr = PROTOCOL_BINARY_CMD_GETKQ;
         }
 
-        // Handles get and gets.
-        //
+        /* Handles get and gets. */
+
         cproxy_pause_upstream_for_downstream(ptd, c);
 
-        // The cmd_len from scan_tokens might not include
-        // all the keys, so cmd_len might not == strlen(command).
-        // Handle read_bytes during multiget broadcast.
-        //
+        /* The cmd_len from scan_tokens might not include */
+        /* all the keys, so cmd_len might not == strlen(command). */
+        /* Handle read_bytes during multiget broadcast. */
+
         if (cmd[3] == 'l') {
             SEEN(STATS_CMD_GETL, true, 0);
         } else {
@@ -263,10 +263,10 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
                (false == self_command) &&
                (strcmp(cmd, "stats") == 0) &&
                (c->cmd_curr = PROTOCOL_BINARY_CMD_STAT)) {
-        // Even though we've coded to handle advanced stats
-        // like stats cachedump, prevent those here to avoid
-        // locking downstream servers.
-        //
+        /* Even though we've coded to handle advanced stats */
+        /* like stats cachedump, prevent those here to avoid */
+        /* locking downstream servers. */
+
         cproxy_pause_upstream_for_downstream(ptd, c);
 
         SEEN(STATS_CMD_STATS, false, cmd_len);
@@ -306,13 +306,13 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
 
         SEEN(STATS_CMD_UNL, false, cmd_len);
 
-    } else if (ntokens == 4 && // Ex: "touch <key> <expiration>"
+    } else if (ntokens == 4 && /* Ex: "touch <key> <expiration>" */
                (false == self_command) &&
                (strncmp(cmd, "touch", 5) == 0) &&
                (c->cmd_curr = PROTOCOL_BINARY_CMD_TOUCH)) {
         cproxy_pause_upstream_for_downstream(ptd, c);
 
-        // TODO: SEEN(STATS_CMD_TOUCH, false, cmd_len);
+        /* TODO: SEEN(STATS_CMD_TOUCH, false, cmd_len); */
 
     } else {
         out_string(c, "ERROR");
@@ -333,9 +333,9 @@ void cproxy_process_upstream_ascii_nread(conn *c) {
 
     assert(it != NULL);
 
-    // pthread_mutex_lock(&c->thread->stats.mutex);
-    // c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++;
-    // pthread_mutex_unlock(&c->thread->stats.mutex);
+    /* pthread_mutex_lock(&c->thread->stats.mutex); */
+    /* c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++; */
+    /* pthread_mutex_unlock(&c->thread->stats.mutex); */
 
     if (strncmp(ITEM_data(it) + it->nbytes - 2, "\r\n", 2) == 0) {
         proxy_td *ptd = c->extra;
@@ -373,9 +373,9 @@ void cproxy_upstream_ascii_item_response(item *it, conn *uc,
     }
 
     if (strncmp(ITEM_data(it) + it->nbytes - 2, "\r\n", 2) == 0) {
-        // TODO: Need to clean up half-written add_iov()'s.
-        //       Consider closing the upstream_conns?
-        //
+        /* TODO: Need to clean up half-written add_iov()'s. */
+        /*       Consider closing the upstream_conns? */
+
         uint64_t cas = ITEM_get_cas(it);
         if ((cas_emit == 0) ||
             (cas_emit < 0 &&
@@ -438,9 +438,9 @@ void cproxy_del_front_cache_key_ascii_response(downstream *d,
         return;
     }
 
-    // TODO: Not sure if we need all these checks, or just
-    // clear the cache item no matter what.
-    //
+    /* TODO: Not sure if we need all these checks, or just */
+    /* clear the cache item no matter what. */
+
     if (strncmp(response, "DELETED", 7) == 0 ||
         strncmp(response, "STORED", 6) == 0 ||
         strncmp(response, "EXISTS", 6) == 0 ||
@@ -527,7 +527,7 @@ void cproxy_process_downstream_ascii(conn *c, char *line) {
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2a_downstream(c, line);
     } else {
-        assert(false); // TODO: b2a.
+        assert(false); /* TODO: b2a. */
     }
 }
 
@@ -539,13 +539,13 @@ void cproxy_process_downstream_ascii_nread(conn *c) {
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2a_downstream_nread(c);
     } else {
-        assert(false); // TODO: b2a.
+        assert(false); /* TODO: b2a. */
     }
 }
 
 bool cproxy_is_broadcast_cmd(int cmd) {
     return (cmd == PROTOCOL_BINARY_CMD_FLUSH ||
-            cmd == PROTOCOL_BINARY_CMD_STAT || // In a2x translation.
+            cmd == PROTOCOL_BINARY_CMD_STAT || /* In a2x translation. */
             cmd == PROTOCOL_BINARY_CMD_NOOP ||
             cmd == PROTOCOL_BINARY_CMD_GETKQ);
 }
@@ -554,24 +554,24 @@ bool ascii_scan_key(char *line, char **key, int *key_len) {
     char *curr = line;
 
     while (*curr != '\0' &&
-           *curr == ' ') { // Scan to start of cmd.
+           *curr == ' ') { /* Scan to start of cmd. */
         curr++;
     }
 
     while (*curr != '\0' &&
-           *curr != ' ') { // Scan to end of cmd.
+           *curr != ' ') { /* Scan to end of cmd. */
         curr++;
     }
 
     while (*curr != '\0' &&
-           *curr == ' ') { // Scan to start of key.
+           *curr == ' ') { /* Scan to start of key. */
         curr++;
     }
 
     *key = curr;
 
     while (*curr != '\0' &&
-           *curr != ' ') { // Scan to end of key.
+           *curr != ' ') { /* Scan to end of key. */
         curr++;
     }
 

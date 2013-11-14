@@ -33,7 +33,7 @@ void multiget_foreach_free(const void *key,
             psc_get_key->misses++;
         }
 
-        // TODO: Update key-level stats misses.
+        /* TODO: Update key-level stats misses. */
 
         multiget_entry *curr = entry;
         entry = entry->next;
@@ -44,7 +44,7 @@ void multiget_foreach_free(const void *key,
         length++;
     }
 
-    // TODO: Track key-level multiget squashes (length > 1).
+    /* TODO: Track key-level multiget squashes (length > 1). */
 }
 
 /* Callback to g_hash_table_foreach that clears out multiget_entries
@@ -61,9 +61,9 @@ void multiget_remove_upstream(const void *key,
     assert(uc != NULL);
 
     while (entry != NULL) {
-        // Just clear the slots, because glib hash table API
-        // doesn't allow for key/value modifications during iteration.
-        //
+        /* Just clear the slots, because glib hash table API */
+        /* doesn't allow for key/value modifications during iteration. */
+
         if (entry->upstream_conn == uc) {
             entry->upstream_conn = NULL;
             entry->opaque = 0;
@@ -104,8 +104,8 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         }
     }
 
-    // Snapshot the volatile only once.
-    //
+    /* Snapshot the volatile only once. */
+
     uint64_t msec_current_time_snapshot = msec_current_time;
 
     int   uc_num = 0;
@@ -129,7 +129,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         assert(space > command);
 
         int cmd_len = space - command;
-        assert(cmd_len == 3 || cmd_len == 4); // Either get or gets.
+        assert(cmd_len == 3 || cmd_len == 4); /* Either get or gets. */
 
         int cas_emit = (command[3] == 's');
 
@@ -151,21 +151,21 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                 key_len = strlen(key);
                 key_last = true;
 
-                // We've reached the last key.
-                //
+                /* We've reached the last key. */
+
                 psc_get->read_bytes += (key - command + key_len);
             }
 
-            // This key_len check helps skip consecutive spaces.
-            //
+            /* This key_len check helps skip consecutive spaces. */
+
             if (key_len > 0) {
                 ptd->stats.stats.tot_multiget_keys++;
 
                 psc_get_key->seen++;
                 psc_get_key->read_bytes += key_len;
 
-                // Update key-based statistics.
-                //
+                /* Update key-based statistics. */
+
                 bool do_key_stats =
                     matcher_check(&ptd->key_stats_matcher,
                                   key, key_len, false) == true &&
@@ -181,10 +181,10 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                                     key_len, 0);
                 }
 
-                // Handle a front cache hit by queuing response.
-                //
-                // Note, front cache stats are part of mcache.
-                //
+                /* Handle a front cache hit by queuing response. */
+
+                /* Note, front cache stats are part of mcache. */
+
                 if (!cas_emit) {
                     item *it = NULL;
 
@@ -212,8 +212,8 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                                             0, it->nbytes);
                         }
 
-                        // The refcount was inc'ed by mcache_get() for us.
-                        //
+                        /* The refcount was inc'ed by mcache_get() for us. */
+
                         item_remove(it);
 
                         goto loop_next;
@@ -226,14 +226,14 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                                                          NULL, &vbucket);
                 if (c != NULL) {
 
-                    // If there's more than one key, create a de-duplication map.
-                    // This is used to handle not-my-vbucket errors
-                    // where any later retry attempts should avoid
-                    // retrying already successfully attempted keys.
-                    //
-                    // Previously, we used to only have a map when there was more than
-                    // one upstream conn.
-                    //
+                    /* If there's more than one key, create a de-duplication map. */
+                    /* This is used to handle not-my-vbucket errors */
+                    /* where any later retry attempts should avoid */
+                    /* retrying already successfully attempted keys. */
+
+                    /* Previously, we used to only have a map when there was more than */
+                    /* one upstream conn. */
+
                     if (key_last == false &&
                         d->multiget == NULL) {
                         d->multiget = genhash_init(128, skeyhash_ops);
@@ -242,10 +242,10 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                         }
                     }
 
-                    // See if we've already requested this key via
-                    // the multiget hash table, in order to
-                    // de-duplicate repeated keys.
-                    //
+                    /* See if we've already requested this key via */
+                    /* the multiget hash table, in order to */
+                    /* de-duplicate repeated keys. */
+
                     bool first_request = true;
 
                     if (d->multiget != NULL) {
@@ -259,8 +259,8 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                                     c->sfd, key_buf, vbucket, (int) (key - command), key_len);
                         }
 
-                        // TODO: Use Trond's allocator here.
-                        //
+                        /* TODO: Use Trond's allocator here. */
+
                         multiget_entry *entry =
                             calloc(1, sizeof(multiget_entry));
                         if (entry != NULL) {
@@ -275,7 +275,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                                 first_request = false;
                             }
                         } else {
-                            // TODO: Handle out of multiget entry memory.
+                            /* TODO: Handle out of multiget entry memory. */
                         }
                     }
 
@@ -291,9 +291,9 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                             emit_start(c, command, cmd_len);
                         }
 
-                        // Provide the preceding space as optimization
-                        // for ascii-to-ascii configuration.
-                        //
+                        /* Provide the preceding space as optimization */
+                        /* for ascii-to-ascii configuration. */
+
                         emit_skey(c, key - 1, key_len + 1, vbucket, key - command);
                     } else {
                         ptd->stats.stats.tot_multiget_keys_dedupe++;
@@ -308,7 +308,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                         }
                     }
                 } else {
-                    // TODO: Handle when downstream conn is down.
+                    /* TODO: Handle when downstream conn is down. */
                 }
             }
 
@@ -394,8 +394,8 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
     }
 
     if (d->multiget != NULL) {
-        // The ITEM_key is not NULL or space terminated.
-        //
+        /* The ITEM_key is not NULL or space terminated. */
+
         char key_buf[KEY_MAX_LENGTH + 10];
         assert(it->nkey <= KEY_MAX_LENGTH);
         memcpy(key_buf, ITEM_key(it), it->nkey);
@@ -408,10 +408,10 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
 
             multiget_entry *entry = entry_first;
             while (entry != NULL) {
-                // The upstream might have been closed mid-request.
-                //
-                // TODO: Revisit the -1 cas_emit parameter.
-                //
+                /* The upstream might have been closed mid-request. */
+
+                /* TODO: Revisit the -1 cas_emit parameter. */
+
                 conn *uc = entry->upstream_conn;
                 if (uc != NULL) {
                     cproxy_upstream_ascii_item_response(it, uc, -1);
@@ -440,14 +440,14 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
             }
         }
     } else {
-        // TODO: We're not tracking miss stats in the simple case.
-        // Do we always need to use a multiget hashtable?
-        // Or, perhaps misses equals number of requests - number of hits.
-        //
+        /* TODO: We're not tracking miss stats in the simple case. */
+        /* Do we always need to use a multiget hashtable? */
+        /* Or, perhaps misses equals number of requests - number of hits. */
+
         conn *uc = d->upstream_conn;
         while (uc != NULL) {
-            // TODO: Revisit the -1 cas_emit parameter.
-            //
+            /* TODO: Revisit the -1 cas_emit parameter. */
+
             cproxy_upstream_ascii_item_response(it, uc, -1);
 
             psc_get_key->hits++;

@@ -12,8 +12,8 @@
 #include "work.h"
 #include "log.h"
 
-// Internal declarations.
-//
+/* Internal declarations. */
+
 static protocol_binary_request_noop req_noop = {
     .bytes = {0}
 };
@@ -22,49 +22,49 @@ static protocol_binary_request_noop req_noop = {
 #define KEY_TOKEN  1
 #define MAX_TOKENS 9
 
-// A2B means ascii-to-binary (or, ascii upstream and binary downstream).
-//
+/* A2B means ascii-to-binary (or, ascii upstream and binary downstream). */
+
 struct A2BSpec {
     char *line;
 
     protocol_binary_command cmd;
     protocol_binary_command cmdq;
 
-    int     size;         // Number of bytes in request header.
+    int     size;         /* Number of bytes in request header. */
     token_t tokens[MAX_TOKENS];
     int     ntokens;
     bool    noreply_allowed;
-    int     num_optional; // Number of optional arguments in cmd.
-    bool    broadcast;    // True if cmd does scatter/gather.
+    int     num_optional; /* Number of optional arguments in cmd. */
+    bool    broadcast;    /* True if cmd does scatter/gather. */
 };
 
-// The a2b_specs are immutable after init.
-//
-// The arguments are carefully named with unique first characters.
-//
+/* The a2b_specs are immutable after init. */
+
+/* The arguments are carefully named with unique first characters. */
+
 struct A2BSpec a2b_specs[] = {
     { .line = "set <key> <flags> <exptime> <bytes> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_SET,
       .cmdq = PROTOCOL_BINARY_CMD_SETQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_set.message.body) [8 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_set.message.body) [8 bytes] */
       .size = sizeof(protocol_binary_request_header) + 8
     },
     { .line = "add <key> <flags> <exptime> <bytes> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_ADD,
       .cmdq = PROTOCOL_BINARY_CMD_ADDQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_add.message.body) [8 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_add.message.body) [8 bytes] */
       .size = sizeof(protocol_binary_request_header) + 8
     },
     { .line = "replace <key> <flags> <exptime> <bytes> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_REPLACE,
       .cmdq = PROTOCOL_BINARY_CMD_REPLACEQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_replace.message.body) [8 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_replace.message.body) [8 bytes] */
       .size = sizeof(protocol_binary_request_header) + 8
     },
     { .line = "append <key> <skip_flags> <skip_exptime> <bytes> [noreply]",
@@ -80,9 +80,9 @@ struct A2BSpec a2b_specs[] = {
     { .line = "cas <key> <flags> <exptime> <bytes> <cas> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_SET,
       .cmdq = PROTOCOL_BINARY_CMD_SETQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_set.message.body) [8 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_set.message.body) [8 bytes] */
       .size = sizeof(protocol_binary_request_header) + 8
     },
     { .line = "delete <key> [noreply]",
@@ -93,34 +93,34 @@ struct A2BSpec a2b_specs[] = {
     { .line = "incr <key> <value> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_INCREMENT,
       .cmdq = PROTOCOL_BINARY_CMD_INCREMENTQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_incr.message.body) [20 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_incr.message.body) [20 bytes] */
       .size = sizeof(protocol_binary_request_header) + 20
     },
     { .line = "decr <key> <value> [noreply]",
       .cmd  = PROTOCOL_BINARY_CMD_DECREMENT,
       .cmdq = PROTOCOL_BINARY_CMD_DECREMENTQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_decr.message.body) [20 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_decr.message.body) [20 bytes] */
       .size = sizeof(protocol_binary_request_header) + 20
     },
-    { .line = "flush_all [xpiration] [noreply]", // TODO: noreply tricky here.
+    { .line = "flush_all [xpiration] [noreply]", /* TODO: noreply tricky here. */
       .cmd  = PROTOCOL_BINARY_CMD_FLUSH,
       .cmdq = PROTOCOL_BINARY_CMD_FLUSHQ,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_flush.message.body) [4 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_flush.message.body) [4 bytes] */
       .size = sizeof(protocol_binary_request_header) + 4,
       .broadcast = true
     },
-    { .line = "get <key>*", // Multi-key GET/GETS
+    { .line = "get <key>*", /* Multi-key GET/GETS */
       .cmd  = PROTOCOL_BINARY_CMD_GETKQ,
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header)
     },
-    { .line = "get <key>", // Single-key GET/GETS.
+    { .line = "get <key>", /* Single-key GET/GETS. */
       .cmd  = PROTOCOL_BINARY_CMD_GETK,
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header)
@@ -136,12 +136,12 @@ struct A2BSpec a2b_specs[] = {
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_version)
     },
-    { .line = "getl <key> <xpiration>", // Single-key GETL.
+    { .line = "getl <key> <xpiration>", /* Single-key GETL. */
       .cmd  = PROTOCOL_BINARY_CMD_GETL,
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header) + 4
     },
-    { .line = "unl <key> <cas>", // Single-key UNL.
+    { .line = "unl <key> <cas>", /* Single-key UNL. */
       .cmd  = PROTOCOL_BINARY_CMD_UNL,
       .cmdq = -1,
       .size = sizeof(protocol_binary_request_header)
@@ -149,18 +149,18 @@ struct A2BSpec a2b_specs[] = {
     { .line = "touch <key> <xpiration>",
       .cmd  = PROTOCOL_BINARY_CMD_TOUCH,
       .cmdq = -1,
-      // The size should be...
-      //   sizeof(protocol_binary_request_header) [24 bytes] +
-      //   sizeof(protocol_binary_request_touch.message.body) [4 bytes]
+      /* The size should be... */
+      /*   sizeof(protocol_binary_request_header) [24 bytes] + */
+      /*   sizeof(protocol_binary_request_touch.message.body) [4 bytes] */
       .size = sizeof(protocol_binary_request_header) + 4,
     },
-    { .line = 0 } // NULL sentinel.
+    { .line = 0 } /* NULL sentinel. */
 };
 
-// These are immutable after init.
-//
-struct A2BSpec *a2b_spec_map[0x100] = {0}; // Lookup table by A2BSpec->cmd.
-int             a2b_size_max = 0;          // Max header + extra frame bytes.
+/* These are immutable after init. */
+
+struct A2BSpec *a2b_spec_map[0x100] = {0}; /* Lookup table by A2BSpec->cmd. */
+int             a2b_size_max = 0;          /* Max header + extra frame bytes. */
 
 int a2b_fill_request(short    cmd,
                      token_t *cmd_tokens,
@@ -198,8 +198,8 @@ void cproxy_init_a2b() {
     req_noop.message.header.request.opcode   = PROTOCOL_BINARY_CMD_NOOP;
     req_noop.message.header.request.datatype = PROTOCOL_BINARY_RAW_BYTES;
 
-    // Run through the a2b_specs to populate the a2b_spec_map.
-    //
+    /* Run through the a2b_specs to populate the a2b_spec_map. */
+
     int i = 0;
     while (true) {
         struct A2BSpec *spec = &a2b_specs[i];
@@ -279,8 +279,8 @@ int a2b_fill_request(short    cmd,
                 header->request.opcode = spec->cmd;
             }
 
-            // Start at 1 to skip the CMD_TOKEN.
-            //
+            /* Start at 1 to skip the CMD_TOKEN. */
+
             for (int i = 1; i < cmd_ntokens - 1; i++) {
                 if (a2b_fill_request_token(spec, i,
                                            cmd_tokens, cmd_ntokens,
@@ -292,7 +292,7 @@ int a2b_fill_request(short    cmd,
                 }
             }
 
-            return spec->size; // Success.
+            return spec->size; /* Success. */
         }
     } else {
         if (settings.verbose > 2) {
@@ -330,7 +330,7 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
 
     char t = spec->tokens[cur_token].value[1];
     switch (t) {
-    case 'k': // key
+    case 'k': /* key */
         assert(out_key);
         assert(out_keylen);
         *out_key    = (uint8_t *) cmd_tokens[cur_token].value;
@@ -339,7 +339,7 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
             htons((uint16_t) cmd_tokens[cur_token].length);
         break;
 
-    case 'v': // value (for incr/decr)
+    case 'v': /* value (for incr/decr) */
         delta = 0;
         if (safe_strtoull(cmd_tokens[cur_token].value, &delta)) {
             assert(out_extlen);
@@ -354,12 +354,12 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
             req->message.body.initial = 0;
             req->message.body.expiration = 0xffffffff;
         } else {
-            // TODO: Send back better error.
+            /* TODO: Send back better error. */
             return false;
         }
         break;
 
-    case 'x': { // xpiration (for flush_all)
+    case 'x': { /* xpiration (for flush_all) */
         int32_t exptime_int = 0;
         time_t  exptime = 0;
 
@@ -378,7 +378,7 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
         break;
     }
 
-    case 'a': // args (for stats)
+    case 'a': /* args (for stats) */
         assert(out_key);
         assert(out_keylen);
         *out_key    = (uint8_t *) cmd_tokens[cur_token].value;
@@ -387,7 +387,7 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
             htons((uint16_t) cmd_tokens[cur_token].length);
         break;
 
-   case 'c': { // cas value for unl
+   case 'c': { /* cas value for unl */
         uint64_t cas = 0;
         if (safe_strtoull(cmd_tokens[cur_token].value, &cas)) {
             header->request.cas = cas;
@@ -395,18 +395,18 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
         break;
    }
 
-    // The noreply was handled in a2b_fill_request().
-    //
-    // case 'n': // noreply
-    //
-    // The above are handled by looking at the item struct.
-    //
-    // case 'f': // FALLTHRU, flags
-    // case 'e': // FALLTHRU, exptime
-    // case 'b': // FALLTHRU, bytes
-    // case 's': // FALLTHRU, skip_xxx
-    // case 'c': // FALLTHRU, cas
-    //
+    /* The noreply was handled in a2b_fill_request(). */
+
+    /* case 'n': // noreply */
+
+    /* The above are handled by looking at the item struct. */
+
+    /* case 'f': // FALLTHRU, flags */
+    /* case 'e': // FALLTHRU, exptime */
+    /* case 'b': // FALLTHRU, bytes */
+    /* case 's': // FALLTHRU, skip_xxx */
+    /* case 'c': // FALLTHRU, cas */
+
     default:
         break;
     }
@@ -425,8 +425,8 @@ void cproxy_process_a2b_downstream(conn *c) {
     assert(IS_BINARY(c->protocol));
     assert(IS_PROXY(c->protocol));
 
-    // Snapshot rcurr, because the caller, try_read_command(), changes it.
-    //
+    /* Snapshot rcurr, because the caller, try_read_command(), changes it. */
+
     c->cmd_start = c->rcurr;
 
     protocol_binary_response_header *header =
@@ -437,7 +437,7 @@ void cproxy_process_a2b_downstream(conn *c) {
     assert(header->response.magic == (uint8_t) PROTOCOL_BINARY_RES);
     assert(header->response.opcode == c->cmd);
 
-    process_bin_noreply(c); // Map quiet c->cmd values into non-quiet.
+    process_bin_noreply(c); /* Map quiet c->cmd values into non-quiet. */
 
     int      extlen  = header->response.extlen;
     int      keylen  = header->response.keylen;
@@ -445,39 +445,39 @@ void cproxy_process_a2b_downstream(conn *c) {
 
     assert(bodylen >= (uint32_t) keylen + extlen);
 
-    // Our approach is to read everything we can before
-    // getting into big switch/case statements for the
-    // actual processing.
-    //
-    // If status is non-zero (an err code), then bodylen should be small.
-    // If status is 0, then bodylen might be for a huge item during
-    // a GET family of response.
-    //
-    // If bodylen > extlen + keylen, then we should nread
-    // the ext+key and set ourselves up for a later item nread.
-    //
-    // We overload the meaning of the conn substates...
-    // - bin_reading_get_key means do nread for ext and key data.
-    // - bin_read_set_value means do nread for item data.
-    //
+    /* Our approach is to read everything we can before */
+    /* getting into big switch/case statements for the */
+    /* actual processing. */
+
+    /* If status is non-zero (an err code), then bodylen should be small. */
+    /* If status is 0, then bodylen might be for a huge item during */
+    /* a GET family of response. */
+
+    /* If bodylen > extlen + keylen, then we should nread */
+    /* the ext+key and set ourselves up for a later item nread. */
+
+    /* We overload the meaning of the conn substates... */
+    /* - bin_reading_get_key means do nread for ext and key data. */
+    /* - bin_read_set_value means do nread for item data. */
+
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_a2b_downstream %x %d %d %u\n",
                 c->sfd, c->cmd, extlen, keylen, bodylen);
     }
 
     if (keylen > 0 || extlen > 0) {
-        // One reason we reach here is during a
-        // GET/GETQ/GETK/GETKQ hit response, because extlen
-        // will be > 0 for the flags.
-        //
-        // Also, we reach here during a GETK miss response, since
-        // keylen will be > 0.  Oddly, a GETK miss response will have
-        // a non-zero status of PROTOCOL_BINARY_RESPONSE_KEY_ENOENT,
-        // but won't have any extra error message string.
-        //
-        // Also, we reach here during a STAT response, with
-        // keylen > 0, extlen == 0, and bodylen == keylen.
-        //
+        /* One reason we reach here is during a */
+        /* GET/GETQ/GETK/GETKQ hit response, because extlen */
+        /* will be > 0 for the flags. */
+
+        /* Also, we reach here during a GETK miss response, since */
+        /* keylen will be > 0.  Oddly, a GETK miss response will have */
+        /* a non-zero status of PROTOCOL_BINARY_RESPONSE_KEY_ENOENT, */
+        /* but won't have any extra error message string. */
+
+        /* Also, we reach here during a STAT response, with */
+        /* keylen > 0, extlen == 0, and bodylen == keylen. */
+
         assert(c->cmd == PROTOCOL_BINARY_CMD_GET ||
                c->cmd == PROTOCOL_BINARY_CMD_GETK ||
                c->cmd == PROTOCOL_BINARY_CMD_GETL ||
@@ -488,16 +488,16 @@ void cproxy_process_a2b_downstream(conn *c) {
         assert(keylen == 0 && extlen == 0);
 
         if (bodylen > 0) {
-            // We reach here on error response, version response,
-            // or incr/decr responses, which all have only (relatively
-            // small) body bytes, and with no ext bytes and no key bytes.
-            //
-            // For example, error responses will have 0 keylen,
-            // 0 extlen, with an error message string for the body.
-            //
-            // We'll just reuse the key-reading code path, rather
-            // than allocating an item.
-            //
+            /* We reach here on error response, version response, */
+            /* or incr/decr responses, which all have only (relatively */
+            /* small) body bytes, and with no ext bytes and no key bytes. */
+
+            /* For example, error responses will have 0 keylen, */
+            /* 0 extlen, with an error message string for the body. */
+
+            /* We'll just reuse the key-reading code path, rather */
+            /* than allocating an item. */
+
             assert(header->response.status != 0 ||
                    c->cmd == PROTOCOL_BINARY_CMD_VERSION ||
                    c->cmd == PROTOCOL_BINARY_CMD_INCREMENT ||
@@ -508,10 +508,10 @@ void cproxy_process_a2b_downstream(conn *c) {
         } else {
             assert(keylen == 0 && extlen == 0 && bodylen == 0);
 
-            // We have the entire response in the header,
-            // such as due to a general success response,
-            // including a no-op response.
-            //
+            /* We have the entire response in the header, */
+            /* such as due to a general success response, */
+            /* including a no-op response. */
+
             a2b_process_downstream_response(c);
         }
     }
@@ -556,10 +556,10 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
 
         assert(c->item == NULL);
 
-        // Alloc an item and continue with an item nread.
-        // We item_alloc() even if vlen is 0, so that later
-        // code can assume an item exists.
-        //
+        /* Alloc an item and continue with an item nread. */
+        /* We item_alloc() even if vlen is 0, so that later */
+        /* code can assume an item exists. */
+
         char *key   = binary_get_key(c);
         int   vlen  = bodylen - (keylen + extlen);
         int   flags = 0;
@@ -687,10 +687,10 @@ void a2b_process_downstream_response(conn *c) {
                 c->sfd, c->cmd, (c->item != NULL), status);
     }
 
-    // We reach here when we have the entire response,
-    // including header, ext, key, and possibly item data.
-    // Now we can get into big switch/case processing.
-    //
+    /* We reach here when we have the entire response, */
+    /* including header, ext, key, and possibly item data. */
+    /* Now we can get into big switch/case processing. */
+
     downstream *d = c->extra;
     assert(d != NULL);
     assert(d->ptd != NULL);
@@ -698,9 +698,9 @@ void a2b_process_downstream_response(conn *c) {
 
     item *it = c->item;
 
-    // Clear c->item because we either move it to the upstream or
-    // item_remove() it on error.
-    //
+    /* Clear c->item because we either move it to the upstream or */
+    /* item_remove() it on error. */
+
     c->item = NULL;
 
     if (cproxy_binary_ignore_reply(c, header, it)) {
@@ -709,8 +709,8 @@ void a2b_process_downstream_response(conn *c) {
 
     conn *uc = d->upstream_conn;
 
-    // Handle not-my-vbucket error response.
-    //
+    /* Handle not-my-vbucket error response. */
+
     if (status == PROTOCOL_BINARY_RESPONSE_NOT_MY_VBUCKET) {
         assert(it == NULL);
 
@@ -727,8 +727,8 @@ void a2b_process_downstream_response(conn *c) {
         }
 
         if (c->noreply == false) {
-            // Single-key GET/GETS.
-            //
+            /* Single-key GET/GETS. */
+
             if (status == 0) {
                 assert(it != NULL);
                 assert(it->nbytes >= 2);
@@ -741,7 +741,7 @@ void a2b_process_downstream_response(conn *c) {
 
                     multiget_ascii_downstream_response(d, it);
                 } else {
-                    assert(false); // TODO.
+                    assert(false); /* TODO. */
                 }
 
                 item_remove(it);
@@ -754,23 +754,23 @@ void a2b_process_downstream_response(conn *c) {
             return;
         }
 
-        // Multi-key GET/GETS.
-        //
-        // We should keep processing for a non-quiet
-        // terminating response (NO-OP).
-        //
+        /* Multi-key GET/GETS. */
+
+        /* We should keep processing for a non-quiet */
+        /* terminating response (NO-OP). */
+
         conn_set_state(c, conn_new_cmd);
 
         if (status != 0) {
             assert(it == NULL);
 
             if (status == PROTOCOL_BINARY_RESPONSE_KEY_ENOENT) {
-                return; // Swallow miss response.
+                return; /* Swallow miss response. */
             }
 
-            // TODO: Handle error case.  Should we pause the conn
-            //       or keep looking for more responses?
-            //
+            /* TODO: Handle error case.  Should we pause the conn */
+            /*       or keep looking for more responses? */
+
             assert(false);
             return;
         }
@@ -787,7 +787,7 @@ void a2b_process_downstream_response(conn *c) {
 
             multiget_ascii_downstream_response(d, it);
         } else {
-            assert(false); // TODO.
+            assert(false); /* TODO. */
         }
 
         item_remove(it);
@@ -811,7 +811,7 @@ void a2b_process_downstream_response(conn *c) {
 
                         cproxy_upstream_ascii_item_response(it, uc, -1);
                     } else {
-                        assert(false); // TODO.
+                        assert(false); /* TODO. */
                     }
 
                     item_remove(it);
@@ -859,13 +859,13 @@ void a2b_process_downstream_response(conn *c) {
             }
         }
 
-        // TODO: Handle flush_all's expiration parameter against
-        // the front_cache.
-        //
-        // TODO: We flush the front_cache too often, inefficiently
-        // on every downstream FLUSH response, rather than on
-        // just the last FLUSH response.
-        //
+        /* TODO: Handle flush_all's expiration parameter against */
+        /* the front_cache. */
+
+        /* TODO: We flush the front_cache too often, inefficiently */
+        /* on every downstream FLUSH response, rather than on */
+        /* just the last FLUSH response. */
+
         if (uc != NULL) {
             mcache_flush_all(&d->ptd->proxy->front_cache, 0);
         }
@@ -930,7 +930,7 @@ void a2b_process_downstream_response(conn *c) {
                 break;
             case PROTOCOL_BINARY_RESPONSE_KEY_ENOENT:
             case PROTOCOL_BINARY_RESPONSE_NOT_STORED:
-            case PROTOCOL_BINARY_RESPONSE_ENOMEM: // TODO.
+            case PROTOCOL_BINARY_RESPONSE_ENOMEM: /* TODO. */
             default:
                 out_string(uc, "NOT_FOUND");
                 break;
@@ -949,9 +949,9 @@ void a2b_process_downstream_response(conn *c) {
         if (uc != NULL) {
             assert(uc->next == NULL);
 
-            // TODO: Any weird alignment/padding issues on different
-            //       platforms in this cast to worry about here?
-            //
+            /* TODO: Any weird alignment/padding issues on different */
+            /*       platforms in this cast to worry about here? */
+
             protocol_binary_response_incr *response_incr =
                 (protocol_binary_response_incr *) c->cmd_start;
 
@@ -968,7 +968,7 @@ void a2b_process_downstream_response(conn *c) {
                 }
                 break;
             }
-            case PROTOCOL_BINARY_RESPONSE_KEY_EEXISTS: // Due to CAS.
+            case PROTOCOL_BINARY_RESPONSE_KEY_EEXISTS: /* Due to CAS. */
                 out_string(uc, "EXISTS");
                 break;
             case PROTOCOL_BINARY_RESPONSE_KEY_ENOENT:
@@ -977,7 +977,7 @@ void a2b_process_downstream_response(conn *c) {
             case PROTOCOL_BINARY_RESPONSE_NOT_STORED:
                 out_string(uc, "NOT_STORED");
                 break;
-            case PROTOCOL_BINARY_RESPONSE_ENOMEM: // TODO.
+            case PROTOCOL_BINARY_RESPONSE_ENOMEM: /* TODO. */
             default:
                 out_string(uc, "SERVER_ERROR a2b arith error");
                 break;
@@ -1005,10 +1005,10 @@ void a2b_process_downstream_response(conn *c) {
                 uint32_t buf_offset = 0;
 
                 if (s != NULL) {
-                    // TODO: Assuming bodylen is not that long.
+                    /* TODO: Assuming bodylen is not that long. */
                     if (c->cmd == PROTOCOL_BINARY_CMD_VERSION) {
                         memcpy(s, "VERSION ", 8);
-                        buf_offset = 8; // sizeof "VERSION "
+                        buf_offset = 8; /* sizeof "VERSION " */
                     }
                     memcpy(s + buf_offset,
                            c->cmd_start + sizeof(protocol_binary_response_version),
@@ -1031,16 +1031,16 @@ void a2b_process_downstream_response(conn *c) {
         assert(c->noreply == false);
 
         if (keylen > 0) {
-            assert(it != NULL);      // Holds the stat value.
-            assert(it->nbytes >= 2); // Note: ep-engine-to-mc_couch can return empty STAT val.
+            assert(it != NULL);      /* Holds the stat value. */
+            assert(it->nbytes >= 2); /* Note: ep-engine-to-mc_couch can return empty STAT val. */
             assert(bodylen >= keylen);
             assert(d->merger != NULL);
 
             if (uc != NULL) {
                 assert(uc->next == NULL);
 
-                // TODO: Handle ITEM and PREFIX.
-                //
+                /* TODO: Handle ITEM and PREFIX. */
+
                 protocol_stats_merge_name_val(d->merger,
                                               "STAT", 4,
                                               ITEM_key(it), it->nkey,
@@ -1050,9 +1050,9 @@ void a2b_process_downstream_response(conn *c) {
             item_remove(it);
             conn_set_state(c, conn_new_cmd);
         } else {
-            // Handle the stats terminator, which might have an error or
-            // non-empty bodylen, for some implementations of memcached protocol.
-            //
+            /* Handle the stats terminator, which might have an error or */
+            /* non-empty bodylen, for some implementations of memcached protocol. */
+
             assert(it == NULL);
             conn_set_state(c, conn_pause);
         }
@@ -1060,7 +1060,7 @@ void a2b_process_downstream_response(conn *c) {
 
     case PROTOCOL_BINARY_CMD_QUIT:
     default:
-        assert(false); // TODO: Handled unexpected responses.
+        assert(false); /* TODO: Handled unexpected responses. */
         break;
     }
 }
@@ -1139,11 +1139,11 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     assert(uc->cmd_curr != (protocol_binary_command) -1);
     assert(d->merger == NULL);
 
-    // Handles multi-key get and gets.
-    //
+    /* Handles multi-key get and gets. */
+
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETKQ) {
-        // Only use front_cache for 'get', not for 'gets'.
-        //
+        /* Only use front_cache for 'get', not for 'gets'. */
+
         mcache *front_cache =
             (command[3] == ' ') ? &d->ptd->proxy->front_cache : NULL;
 
@@ -1165,16 +1165,16 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
     assert(uc->next == NULL);
 
-    // TODO: Inefficient repeated scan_tokens.
-    //
+    /* TODO: Inefficient repeated scan_tokens. */
+
     int      cmd_len = 0;
     token_t  tokens[MAX_TOKENS];
     size_t   ntokens = scan_tokens(command, tokens, MAX_TOKENS, &cmd_len);
     char    *key     = tokens[KEY_TOKEN].value;
     int      key_len = tokens[KEY_TOKEN].length;
 
-    if (ntokens <= 1) { // This was checked long ago, while parsing
-        assert(false);  // the upstream conn.
+    if (ntokens <= 1) { /* This was checked long ago, while parsing */
+        assert(false);  /* the upstream conn. */
         return false;
     }
 
@@ -1263,15 +1263,15 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
     }
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_VERSION) {
-        // Fake key so that we hash to some server.
-        //
+        /* Fake key so that we hash to some server. */
+
         key     = "v";
         key_len = 1;
     }
 
-    // Assuming we're already connected to downstream.
-    // Handle all other simple commands.
-    //
+    /* Assuming we're already connected to downstream. */
+    /* Handle all other simple commands. */
+
     int  vbucket = -1;
     bool local;
 
@@ -1352,8 +1352,8 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
                     return true;
                 } else {
-                    // TODO: Error handling.
-                    //
+                    /* TODO: Error handling. */
+
                     if (settings.verbose > 1) {
                         moxi_log_write("ERROR: Couldn't a2b update write event\n");
                     }
@@ -1367,8 +1367,8 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
                     }
                 }
             } else {
-                // TODO: Error handling.
-                //
+                /* TODO: Error handling. */
+
                 if (settings.verbose > 1) {
                     moxi_log_write("ERROR: Couldn't a2b fill request: %s (%x)\n",
                             command, uc->cmd_curr);
@@ -1398,7 +1398,7 @@ int a2b_multiget_start(conn *c, char *cmd, int cmd_len) {
     (void)c;
     (void)cmd;
     (void)cmd_len;
-    return 0; // No-op.
+    return 0; /* No-op. */
 }
 
 /* An skey is a space prefixed key string.
@@ -1438,7 +1438,7 @@ int a2b_multiget_skey(conn *c, char *skey, int skey_length, int vbucket, int key
 
             if (add_iov(c, ITEM_data(it), sizeof(req->bytes)) == 0 &&
                 add_iov(c, key, key_len) == 0) {
-                return 0; // Success.
+                return 0; /* Success. */
             }
 
             return -1;
@@ -1546,9 +1546,9 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
 
             cproxy_start_downstream_timeout(d, NULL);
         } else {
-            // TODO: Handle flush_all's expiration parameter against
-            // the front_cache.
-            //
+            /* TODO: Handle flush_all's expiration parameter against */
+            /* the front_cache. */
+
             if (req->request.opcode == PROTOCOL_BINARY_CMD_FLUSH ||
                 req->request.opcode == PROTOCOL_BINARY_CMD_FLUSHQ) {
                 mcache_flush_all(&d->ptd->proxy->front_cache, 0);
@@ -1576,8 +1576,8 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
     assert(uc->next == NULL);
     assert(cmd > 0);
 
-    // Assuming we're already connected to downstream.
-    //
+    /* Assuming we're already connected to downstream. */
+
     int  vbucket = -1;
     bool local;
 
@@ -1615,10 +1615,10 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
                     req->request.extlen   = extlen;
 
                     if (vbucket >= 0) {
-                        // We also put the vbucket id into the opaque,
-                        // so we can have it later for not-my-vbucket
-                        // error handling.
-                        //
+                        /* We also put the vbucket id into the opaque, */
+                        /* so we can have it later for not-my-vbucket */
+                        /* error handling. */
+
                         req->request.reserved = htons(vbucket);
                         req->request.opaque   = htonl(vbucket);
                     }
@@ -1664,7 +1664,7 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
                             PROTOCOL_BINARY_CMD_PREPEND;
                         break;
                     default:
-                        assert(false); // TODO.
+                        assert(false); /* TODO. */
                         break;
                     }
 
@@ -1707,14 +1707,14 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
                             } else {
                                 c->write_and_go = conn_pause;
 
-                                // TODO: At this point, the item key string is
-                                // not '\0' or space terminated, which is
-                                // required by the mcache API.
-                                // Be sure to config front_cache to be off
-                                // for binary protocol downstreams.
-                                //
-                                // mcache_delete(&d->ptd->proxy->front_cache,
-                                //               ITEM_key(it), it->nkey);
+                                /* TODO: At this point, the item key string is */
+                                /* not '\0' or space terminated, which is */
+                                /* required by the mcache API. */
+                                /* Be sure to config front_cache to be off */
+                                /* for binary protocol downstreams. */
+
+                                /* mcache_delete(&d->ptd->proxy->front_cache, */
+                                /*               ITEM_key(it), it->nkey); */
                             }
 
                             return true;
@@ -1739,10 +1739,10 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
 void a2b_set_opaque(conn *c, protocol_binary_request_header *header,
                     bool noreply) {
     if (noreply) {
-        // Set a magic opaque value during quiet commands that tells us later
-        // that we can ignore the downstream's error response messge,
-        // since the upstream ascii client doesn't want it.
-        //
+        /* Set a magic opaque value during quiet commands that tells us later */
+        /* that we can ignore the downstream's error response messge, */
+        /* since the upstream ascii client doesn't want it. */
+
         header->request.opaque = htonl(OPAQUE_IGNORE_REPLY);
 
         if (settings.verbose > 2) {
@@ -1767,12 +1767,12 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
     if ((c->cmd != PROTOCOL_BINARY_CMD_GETK &&
          c->cmd != PROTOCOL_BINARY_CMD_GETL) ||
         c->noreply == false) {
-        // For non-multi-key GET commands, enqueue a retry after
-        // informing the vbucket map.  This includes single-key GET's.
-        //
+        /* For non-multi-key GET commands, enqueue a retry after */
+        /* informing the vbucket map.  This includes single-key GET's. */
+
         if (uc == NULL) {
-            // If the client went away, though, don't retry.
-            //
+            /* If the client went away, though, don't retry. */
+
             conn_set_state(c, conn_pause);
             return true;
         }
@@ -1788,9 +1788,9 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
 
         mcs_server_invalid_vbucket(&d->mst, sindex, vbucket);
 
-        // As long as the upstream is still open and we haven't
-        // retried too many times already.
-        //
+        /* As long as the upstream is still open and we haven't */
+        /* retried too many times already. */
+
         int max_retries = cproxy_max_retries(d);
 
         if (uc->cmd_retries < max_retries) {
@@ -1812,15 +1812,15 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
 
         return false;
     } else {
-        // Handle ascii multi-GET commands by awaiting all NOOP's from
-        // downstream servers, eating the NOOP's, and retrying with
-        // the same multiget de-duplication map, which might be partially
-        // filled in already.
-        //
+        /* Handle ascii multi-GET commands by awaiting all NOOP's from */
+        /* downstream servers, eating the NOOP's, and retrying with */
+        /* the same multiget de-duplication map, which might be partially */
+        /* filled in already. */
+
         if (uc == NULL) {
-            // If the client went away, though, don't retry,
-            // but keep looking for that NOOP.
-            //
+            /* If the client went away, though, don't retry, */
+            /* but keep looking for that NOOP. */
+
             conn_set_state(c, conn_new_cmd);
             return true;
         }
@@ -1832,8 +1832,8 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
         char *key       = uc->cmd_start + key_index;
         int   key_len   = skey_len(key);
 
-        // The key is not NULL or space terminated.
-        //
+        /* The key is not NULL or space terminated. */
+
         char key_buf[KEY_MAX_LENGTH + 10];
         assert(key_len <= KEY_MAX_LENGTH);
         memcpy(key_buf, key, key_len);
@@ -1853,10 +1853,10 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
 
         mcs_server_invalid_vbucket(&d->mst, sindex, vbucket);
 
-        // Update the de-duplication map, removing the key, so that
-        // we'll reattempt another request for the key during the
-        // retry.
-        //
+        /* Update the de-duplication map, removing the key, so that */
+        /* we'll reattempt another request for the key during the */
+        /* retry. */
+
         if (d->multiget != NULL) {
             multiget_entry *entry = genhash_find(d->multiget, key_buf);
 
@@ -1884,10 +1884,10 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
             }
         }
 
-        // Signal that we need to retry, where this counter is
-        // later checked after all NOOP's from downstreams are
-        // received.
-        //
+        /* Signal that we need to retry, where this counter is */
+        /* later checked after all NOOP's from downstreams are */
+        /* received. */
+
         d->upstream_retry++;
         d->ptd->stats.stats.tot_retry_vbucket++;
 

@@ -220,8 +220,8 @@ static void setup_thread(LIBEVENT_THREAD *me) {
     }
     cq_init(me->new_conn_queue);
 
-    // TODO: Merge new_conn_queue with work_queue.
-    //
+    /* TODO: Merge new_conn_queue with work_queue. */
+
     me->work_queue = calloc(1, sizeof(work_queue));
     if (me->work_queue == NULL) {
         perror("Failed to allocate memory for work queue");
@@ -408,7 +408,7 @@ LIBEVENT_THREAD *thread_by_index(int i) {
  */
 item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbytes) {
 #ifdef MOXI_ITEM_MALLOC
-    // Skip past the lock, since we're using malloc.
+    /* Skip past the lock, since we're using malloc. */
     return do_item_alloc(key, nkey, flags, exptime, nbytes);
 #else
     item *it;
@@ -449,7 +449,7 @@ int item_link(item *cq_item) {
  */
 void item_remove(item *cq_item) {
 #ifdef MOXI_ITEM_MALLOC
-    // Skip past the lock, since we're using malloc.
+    /* Skip past the lock, since we're using malloc. */
     do_item_remove(cq_item);
 #else
     pthread_mutex_lock(&cache_lock);

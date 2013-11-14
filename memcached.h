@@ -350,8 +350,8 @@ typedef struct _stritem {
 typedef struct bin_cmd bin_cmd;
 
 struct bin_cmd {
-    item *request_item;  // Has 1 refcount.
-    item *response_item; // Has 1 refcount.
+    item *request_item;  /* Has 1 refcount. */
+    item *response_item; /* Has 1 refcount. */
     bin_cmd *next;
 };
 
@@ -482,8 +482,8 @@ struct conn {
 
     protocol_binary_command cmd_curr;
 
-    char     *cmd_start;      // Pointer into rbuf, snapshot of rcurr.
-    uint64_t  cmd_start_time; // Snapshot of usec_now or msec_current_time.
+    char     *cmd_start;      /* Pointer into rbuf, snapshot of rcurr. */
+    uint64_t  cmd_start_time; /* Snapshot of usec_now or msec_current_time. */
     int       cmd_retries;
 
     bool      hit_local;
@@ -492,10 +492,10 @@ struct conn {
 
     bin_cmd *corked;
 
-    char *host_ident; // Uniquely identifies a memcached server, including
-                      // address:port and possibly optional bucket/usr/pwd info.
-    char *peer_host;    // this and the following two paramters are used for mcmux
-    unsigned int peer_protocol;  // compatiblity mode
+    char *host_ident; /* Uniquely identifies a memcached server, including */
+                      /* address:port and possibly optional bucket/usr/pwd info. */
+    char *peer_host;    /* this and the following two paramters are used for mcmux */
+    unsigned int peer_protocol;  /* compatiblity mode */
     int peer_port;
 
     const char *update_diag;
@@ -665,7 +665,7 @@ extern void drop_privileges(void);
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-// used by unit tests
+/* used by unit tests */
 void start_main(char *arg0, ...);
 
 void process_bin_proxy_stats(conn *c);

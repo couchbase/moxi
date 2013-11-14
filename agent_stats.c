@@ -19,8 +19,8 @@
 #include "redirects.h"
 #endif
 
-// Local declarations.
-//
+/* Local declarations. */
+
 void xpassword(char *p);
 
 static void add_stat_prefix(const void *dump_opaque,
@@ -114,7 +114,7 @@ struct main_stats_collect_info {
     struct main_stats_proxy_info *proxies;
 };
 
-static char *cmd_names[] = { // Keep sync'ed with enum_stats_cmd.
+static char *cmd_names[] = { /* Keep sync'ed with enum_stats_cmd. */
     "get",
     "get_key",
     "set",
@@ -137,14 +137,14 @@ static char *cmd_names[] = { // Keep sync'ed with enum_stats_cmd.
     "ERROR"
 };
 
-static char *cmd_type_names[] = { // Keep sync'ed with enum_stats_cmd_type.
+static char *cmd_type_names[] = { /* Keep sync'ed with enum_stats_cmd_type. */
     "regular",
     "quiet"
 };
 
 struct stats_gathering_pair {
-    genhash_t *map_pstd; // maps "<proxy-name>:<port>" strings to (proxy_stats_td *)
-    genhash_t *map_key_stats; // maps "<proxy-name>:<port>" strings to (genhash that maps key names to (struct key_stats *))
+    genhash_t *map_pstd; /* maps "<proxy-name>:<port>" strings to (proxy_stats_td *) */
+    genhash_t *map_key_stats; /* maps "<proxy-name>:<port>" strings to (genhash that maps key names to (struct key_stats *)) */
 };
 
 #ifndef REDIRECTS_FOR_MOCKS
@@ -240,7 +240,7 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
         .do_settings = (do_all || strcmp(type, "settings") == 0),
         .do_stats    = (do_all || strcmp(type, "stats") == 0),
         .do_zeros    = (type != NULL &&
-                        strcmp(type, "all") == 0), // Only when explicit "all".
+                        strcmp(type, "all") == 0), /* Only when explicit "all". */
         /* .nproxy   = 0, */
         .proxies = 0
     };
@@ -296,8 +296,8 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
         server_stats(add_stat_prefix_ase, &ase, NULL);
     }
 
-    // Alloc here so the main listener thread has less work.
-    //
+    /* Alloc here so the main listener thread has less work. */
+
     work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
     if (ca != NULL) {
         int i;
@@ -309,30 +309,30 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
                 break;
             }
 
-            // Each thread gets its own collection hashmap, which
-            // is keyed by each proxy's "binding:name", and whose
-            // values are proxy_stats_td.
-            //
+            /* Each thread gets its own collection hashmap, which */
+            /* is keyed by each proxy's "binding:name", and whose */
+            /* values are proxy_stats_td. */
+
             if (!(pair->map_pstd = genhash_init(128, strhash_ops))) {
                 break;
             }
 
-            // Key stats hashmap has same keys and
-            // genhash<string, struct key_stats *> as values.
-            //
+            /* Key stats hashmap has same keys and */
+            /* genhash<string, struct key_stats *> as values. */
+
             if (!(pair->map_key_stats = genhash_init(128, strhash_ops))) {
                 break;
             }
             work_collect_init(&ca[i], -1, pair);
         }
 
-        // Continue on the main listener thread.
-        //
+        /* Continue on the main listener thread. */
+
         if (i >= m->nthreads &&
             work_send(mthread->work_queue, main_stats_collect,
                       &msci, ca)) {
-            // Wait for all the stats collecting to finish.
-            //
+            /* Wait for all the stats collecting to finish. */
+
             for (i = 1; i < m->nthreads; i++) {
                 work_collect_wait(&ca[i]);
             }
@@ -344,9 +344,9 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
                 genhash_t *end_pstd = end_pair->map_pstd;
                 genhash_t *end_map_key_stats = end_pair->map_key_stats;
                 if (end_pstd != NULL) {
-                    // Skip the first worker thread (index 1)'s results,
-                    // because that's where we'll aggregate final results.
-                    //
+                    /* Skip the first worker thread (index 1)'s results, */
+                    /* because that's where we'll aggregate final results. */
+
                     for (i = 2; i < m->nthreads; i++) {
                         struct stats_gathering_pair *pair = ca[i].data;
                         genhash_t *map_pstd = pair->map_pstd;
@@ -459,22 +459,22 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
     APPEND_PREFIX_STAT("downstream_weight",   "%u", b->downstream_weight);
     APPEND_PREFIX_STAT("downstream_retry",    "%u", b->downstream_retry);
     APPEND_PREFIX_STAT("downstream_protocol", "%d", b->downstream_protocol);
-    APPEND_PREFIX_STAT("downstream_timeout", "%ld", // In millisecs.
+    APPEND_PREFIX_STAT("downstream_timeout", "%ld", /* In millisecs. */
               (b->downstream_timeout.tv_sec * 1000 +
                b->downstream_timeout.tv_usec / 1000));
-    APPEND_PREFIX_STAT("downstream_conn_queue_timeout", "%ld", // In millisecs.
+    APPEND_PREFIX_STAT("downstream_conn_queue_timeout", "%ld", /* In millisecs. */
               (b->downstream_conn_queue_timeout.tv_sec * 1000 +
                b->downstream_conn_queue_timeout.tv_usec / 1000));
 
-    APPEND_PREFIX_STAT("connect_timeout", "%ld", // In millisecs.
+    APPEND_PREFIX_STAT("connect_timeout", "%ld", /* In millisecs. */
                        (b->connect_timeout.tv_sec * 1000 +
                         b->connect_timeout.tv_usec / 1000));
-    APPEND_PREFIX_STAT("auth_timeout", "%ld", // In millisecs.
+    APPEND_PREFIX_STAT("auth_timeout", "%ld", /* In millisecs. */
                        (b->auth_timeout.tv_sec * 1000 +
                         b->auth_timeout.tv_usec / 1000));
 
     if (level >= 1) {
-        APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", // In millisecs.
+        APPEND_PREFIX_STAT("wait_queue_timeout", "%ld", /* In millisecs. */
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
         APPEND_PREFIX_STAT("time_stats", "%d", b->time_stats);
@@ -778,9 +778,9 @@ void proxy_stats_dump_proxy_main(ADD_STAT add_stats, conn *c,
 }
 
 void xpassword(char *p) {
-    // X out passwords in input string.
-    // Example: ..."nodeLocator": "vbucket", "saslPassword": "test", "nodes":...
-    // Becomes: ..."nodeLocator": "vbucket", "saslPassword": "XXXX", "nodes":...
+    /* X out passwords in input string. */
+    /* Example: ..."nodeLocator": "vbucket", "saslPassword": "test", "nodes":... */
+    /* Becomes: ..."nodeLocator": "vbucket", "saslPassword": "XXXX", "nodes":... */
     while (true) {
         p = strstr(p, "assword\"");
         if (p == NULL) {
@@ -836,7 +836,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
                 char *buf = trimstrdup(p->config);
                 if (buf != NULL) {
-                    // Remove embedded newlines, as config might be a JSON string.
+                    /* Remove embedded newlines, as config might be a JSON string. */
                     char *slow = buf;
                     for (char *fast = buf; *fast != '\0'; fast++) {
                         *slow = *fast;
@@ -1022,8 +1022,8 @@ static void main_stats_collect(void *data0, void *data1) {
 
         pthread_mutex_unlock(&p->proxy_lock);
 
-        // Emit front_cache stats.
-        //
+        /* Emit front_cache stats. */
+
         if (msci->do_stats) {
             pthread_mutex_lock(p->front_cache.lock);
 
@@ -1073,8 +1073,8 @@ static void main_stats_collect(void *data0, void *data1) {
 
     pthread_mutex_unlock(&m->proxy_main_lock);
 
-    // Starting at 1 because 0 is the main listen thread.
-    //
+    /* Starting at 1 because 0 is the main listen thread. */
+
     for (int i = 1; i < m->nthreads; i++) {
         work_collect *c = &ca[i];
 
@@ -1123,18 +1123,18 @@ static void main_stats_collect(void *data0, void *data1) {
         msci->nproxy = nproxy;
     }
 
-    // Normally, no need to wait for the worker threads to finish,
-    // as the workers will signal using work_collect_one().
-    //
-    // TODO: If sent is too small, then some proxies were disabled?
-    //       Need to decrement count?
-    //
-    // TODO: Might want to block here until worker threads are done,
-    //       so that concurrent reconfigs don't cause issues.
-    //
-    // In the case when config/config_ver changes might already
-    // be inflight, as long as they're not removing proxies,
-    // we're ok.  New proxies that happen afterwards are fine, too.
+    /* Normally, no need to wait for the worker threads to finish, */
+    /* as the workers will signal using work_collect_one(). */
+
+    /* TODO: If sent is too small, then some proxies were disabled? */
+    /*       Need to decrement count? */
+
+    /* TODO: Might want to block here until worker threads are done, */
+    /*       so that concurrent reconfigs don't cause issues. */
+
+    /* In the case when config/config_ver changes might already */
+    /* be inflight, as long as they're not removing proxies, */
+    /* we're ok.  New proxies that happen afterwards are fine, too. */
 }
 
 static void work_stats_collect(void *data0, void *data1) {
@@ -1147,7 +1147,7 @@ static void work_stats_collect(void *data0, void *data1) {
     work_collect *c = data1;
     assert(c);
 
-    assert(is_listen_thread() == false); // Expecting a worker thread.
+    assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     struct stats_gathering_pair *pair = c->data;
     genhash_t *map_pstd = pair->map_pstd;
@@ -1707,9 +1707,9 @@ static void main_stats_reset(void *data0, void *data1) {
     for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
         nproxy++;
 
-        // We don't clear p->listening because it's meant to
-        // increase and decrease.
-        //
+        /* We don't clear p->listening because it's meant to */
+        /* increase and decrease. */
+
         p->listening_failed = 0;
 
         mcache_reset_stats(&p->front_cache);
@@ -1720,8 +1720,8 @@ static void main_stats_reset(void *data0, void *data1) {
     if (nproxy > 0) {
         work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
         if (ca != NULL) {
-            // Starting at 1 because 0 is the main listen thread.
-            //
+            /* Starting at 1 because 0 is the main listen thread. */
+
             for (int i = 1; i < m->nthreads; i++) {
                 work_collect *c = &ca[i];
 
@@ -1744,8 +1744,8 @@ static void main_stats_reset(void *data0, void *data1) {
                 pthread_mutex_unlock(&m->proxy_main_lock);
             }
 
-            // Wait for all resets to finish.
-            //
+            /* Wait for all resets to finish. */
+
             for (int i = 1; i < m->nthreads; i++) {
                 work_collect_wait(&ca[i]);
             }
@@ -1754,15 +1754,15 @@ static void main_stats_reset(void *data0, void *data1) {
         }
     }
 
-    // TODO: If sent is too small, then some proxies were disabled?
-    //       Need to decrement count?
-    //
-    // TODO: Might want to block here until worker threads are done,
-    //       so that concurrent reconfigs don't cause issues.
-    //
-    // In the case when config/config_ver changes might already
-    // be inflight, as long as they're not removing proxies,
-    // we're ok.  New proxies that happen afterwards are fine, too.
+    /* TODO: If sent is too small, then some proxies were disabled? */
+    /*       Need to decrement count? */
+
+    /* TODO: Might want to block here until worker threads are done, */
+    /*       so that concurrent reconfigs don't cause issues. */
+
+    /* In the case when config/config_ver changes might already */
+    /* be inflight, as long as they're not removing proxies, */
+    /* we're ok.  New proxies that happen afterwards are fine, too. */
 }
 
 static void work_stats_reset(void *data0, void *data1) {
@@ -1772,7 +1772,7 @@ static void work_stats_reset(void *data0, void *data1) {
     work_collect *c = data1;
     assert(c);
 
-    assert(is_listen_thread() == false); // Expecting a worker thread.
+    assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     cproxy_reset_stats_td(&ptd->stats);
 

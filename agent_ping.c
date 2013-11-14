@@ -12,8 +12,8 @@
 #include "agent.h"
 #include "log.h"
 
-// Local declarations.
-//
+/* Local declarations. */
+
 struct ping_test_recipe {
     char *name;
     int keysize;
@@ -84,42 +84,42 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
     (void)direct;
     assert(userdata);
 
-    // The form key-multivalues looks roughly like...
-    //
-    //  servers
-    //    svrname1
-    //    svrname2
-    //  svr-svrname1
-    //    host=mc1.foo.net
-    //    port=11211
-    //    bucket=buck1
-    //    usr=test1
-    //    pwd=password
-    //  svr-svrname2
-    //    host=mc2.foo.net
-    //    port=11211
-    //    bucket=buck1
-    //    usr=test1
-    //    pwd=password
-    //  tests
-    //    test1
-    //    test2
-    //  def-test1
-    //    ksize=16
-    //    vsize=16
-    //    iterations=500
-    //  def-test2
-    //    ksize=64
-    //    vsize=524288
-    //    iterations=50
-    //
+    /* The form key-multivalues looks roughly like... */
+
+    /*  servers */
+    /*    svrname1 */
+    /*    svrname2 */
+    /*  svr-svrname1 */
+    /*    host=mc1.foo.net */
+    /*    port=11211 */
+    /*    bucket=buck1 */
+    /*    usr=test1 */
+    /*    pwd=password */
+    /*  svr-svrname2 */
+    /*    host=mc2.foo.net */
+    /*    port=11211 */
+    /*    bucket=buck1 */
+    /*    usr=test1 */
+    /*    pwd=password */
+    /*  tests */
+    /*    test1 */
+    /*    test2 */
+    /*  def-test1 */
+    /*    ksize=16 */
+    /*    vsize=16 */
+    /*    iterations=500 */
+    /*  def-test2 */
+    /*    ksize=64 */
+    /*    vsize=524288 */
+    /*    iterations=50 */
+
     if (!form) {
         return RV_BADARG;
     }
 
     char detail_key[200];
 
-    // Discover test configuration.
+    /* Discover test configuration. */
     char **tests = get_key_values(form, "tests");
     int nrecipes = charlistlen(tests);
     struct ping_test_recipe recipes[nrecipes+1];
@@ -131,7 +131,7 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
         load_ping_recipe(get_key_values(form, detail_key), &recipes[j]);
     }
 
-    // Initialize each server and run the tests
+    /* Initialize each server and run the tests */
     char **servers = get_key_values(form, "servers");
     for (int j = 0; servers != NULL && servers[j]; j++) {
         snprintf(detail_key, sizeof(detail_key),
@@ -297,7 +297,7 @@ static void ping_server(char *server_name,
                         gettimeofday(&tv_auth, NULL);
                         tv_report("auth", tv_conn, tv_auth);
 
-                        // Flag whether to proceed if we connected
+                        /* Flag whether to proceed if we connected */
                         connected = true;
                     }
                 }

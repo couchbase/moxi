@@ -1279,7 +1279,7 @@ static void process_bin_get(conn *c) {
         add_bin_header(c, 0, sizeof(rsp->message.body), keylen, bodylen);
         rsp->message.header.response.cas = mc_swap64(ITEM_get_cas(it));
 
-        // add the flags
+        /* add the flags */
         rsp->message.body.flags = htonl(strtoul(ITEM_suffix(it), NULL, 10));
         add_iov(c, &rsp->message.body, sizeof(rsp->message.body));
 
@@ -1421,7 +1421,7 @@ static void append_stats(const char *key, const uint16_t klen,
         }
         append_bin_stats(key, klen, val, vlen, c);
     } else {
-        size_t needed = vlen + klen + 10; // 10 == "STAT = \r\n"
+        size_t needed = vlen + klen + 10; /* 10 == "STAT = \r\n" */
         if (!grow_stats_buf(c, needed)) {
             return ;
         }
@@ -2013,16 +2013,16 @@ enum store_item_type do_store_item(item *it, int comm, conn *c) {
     } else if (comm == NREAD_CAS) {
         /* validate cas operation */
         if(old_it == NULL) {
-            // LRU expired
+            /* LRU expired */
             stored = NOT_FOUND;
             pthread_mutex_lock(&c->thread->stats.mutex);
             c->thread->stats.cas_misses++;
             pthread_mutex_unlock(&c->thread->stats.mutex);
         }
         else if (ITEM_get_cas(it) == ITEM_get_cas(old_it)) {
-            // cas validates
-            // it and old_it may belong to different classes.
-            // I'm updating the stats for the one that's getting pushed out
+            /* cas validates */
+            /* it and old_it may belong to different classes. */
+            /* I'm updating the stats for the one that's getting pushed out */
             pthread_mutex_lock(&c->thread->stats.mutex);
             c->thread->stats.slab_stats[old_it->slabs_clsid].cas_hits++;
             pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -2051,7 +2051,7 @@ enum store_item_type do_store_item(item *it, int comm, conn *c) {
              * Validate CAS
              */
             if (ITEM_get_cas(it) != 0) {
-                // CAS much be equal
+                /* CAS much be equal */
                 if (ITEM_get_cas(it) != ITEM_get_cas(old_it)) {
                     stored = EXISTS;
                 }
@@ -2658,7 +2658,7 @@ void process_update_command(conn *c, token_t *tokens, const size_t ntokens, int 
     /* Ubuntu 8.04 breaks when I pass exptime to safe_strtol */
     exptime = exptime_int;
 
-    // does cas value exist?
+    /* does cas value exist? */
     if (handle_cas) {
         if (!safe_strtoull(tokens[5].value, &req_cas_id)) {
             out_string(c, "CLIENT_ERROR bad command line format");
@@ -3728,9 +3728,9 @@ void drive_machine(conn *c) {
             break;
 
         case conn_pause:
-            // In case whoever put us into conn_pause didn't clear out
-            // libevent registration, do so now.
-            //
+            /* In case whoever put us into conn_pause didn't clear out */
+            /* libevent registration, do so now. */
+
             update_event(c, 0);
 
             if (c->funcs->conn_pause != NULL)
@@ -4776,9 +4776,9 @@ int main (int argc, char **argv) {
     if (cproxy_cfg
         && settings.port == UNSPECIFIED
         && settings.udpport == UNSPECIFIED) {
-        // Default behavior when we're a proxy is to also
-        // behave as a memcached on port 11210.
-        //
+        /* Default behavior when we're a proxy is to also */
+        /* behave as a memcached on port 11210. */
+
         settings.port = MEMCACHED_DEFAULT_LISTEN_PORT;
     }
 

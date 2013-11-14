@@ -154,8 +154,8 @@ void mcache_stop(mcache *m) {
         pthread_mutex_unlock(m->lock);
     }
 
-    // Destroying hash table outside the lock.
-    //
+    /* Destroying hash table outside the lock. */
+
     if (x != NULL) {
         genhash_free(x);
     }
@@ -187,7 +187,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
                  exptime >= m->oldest_live)) {
                 mcache_item_touch(m, it);
 
-                m->funcs->item_add_ref(it); // TODO: Need lock here?
+                m->funcs->item_add_ref(it); /* TODO: Need lock here? */
 
                 m->tot_get_hits++;
                 m->tot_get_bytes += m->funcs->item_len(it);
@@ -203,8 +203,8 @@ void *mcache_get(mcache *m, char *key, int key_len,
                 return it;
             }
 
-            // Handle item expiration.
-            //
+            /* Handle item expiration. */
+
             m->tot_get_expires++;
 
             if (settings.verbose > 1) {
@@ -241,15 +241,15 @@ void mcache_set(mcache *m, void *it,
         return;
     }
 
-    // TODO: Our lock areas are possibly too wide.
-    //
+    /* TODO: Our lock areas are possibly too wide. */
+
     if (m->lock) {
         pthread_mutex_lock(m->lock);
     }
 
     if (m->map != NULL) {
-        // Evict some items if necessary.
-        //
+        /* Evict some items if necessary. */
+
         for (int i = 0; m->lru_tail != NULL && i < 20; i++) {
             if ((uint32_t)genhash_size(m->map) < m->max) {
                 break;
@@ -279,11 +279,11 @@ void mcache_set(mcache *m, void *it,
             char *key_buf = NULL;
 
             if (m->key_alloc) {
-                // The ITEM_key is not NULL or space terminated,
-                // and we need a copy, too, for hashtable ownership.
-                //
-                // TODO: Move this outside the lock area?
-                //
+                /* The ITEM_key is not NULL or space terminated, */
+                /* and we need a copy, too, for hashtable ownership. */
+
+                /* TODO: Move this outside the lock area? */
+
                 key_buf = malloc(key_len + 1);
                 if (key_buf != NULL) {
                     memcpy(key_buf, key, key_len);
@@ -466,7 +466,7 @@ void mcache_foreach(mcache *m, mcache_traversal_func f, void *userdata) {
     genhash_iter(m->map, mcache_foreach_trampoline, &data);
 }
 
-// -------------------------------------------------
+/* ------------------------------------------------- */
 
 static char *item_key(void *it) {
     item *i = it;
@@ -489,7 +489,7 @@ static int item_len(void *it) {
 static void item_add_ref(void *it) {
     item *i = it;
     if (i != NULL) {
-        i->refcount++; // TODO: Need item lock here?
+        i->refcount++; /* TODO: Need item lock here? */
     }
 }
 

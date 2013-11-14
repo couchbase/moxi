@@ -9,11 +9,11 @@
 #include "mcs.h"
 #include "htgram.h"
 
-// From libmemcached.
-//
+/* From libmemcached. */
+
 uint32_t murmur_hash(const char *key, size_t length);
 
-// -------------------------------
+/* ------------------------------- */
 
 int cproxy_init(char *cfg_str,
                 char *behavior_str,
@@ -26,21 +26,21 @@ extern volatile uint64_t msec_current_time;
 
 uint64_t usec_now(void);
 
-extern char cproxy_hostname[300]; // Immutable after init.
+extern char cproxy_hostname[300]; /* Immutable after init. */
 
-// -------------------------------
+/* ------------------------------- */
 
-// Special bucket name for the null bucket.
-//
+/* Special bucket name for the null bucket. */
+
 #define NULL_BUCKET "[ <NULL_BUCKET> ]"
 
-// Special bucket name that signifies that
-// upstream connections start on the first
-// configured bucket.
-//
+/* Special bucket name that signifies that */
+/* upstream connections start on the first */
+/* configured bucket. */
+
 #define FIRST_BUCKET "[ <FIRST_BUCKET> ]"
 
-// -------------------------------
+/* ------------------------------- */
 
 typedef struct {
     char *(*item_key)(void *it);
@@ -62,21 +62,21 @@ extern mcache_funcs mcache_key_stats_funcs;
 typedef struct {
     mcache_funcs *funcs;
 
-    pthread_mutex_t *lock; // NULL-able, for non-multithreaded.
+    pthread_mutex_t *lock; /* NULL-able, for non-multithreaded. */
 
-    bool key_alloc;        // True if mcache must alloc key memory.
+    bool key_alloc;        /* True if mcache must alloc key memory. */
 
-    genhash_t *map;        // NULL-able, keyed by string, value is item.
+    genhash_t *map;        /* NULL-able, keyed by string, value is item. */
 
-    uint32_t max;          // Maxiumum number of items to keep.
+    uint32_t max;          /* Maxiumum number of items to keep. */
 
-    void *lru_head;        // Most recently used.
-    void *lru_tail;        // Least recently used.
+    void *lru_head;        /* Most recently used. */
+    void *lru_tail;        /* Least recently used. */
 
-    uint32_t oldest_live;  // In millisecs, relative to msec_current_time.
+    uint32_t oldest_live;  /* In millisecs, relative to msec_current_time. */
 
-    // Statistics.
-    //
+    /* Statistics. */
+
     uint64_t tot_get_hits;
     uint64_t tot_get_expires;
     uint64_t tot_get_misses;
@@ -99,66 +99,66 @@ typedef struct downstream          downstream;
 typedef struct key_stats           key_stats;
 
 struct proxy_behavior {
-    // IL means startup, system initialization level behavior.
-    // ML means proxy/pool manager-level behavior (proxy_main).
-    // PL means proxy/pool-level behavior.
-    // SL means server-level behavior, although we inherit from proxy level.
-    //
-    uint32_t       cycle;               // IL: Clock resolution in millisecs.
-    uint32_t       downstream_max;      // PL: Downstream concurrency.
-    uint32_t       downstream_conn_max; // PL: Max # of conns per thread
-                                        // and per host_ident.
-    uint32_t       downstream_weight;   // SL: Server weight.
-    uint32_t       downstream_retry;    // SL: How many times to retry a cmd.
-    enum protocol  downstream_protocol; // SL: Favored downstream protocol.
-    struct timeval downstream_timeout;  // SL: Fields of 0 mean no timeout.
-    struct timeval downstream_conn_queue_timeout; // SL: Fields of 0 mean no timeout.
-    struct timeval wait_queue_timeout;  // PL: Fields of 0 mean no timeout.
-    struct timeval connect_timeout;     // PL: Fields of 0 mean no timeout.
-    struct timeval auth_timeout;        // PL: Fields of 0 mean no timeout.
-    bool           time_stats;          // IL: Capture timing stats.
-    char           mcs_opts[80];        // PL: Extra options for mcs initialization.
+    /* IL means startup, system initialization level behavior. */
+    /* ML means proxy/pool manager-level behavior (proxy_main). */
+    /* PL means proxy/pool-level behavior. */
+    /* SL means server-level behavior, although we inherit from proxy level. */
 
-    uint32_t connect_max_errors;      // IL: Pause when too many connect() errs.
-    uint32_t connect_retry_interval;  // IL: Time in millisecs before retrying
-                                      // when too many connect() errors, to not
-                                      // overwhelm the downstream servers.
+    uint32_t       cycle;               /* IL: Clock resolution in millisecs. */
+    uint32_t       downstream_max;      /* PL: Downstream concurrency. */
+    uint32_t       downstream_conn_max; /* PL: Max # of conns per thread */
+                                        /* and per host_ident. */
+    uint32_t       downstream_weight;   /* SL: Server weight. */
+    uint32_t       downstream_retry;    /* SL: How many times to retry a cmd. */
+    enum protocol  downstream_protocol; /* SL: Favored downstream protocol. */
+    struct timeval downstream_timeout;  /* SL: Fields of 0 mean no timeout. */
+    struct timeval downstream_conn_queue_timeout; /* SL: Fields of 0 mean no timeout. */
+    struct timeval wait_queue_timeout;  /* PL: Fields of 0 mean no timeout. */
+    struct timeval connect_timeout;     /* PL: Fields of 0 mean no timeout. */
+    struct timeval auth_timeout;        /* PL: Fields of 0 mean no timeout. */
+    bool           time_stats;          /* IL: Capture timing stats. */
+    char           mcs_opts[80];        /* PL: Extra options for mcs initialization. */
 
-    uint32_t front_cache_max;         // PL: Max # of front cachable items.
-    uint32_t front_cache_lifespan;    // PL: In millisecs.
-    char     front_cache_spec[300];   // PL: Matcher prefixes for front caching.
-    char     front_cache_unspec[100]; // PL: Don't front cache prefixes.
+    uint32_t connect_max_errors;      /* IL: Pause when too many connect() errs. */
+    uint32_t connect_retry_interval;  /* IL: Time in millisecs before retrying */
+                                      /* when too many connect() errors, to not */
+                                      /* overwhelm the downstream servers. */
 
-    uint32_t key_stats_max;         // PL: Max # of key stats entries.
-    uint32_t key_stats_lifespan;    // PL: In millisecs.
-    char     key_stats_spec[300];   // PL: Matcher prefixes for key-level stats.
-    char     key_stats_unspec[100]; // PL: Don't key stat prefixes.
+    uint32_t front_cache_max;         /* PL: Max # of front cachable items. */
+    uint32_t front_cache_lifespan;    /* PL: In millisecs. */
+    char     front_cache_spec[300];   /* PL: Matcher prefixes for front caching. */
+    char     front_cache_unspec[100]; /* PL: Don't front cache prefixes. */
 
-    char optimize_set[400]; // PL: Matcher prefixes for SET optimization.
+    uint32_t key_stats_max;         /* PL: Max # of key stats entries. */
+    uint32_t key_stats_lifespan;    /* PL: In millisecs. */
+    char     key_stats_spec[300];   /* PL: Matcher prefixes for key-level stats. */
+    char     key_stats_unspec[100]; /* PL: Don't key stat prefixes. */
 
-    char usr[250];    // SL.
-    char pwd[900];    // SL.
-    char host[250];   // SL.
-    int  port;        // SL.
-    char bucket[250]; // SL.
-    char nodeLocator[20]; // Ex: ketama or vbucket.
+    char optimize_set[400]; /* PL: Matcher prefixes for SET optimization. */
 
-    // ML: Port for proxy_main to listen on.
-    //
+    char usr[250];    /* SL. */
+    char pwd[900];    /* SL. */
+    char host[250];   /* SL. */
+    int  port;        /* SL. */
+    char bucket[250]; /* SL. */
+    char nodeLocator[20]; /* Ex: ketama or vbucket. */
+
+    /* ML: Port for proxy_main to listen on. */
+
     int port_listen;
 
-    char default_bucket_name[250]; // ML: The named bucket (proxy->name)
-                                   // that upstream conn's should start on.
-                                   // When empty (""), then only binary SASL
-                                   // clients can actually do anything useful.
+    char default_bucket_name[250]; /* ML: The named bucket (proxy->name) */
+                                   /* that upstream conn's should start on. */
+                                   /* When empty (""), then only binary SASL */
+                                   /* clients can actually do anything useful. */
 };
 
 proxy_behavior behavior_default_g;
 
 struct proxy_behavior_pool {
-    proxy_behavior  base; // Proxy pool-level (PL) behavior.
-    int             num;  // Number of server-level (SL) behaviors.
-    proxy_behavior *arr;  // Array, size is num.
+    proxy_behavior  base; /* Proxy pool-level (PL) behavior. */
+    int             num;  /* Number of server-level (SL) behaviors. */
+    proxy_behavior *arr;  /* Array, size is num. */
 };
 
 typedef enum {
@@ -167,43 +167,43 @@ typedef enum {
     PROXY_CONF_TYPE_last
 } enum_proxy_conf_type;
 
-// Quick map of struct hierarchy...
-//
-// proxy_main
-//  - has list of...
-//    proxy
-//     - has array of...
-//       proxy_td (one proxy_td per worker thread)
-//       - has list of...
-//         downstream (in either reserved or released list)
-//         - has mst/libmemcached struct
-//         - has array of downstream conn's
-//         - has non-NULL upstream conn, when reserved
+/* Quick map of struct hierarchy... */
+
+/* proxy_main */
+/*  - has list of... */
+/*    proxy */
+/*     - has array of... */
+/*       proxy_td (one proxy_td per worker thread) */
+/*       - has list of... */
+/*         downstream (in either reserved or released list) */
+/*         - has mst/libmemcached struct */
+/*         - has array of downstream conn's */
+/*         - has non-NULL upstream conn, when reserved */
 
 /* Structure used and owned by main listener thread to
  * track all the outstanding proxy objects.
  */
 struct proxy_main {
-    proxy_behavior behavior; // Default, main listener modifiable only.
+    proxy_behavior behavior; /* Default, main listener modifiable only. */
 
-    enum_proxy_conf_type conf_type; // Immutable proxy configuration type.
+    enum_proxy_conf_type conf_type; /* Immutable proxy configuration type. */
 
-    // Any thread that accesses the proxy list must
-    // first acquire the proxy_main_lock.
-    //
+    /* Any thread that accesses the proxy list must */
+    /* first acquire the proxy_main_lock. */
+
     pthread_mutex_t proxy_main_lock;
 
-    // Start of proxy list.  Covered by proxy_main_lock.
-    // Only the main listener thread may modify the proxy list.
-    // Other threads may read-only traverse the proxy list.
-    //
+    /* Start of proxy list.  Covered by proxy_main_lock. */
+    /* Only the main listener thread may modify the proxy list. */
+    /* Other threads may read-only traverse the proxy list. */
+
     proxy *proxy_head;
 
-    int nthreads; // Immutable.
+    int nthreads; /* Immutable. */
 
-    // Updated by main listener thread only,
-    // so no extra locking needed.
-    //
+    /* Updated by main listener thread only, */
+    /* so no extra locking needed. */
+
     uint64_t stat_configs;
     uint64_t stat_config_fails;
     uint64_t stat_proxy_starts;
@@ -215,35 +215,35 @@ struct proxy_main {
 /* Owned by main listener thread.
  */
 struct proxy {
-    proxy_main *main; // Immutable, points to parent proxy_main.
+    proxy_main *main; /* Immutable, points to parent proxy_main. */
 
-    int   port;   // Immutable.
-    char *name;   // Mutable, covered by proxy_lock, for debugging, NULL-able.
-    char *config; // Mutable, covered by proxy_lock, mem owned by proxy,
-                  // might be NULL if the proxy is shutting down.
+    int   port;   /* Immutable. */
+    char *name;   /* Mutable, covered by proxy_lock, for debugging, NULL-able. */
+    char *config; /* Mutable, covered by proxy_lock, mem owned by proxy, */
+                  /* might be NULL if the proxy is shutting down. */
 
-    // Mutable, covered by proxy_lock, incremented
-    // whenever config changes.
-    //
+    /* Mutable, covered by proxy_lock, incremented */
+    /* whenever config changes. */
+
     uint32_t config_ver;
 
-    // Mutable, covered by proxy_lock.
-    //
+    /* Mutable, covered by proxy_lock. */
+
     proxy_behavior_pool behavior_pool;
 
-    // Any thread that accesses the mutable fields should
-    // first acquire the proxy_lock.
-    //
+    /* Any thread that accesses the mutable fields should */
+    /* first acquire the proxy_lock. */
+
     pthread_mutex_t proxy_lock;
 
-    // Number of listening conn's acting as a proxy,
-    // where (((proxy *) conn->extra) == this).
-    // Modified/accessed only by main listener thread.
-    //
-    uint64_t listening;
-    uint64_t listening_failed; // When server_socket() failed.
+    /* Number of listening conn's acting as a proxy, */
+    /* where (((proxy *) conn->extra) == this). */
+    /* Modified/accessed only by main listener thread. */
 
-    proxy *next; // Modified/accessed only by main listener thread.
+    uint64_t listening;
+    uint64_t listening_failed; /* When server_socket() failed. */
+
+    proxy *next; /* Modified/accessed only by main listener thread. */
 
     mcache  front_cache;
     matcher front_cache_matcher;
@@ -251,17 +251,17 @@ struct proxy {
 
     matcher optimize_set_matcher;
 
-    proxy_td *thread_data;     // Immutable.
-    int       thread_data_num; // Immutable.
+    proxy_td *thread_data;     /* Immutable. */
+    int       thread_data_num; /* Immutable. */
 };
 
 struct proxy_stats {
-    // Naming convention is that num_xxx's go up and down,
-    // while tot_xxx's and err_xxx's only increase.  Only
-    // the tot_xxx's and err_xxx's can be reset to 0.
-    //
-    uint64_t num_upstream; // Current # of upstreams conns using this proxy.
-    uint64_t tot_upstream; // Total # upstream conns that used this proxy.
+    /* Naming convention is that num_xxx's go up and down, */
+    /* while tot_xxx's and err_xxx's only increase.  Only */
+    /* the tot_xxx's and err_xxx's can be reset to 0. */
+
+    uint64_t num_upstream; /* Current # of upstreams conns using this proxy. */
+    uint64_t tot_upstream; /* Total # upstream conns that used this proxy. */
 
     uint64_t num_downstream_conn;
     uint64_t tot_downstream_conn;
@@ -276,18 +276,18 @@ struct proxy_stats {
     uint64_t tot_downstream_max_reached;
     uint64_t tot_downstream_create_failed;
 
-    // When connections have stabilized...
-    //   tot_downstream_connect_started ==
-    //     tot_downstream_connect + tot_downstream_connect_failed.
-    //
-    // When a new connection is just created but not yet ready for use...
-    //   tot_downstream_connect_started >
-    //     tot_downstream_connect + tot_downstream_connect_failed.
-    //
+    /* When connections have stabilized... */
+    /*   tot_downstream_connect_started == */
+    /*     tot_downstream_connect + tot_downstream_connect_failed. */
+
+    /* When a new connection is just created but not yet ready for use... */
+    /*   tot_downstream_connect_started > */
+    /*     tot_downstream_connect + tot_downstream_connect_failed. */
+
     uint64_t tot_downstream_connect_started;
     uint64_t tot_downstream_connect_wait;
-    uint64_t tot_downstream_connect; // Incremented when connect() + auth +
-                                     // bucket_selection succeeds.
+    uint64_t tot_downstream_connect; /* Incremented when connect() + auth + */
+                                     /* bucket_selection succeeds. */
     uint64_t tot_downstream_connect_failed;
     uint64_t tot_downstream_connect_timeout;
     uint64_t tot_downstream_connect_interval;
@@ -330,17 +330,17 @@ struct proxy_stats {
 };
 
 typedef struct {
-    uint64_t seen;        // Number of times a command was seen.
-    uint64_t hits;        // Number of hits or successes.
-    uint64_t misses;      // Number of misses or failures.
-    uint64_t read_bytes;  // Total bytes read, incoming into proxy.
-    uint64_t write_bytes; // Total bytes written, outgoing from proxy.
-    uint64_t cas;         // Number that had or required cas-id.
+    uint64_t seen;        /* Number of times a command was seen. */
+    uint64_t hits;        /* Number of hits or successes. */
+    uint64_t misses;      /* Number of misses or failures. */
+    uint64_t read_bytes;  /* Total bytes read, incoming into proxy. */
+    uint64_t write_bytes; /* Total bytes written, outgoing from proxy. */
+    uint64_t cas;         /* Number that had or required cas-id. */
 } proxy_stats_cmd;
 
 typedef enum {
-    STATS_CMD_GET = 0, // For each "get" cmd, even if multikey get.
-    STATS_CMD_GET_KEY, // For each key in a "get".
+    STATS_CMD_GET = 0, /* For each "get" cmd, even if multikey get. */
+    STATS_CMD_GET_KEY, /* For each key in a "get". */
     STATS_CMD_SET,
     STATS_CMD_ADD,
     STATS_CMD_REPLACE,
@@ -390,35 +390,35 @@ struct key_stats {
  * proxy_td (td means "thread data") struct owned by each
  * worker thread.  The idea is to avoid extraneous locks.
  */
-struct proxy_td { // Per proxy, per worker-thread data struct.
-    proxy *proxy; // Immutable parent pointer.
+struct proxy_td { /* Per proxy, per worker-thread data struct. */
+    proxy *proxy; /* Immutable parent pointer. */
 
-    // Snapshot of proxy-level configuration to avoid locks.
-    //
+    /* Snapshot of proxy-level configuration to avoid locks. */
+
     char    *config;
     uint32_t config_ver;
 
     proxy_behavior_pool behavior_pool;
 
-    // Upstream conns that are paused, waiting for
-    // an available, released downstream.
-    //
+    /* Upstream conns that are paused, waiting for */
+    /* an available, released downstream. */
+
     conn *waiting_any_downstream_head;
     conn *waiting_any_downstream_tail;
 
-    downstream *downstream_reserved; // Downstreams assigned to upstream conns.
-    downstream *downstream_released; // Downstreams unassigned to upstreams conn.
-    uint64_t    downstream_tot;      // Total lifetime downstreams created.
-    int         downstream_num;      // Number downstreams existing.
-    int         downstream_max;      // Max downstream concurrency number.
-    uint64_t    downstream_assigns;  // Track recursion.
+    downstream *downstream_reserved; /* Downstreams assigned to upstream conns. */
+    downstream *downstream_released; /* Downstreams unassigned to upstreams conn. */
+    uint64_t    downstream_tot;      /* Total lifetime downstreams created. */
+    int         downstream_num;      /* Number downstreams existing. */
+    int         downstream_max;      /* Max downstream concurrency number. */
+    uint64_t    downstream_assigns;  /* Track recursion. */
 
-    // A timeout for the wait_queue, so that we can emit error
-    // on any upstream conn's that are waiting too long for
-    // an available downstream.
-    //
-    // Timeout is in use when timeout_tv fields are non-zero.
-    //
+    /* A timeout for the wait_queue, so that we can emit error */
+    /* on any upstream conn's that are waiting too long for */
+    /* an available downstream. */
+
+    /* Timeout is in use when timeout_tv fields are non-zero. */
+
     struct timeval timeout_tv;
     struct event   timeout_event;
 
@@ -435,67 +435,67 @@ struct proxy_td { // Per proxy, per worker-thread data struct.
  * Owned by worker thread.
  */
 struct downstream {
-    // The following group of fields are immutable or read-only (RO),
-    // except for config_ver, which gets updated if the downstream's
-    // config/behaviors still matches the parent ptd's config/behaviors.
-    //
-    proxy_td       *ptd;           // RO: Parent pointer.
-    char           *config;        // RO: Mem owned by downstream.
-    uint32_t        config_ver;    // RW: Mutable, copy of proxy->config_ver.
-    int             behaviors_num; // RO: Snapshot of ptd->behavior_pool.num.
-    proxy_behavior *behaviors_arr; // RO: Snapshot of ptd->behavior_pool.arr.
-    mcs_st          mst;           // RW: From mcs.
+    /* The following group of fields are immutable or read-only (RO), */
+    /* except for config_ver, which gets updated if the downstream's */
+    /* config/behaviors still matches the parent ptd's config/behaviors. */
 
-    downstream *next; // To track reserved/released lists.
-                      // See ptd->downstream_reserved/downstream_released.
+    proxy_td       *ptd;           /* RO: Parent pointer. */
+    char           *config;        /* RO: Mem owned by downstream. */
+    uint32_t        config_ver;    /* RW: Mutable, copy of proxy->config_ver. */
+    int             behaviors_num; /* RO: Snapshot of ptd->behavior_pool.num. */
+    proxy_behavior *behaviors_arr; /* RO: Snapshot of ptd->behavior_pool.arr. */
+    mcs_st          mst;           /* RW: From mcs. */
 
-    downstream *next_waiting; // To track lists when a downstream is reserved,
-                              // but is waiting for a downstream connection,
-                              // per zstored perf enhancement.
+    downstream *next; /* To track reserved/released lists. */
+                      /* See ptd->downstream_reserved/downstream_released. */
 
-    conn **downstream_conns;  // Wraps the fd's of mst with conns.
-    int    downstream_used;   // Number of in-use downstream conns, might
-                              // be >1 during scatter-gather commands.
+    downstream *next_waiting; /* To track lists when a downstream is reserved, */
+                              /* but is waiting for a downstream connection, */
+                              /* per zstored perf enhancement. */
+
+    conn **downstream_conns;  /* Wraps the fd's of mst with conns. */
+    int    downstream_used;   /* Number of in-use downstream conns, might */
+                              /* be >1 during scatter-gather commands. */
     int    downstream_used_start;
 
-    uint64_t usec_start; // Snapshot of usec_now().
+    uint64_t usec_start; /* Snapshot of usec_now(). */
 
-    conn  *upstream_conn;     // Non-NULL when downstream is reserved.
-    char  *upstream_suffix;   // Last bit to write when downstreams are done.
-    int    upstream_suffix_len; // When > 0, overrides strlen(upstream_suffix),
-                                // during binary protocol.
+    conn  *upstream_conn;     /* Non-NULL when downstream is reserved. */
+    char  *upstream_suffix;   /* Last bit to write when downstreams are done. */
+    int    upstream_suffix_len; /* When > 0, overrides strlen(upstream_suffix), */
+                                /* during binary protocol. */
 
-    // Used during an error when upstream is binary protocol.
+    /* Used during an error when upstream is binary protocol. */
     protocol_binary_response_status upstream_status;
 
-    int    upstream_retry;    // Will be >0 if we should retry the entire
-                              // command again when all downstreams are done.
-                              // Used in not-my-vbucket error case.  During
-                              // the retry, we'll reuse the same multiget
-                              // de-duplication tracking table to avoid
-                              // asking for successful keys again.
-    int    upstream_retries;  // Count number of upstream_retry attempts.
+    int    upstream_retry;    /* Will be >0 if we should retry the entire */
+                              /* command again when all downstreams are done. */
+                              /* Used in not-my-vbucket error case.  During */
+                              /* the retry, we'll reuse the same multiget */
+                              /* de-duplication tracking table to avoid */
+                              /* asking for successful keys again. */
+    int    upstream_retries;  /* Count number of upstream_retry attempts. */
 
-    // Used when proxying a simple, single-key (non-broadcast) command.
+    /* Used when proxying a simple, single-key (non-broadcast) command. */
     char *target_host_ident;
 
-    genhash_t *multiget; // Keyed by string.
-    genhash_t *merger;   // Keyed by string, for merging replies like STATS.
+    genhash_t *multiget; /* Keyed by string. */
+    genhash_t *merger;   /* Keyed by string, for merging replies like STATS. */
 
-    // Timeout is in use when timeout_tv fields are non-zero.
-    //
+    /* Timeout is in use when timeout_tv fields are non-zero. */
+
     struct timeval timeout_tv;
     struct event   timeout_event;
 };
 
-// Sentinel value for downstream->downstream_conns[] array entries,
-// which usually signals that moxi wasn't able to create a connection
-// to a downstream server.
-//
+/* Sentinel value for downstream->downstream_conns[] array entries, */
+/* which usually signals that moxi wasn't able to create a connection */
+/* to a downstream server. */
+
 #define NULL_CONN ((conn *) -1)
 
-// Functions.
-//
+/* Functions. */
+
 proxy *cproxy_create(proxy_main *main,
                      char    *name,
                      int      port,
@@ -577,7 +577,7 @@ void cproxy_dump_header(int prefix, char *bb);
 
 int cproxy_max_retries(downstream *d);
 
-// ---------------------------------------------------------------
+/* --------------------------------------------------------------- */
 
 void cproxy_process_upstream_ascii(conn *c, char *line);
 void cproxy_process_upstream_ascii_nread(conn *c);
@@ -591,9 +591,9 @@ void cproxy_process_upstream_binary_nread(conn *c);
 void cproxy_process_downstream_binary(conn *c);
 void cproxy_process_downstream_binary_nread(conn *c);
 
-// ---------------------------------------------------------------
-// a2a means ascii upstream, ascii downstream.
-//
+/* --------------------------------------------------------------- */
+/* a2a means ascii upstream, ascii downstream. */
+
 void cproxy_init_a2a(void);
 void cproxy_process_a2a_downstream(conn *c, char *line);
 void cproxy_process_a2a_downstream_nread(conn *c);
@@ -608,9 +608,9 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
 bool cproxy_broadcast_a2a_downstream(downstream *d, char *command,
                                      conn *uc, char *suffix);
 
-// ---------------------------------------------------------------
-// a2b means ascii upstream, binary downstream.
-//
+/* --------------------------------------------------------------- */
+/* a2b means ascii upstream, binary downstream. */
+
 void cproxy_init_a2b(void);
 void cproxy_process_a2b_downstream(conn *c);
 void cproxy_process_a2b_downstream_nread(conn *c);
@@ -629,9 +629,9 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
                                      uint8_t  extlen,
                                      conn *uc, char *suffix);
 
-// ---------------------------------------------------------------
-// b2b means binary upstream, binary downstream.
-//
+/* --------------------------------------------------------------- */
+/* b2b means binary upstream, binary downstream. */
+
 void cproxy_init_b2b(void);
 void cproxy_process_b2b_downstream(conn *c);
 void cproxy_process_b2b_downstream_nread(conn *c);
@@ -642,24 +642,24 @@ bool cproxy_forward_b2b_simple_downstream(downstream *d, conn *uc);
 
 bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc);
 
-// ---------------------------------------------------------------
+/* --------------------------------------------------------------- */
 
 bool b2b_forward_item(conn *uc, downstream *d, item *it);
 
 bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
                               conn *c, int vbucket);
 
-// ---------------------------------------------------------------
+/* --------------------------------------------------------------- */
 
-// Magic opaque value that tells us to eat a binary quiet command
-// response.  That is, do not send the response up to the ascii client
-// which originally made its request with noreply.
-//
+/* Magic opaque value that tells us to eat a binary quiet command */
+/* response.  That is, do not send the response up to the ascii client */
+/* which originally made its request with noreply. */
+
 #define OPAQUE_IGNORE_REPLY 0x0411F00D
 
 bool cproxy_binary_ignore_reply(conn *c, protocol_binary_response_header *header, item *it);
 
-// ---------------------------------------------------------------
+/* --------------------------------------------------------------- */
 
 proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior,
                                   int nthreads, enum_proxy_conf_type conf_type);
@@ -693,7 +693,7 @@ void cproxy_dump_behavior_stderr(const void *dump_opaque,
                                  const char *key,
                                  const char *val);
 
-// ---------------------------------------------------------------
+/* --------------------------------------------------------------- */
 
 bool cproxy_is_broadcast_cmd(int cmd);
 
@@ -724,13 +724,13 @@ void cproxy_binary_uncork_cmds(downstream *d, conn *uc);
 
 bool ascii_scan_key(char *line, char **key, int *key_len);
 
-// Multiget key de-duplication.
-//
+/* Multiget key de-duplication. */
+
 typedef struct multiget_entry multiget_entry;
 
 struct multiget_entry {
     conn           *upstream_conn;
-    uint32_t        opaque; // For binary protocol.
+    uint32_t        opaque; /* For binary protocol. */
     uint64_t        hits;
     multiget_entry *next;
 };
@@ -752,8 +752,8 @@ void multiget_remove_upstream(const void *key,
                               const void *value,
                               void *user_data);
 
-// Space or null terminated key funcs.
-//
+/* Space or null terminated key funcs. */
+
 size_t skey_len(const char *key);
 int    skey_hash(const void *v);
 int    skey_equal(const void *v1, const void *v2);
@@ -763,8 +763,8 @@ extern struct hash_ops skeyhash_ops;
 
 void noop_free(void *v);
 
-// Stats handling.
-//
+/* Stats handling. */
+
 bool protocol_stats_merge_line(genhash_t *merger, char *line);
 
 bool protocol_stats_merge_name_val(genhash_t *merger,
@@ -801,8 +801,8 @@ HTGRAM_HANDLE cproxy_create_timing_histogram(void);
 
 typedef void (*mcache_traversal_func)(const void *it, void *userdata);
 
-// Functions for the front cache.
-//
+/* Functions for the front cache. */
+
 void  mcache_init(mcache *m, bool multithreaded,
                   mcache_funcs *funcs, bool key_alloc);
 void  mcache_start(mcache *m, uint32_t max);
@@ -819,8 +819,8 @@ void  mcache_delete(mcache *m, char *key, int key_len);
 void  mcache_flush_all(mcache *m, uint32_t msec_exp);
 void  mcache_foreach(mcache *m, mcache_traversal_func f, void *userdata);
 
-// Functions for key stats.
-//
+/* Functions for key stats. */
+
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
                           uint64_t msec_time);
 
@@ -837,8 +837,8 @@ void touch_key_stats(proxy_td *ptd, char *key, int key_len,
 void key_stats_add_ref(void *it);
 void key_stats_dec_ref(void *it);
 
-// TODO: The following generic items should be broken out into util file.
-//
+/* TODO: The following generic items should be broken out into util file. */
+
 bool  add_conn_item(conn *c, item *it);
 char *add_conn_suffix(conn *c);
 
@@ -858,4 +858,4 @@ char *trimstr(char *s);
 char *trimstrdup(char *s);
 bool  wordeq(char *s, char *word);
 
-#endif // CPROXY_H
+#endif /* CPROXY_H */

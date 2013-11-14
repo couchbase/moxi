@@ -106,8 +106,8 @@ bool work_send(work_queue *m,
 
     bool rv = false;
 
-    // TODO: Add a free-list of work_items.
-    //
+    /* TODO: Add a free-list of work_items. */
+
     work_item *w = calloc(1, sizeof(work_item));
     if (w != NULL) {
         w->func  = func;
@@ -164,17 +164,17 @@ void work_recv(int fd, short which, void *arg) {
 
     char buf[1];
 
-    // The lock area includes the read() for safety,
-    // as the pipe acts like a cond variable.
-    //
+    /* The lock area includes the read() for safety, */
+    /* as the pipe acts like a cond variable. */
+
     pthread_mutex_lock(&m->work_lock);
 
     int readrv = read(fd, buf, 1);
     assert(readrv == 1);
     if (readrv != 1) {
 #ifdef WORK_DEBUG
-        // Perhaps libevent called us in incorrect way.
-        //
+        /* Perhaps libevent called us in incorrect way. */
+
         moxi_log_write("unexpected work_recv read value\n");
 #endif
     }
@@ -217,7 +217,7 @@ void work_recv(int fd, short which, void *arg) {
     }
 }
 
-// ------------------------------------
+/* ------------------------------------ */
 
 /** The "work_collect" abstraction helps to make scatter/gather easier
  *  when using work queue's.  The main caller uses work_collect_init()
@@ -256,7 +256,7 @@ int work_collect_init(work_collect *c, int count, void *data) {
 int work_collect_wait(work_collect *c) {
     int rv = 0;
     pthread_mutex_lock(&c->collect_lock);
-    while (c->count != 0 && rv == 0) { // Can't test for > 0, due to -1 on init race.
+    while (c->count != 0 && rv == 0) { /* Can't test for > 0, due to -1 on init race. */
         rv = pthread_cond_wait(&c->collect_cond, &c->collect_lock);
     }
     pthread_mutex_unlock(&c->collect_lock);

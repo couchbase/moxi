@@ -46,7 +46,7 @@ void cproxy_process_upstream_binary(conn *c) {
                 c->sfd, c->cmd, extlen, keylen, bodylen);
     }
 
-    process_bin_noreply(c); // Map quiet c->cmd values into non-quiet.
+    process_bin_noreply(c); /* Map quiet c->cmd values into non-quiet. */
 
     if (c->cmd == PROTOCOL_BINARY_CMD_VERSION ||
         c->cmd == PROTOCOL_BINARY_CMD_QUIT) {
@@ -54,10 +54,10 @@ void cproxy_process_upstream_binary(conn *c) {
         return;
     }
 
-    // Alloc an item and continue with an rest-of-body nread if
-    // necessary.  The item will hold the entire request message
-    // (the header + body).
-    //
+    /* Alloc an item and continue with an rest-of-body nread if */
+    /* necessary.  The item will hold the entire request message */
+    /* (the header + body). */
+
     char *ikey    = "u";
     int   ikeylen = 1;
 
@@ -78,12 +78,12 @@ void cproxy_process_upstream_binary(conn *c) {
 
             conn_set_state(c, conn_nread);
         } else {
-            // Since we have no body bytes, we can go immediately to
-            // the nread completed processing step.
-            //
+            /* Since we have no body bytes, we can go immediately to */
+            /* the nread completed processing step. */
+
             if (c->binary_header.request.opcode == PROTOCOL_BINARY_CMD_SASL_LIST_MECHS) {
-                // TODO: One day handle more than just PLAIN sasl auth.
-                //
+                /* TODO: One day handle more than just PLAIN sasl auth. */
+
                 write_bin_response(c, "PLAIN", 0, 0, strlen("PLAIN"));
                 return;
             }
@@ -118,9 +118,9 @@ void cproxy_process_upstream_binary_nread(conn *c) {
                 c->sfd, c->cmd, extlen, keylen, bodylen);
     }
 
-    // pthread_mutex_lock(&c->thread->stats.mutex);
-    // c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++;
-    // pthread_mutex_unlock(&c->thread->stats.mutex);
+    /* pthread_mutex_lock(&c->thread->stats.mutex); */
+    /* c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++; */
+    /* pthread_mutex_unlock(&c->thread->stats.mutex); */
 
     proxy_td *ptd = c->extra;
     assert(ptd != NULL);
@@ -154,25 +154,25 @@ void cproxy_process_upstream_binary_nread(conn *c) {
                     c->sfd, c->cmd, (c->corked != NULL));
         }
 
-        // TODO: We currently don't support binary FLUSHQ.
-        //
-        // Rather than having the downstream connections get
-        // into a wonky state, prevent it.
-        //
+        /* TODO: We currently don't support binary FLUSHQ. */
+
+        /* Rather than having the downstream connections get */
+        /* into a wonky state, prevent it. */
+
         if (header->request.opcode == PROTOCOL_BINARY_CMD_FLUSHQ) {
-            // Note: don't use cproxy_close_conn(c), as it goes
-            // through the drive_machine() loop again.
-            //
-            // cproxy_close_conn(c);
+            /* Note: don't use cproxy_close_conn(c), as it goes */
+            /* through the drive_machine() loop again. */
+
+            /* cproxy_close_conn(c); */
 
             conn_set_state(c, conn_closing);
 
             return;
         }
 
-        // Hold onto or 'cork' all the binary quiet commands
-        // until there's a later non-quiet command.
-        //
+        /* Hold onto or 'cork' all the binary quiet commands */
+        /* until there's a later non-quiet command. */
+
         if (cproxy_binary_cork_cmd(c)) {
             conn_set_state(c, conn_new_cmd);
         } else {
@@ -207,19 +207,19 @@ static int bin_cmd_append(bin_cmd **head, bin_cmd *bc) {
 
     *head = bc;
 
-    return n; // Returns number of items in list.
+    return n; /* Returns number of items in list. */
 }
 
 bool cproxy_binary_cork_cmd(conn *c) {
-    // Save the quiet binary command for later uncorking.
-    //
+    /* Save the quiet binary command for later uncorking. */
+
     assert(c != NULL);
     assert(c->item != NULL);
 
     bin_cmd *bc = calloc(1, sizeof(bin_cmd));
     if (bc != NULL) {
-        // Transferred the item refcount from c->item to the bin_cmd.
-        //
+        /* Transferred the item refcount from c->item to the bin_cmd. */
+
         bc->request_item = c->item;
         c->item = NULL;
 
@@ -333,11 +333,11 @@ void cproxy_dump_header(int prefix, char *bb) {
 bool cproxy_binary_ignore_reply(conn *c, protocol_binary_response_header *header, item *it) {
     if (c->noreply &&
         OPAQUE_IGNORE_REPLY == ntohl(header->response.opaque)) {
-        // Handle when the client sent an ascii noreply command,
-        // and we now need to eat the binary error responses.
-        // So, drop the current response (should be an error response)
-        // and go to read the next response message.
-        //
+        /* Handle when the client sent an ascii noreply command, */
+        /* and we now need to eat the binary error responses. */
+        /* So, drop the current response (should be an error response) */
+        /* and go to read the next response message. */
+
         if (settings.verbose > 2) {
             moxi_log_write("<%d cproxy_process_a2b_downstream_response OPAQUE_IGNORE_REPLY, "
                     "cmd: %x, status: %x, ignoring reply\n",
@@ -362,8 +362,8 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     assert(ptd->proxy != NULL);
     assert(ptd->proxy->main != NULL);
 
-    // Authenticate an upstream connection.
-    //
+    /* Authenticate an upstream connection. */
+
     protocol_binary_request_header *req =
         (protocol_binary_request_header *) req_bytes;
 
@@ -371,10 +371,10 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     int   keylen  = ntohs(req->request.keylen);
     int   bodylen = ntohl(req->request.bodylen);
 
-    // The key is the sasl mech.
-    //
+    /* The key is the sasl mech. */
+
     if (keylen != 5 ||
-        memcmp(key, "PLAIN", 5) != 0) { // 5 == strlen("PLAIN").
+        memcmp(key, "PLAIN", 5) != 0) { /* 5 == strlen("PLAIN"). */
         write_bin_error(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, 0);
         return;
     }
@@ -382,11 +382,11 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     char     *clientin    = key + keylen;
     unsigned  clientinlen = bodylen - keylen - req->request.extlen;
 
-    // The clientin string looks like "[authzid]\0username\0password".
-    //
+    /* The clientin string looks like "[authzid]\0username\0password". */
+
     while (clientinlen > 0 && clientin[0] != '\0') {
-        // Skip authzid.
-        //
+        /* Skip authzid. */
+
         clientin++;
         clientinlen--;
     }
@@ -443,9 +443,9 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
         }
     }
 
-    // TODO: If authentication failed, we should consider
-    // reassigning the connection to the NULL_BUCKET.
-    //
+    /* TODO: If authentication failed, we should consider */
+    /* reassigning the connection to the NULL_BUCKET. */
+
     write_bin_error(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, 0);
 }
 

@@ -10,8 +10,8 @@
 #include "work.h"
 #include "log.h"
 
-// Internal declarations.
-//
+/* Internal declarations. */
+
 #define KEY_TOKEN  1
 #define MAX_TOKENS 8
 
@@ -20,7 +20,7 @@ int a2a_multiget_skey(conn *c, char *skey, int skey_len, int vbucket, int key_in
 int a2a_multiget_end(conn *c);
 
 void cproxy_init_a2a() {
-    // Nothing right now.
+    /* Nothing right now. */
 }
 
 void cproxy_process_a2a_downstream(conn *c, char *line) {
@@ -54,7 +54,7 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
         uint64_t     cas = CPROXY_NOT_CAS;
 
         ntokens = scan_tokens(line, tokens, MAX_TOKENS, &clen);
-        if (ntokens >= 5 && // Accounts for extra termimation token.
+        if (ntokens >= 5 && /* Accounts for extra termimation token. */
             ntokens <= 6 &&
             tokens[KEY_TOKEN].length <= KEY_MAX_LENGTH &&
             safe_strtoul(tokens[2].value, (uint32_t *) &flags) &&
@@ -75,7 +75,7 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
 
                     conn_set_state(c, conn_nread);
 
-                    return; // Success.
+                    return; /* Success. */
                 } else {
                     if (settings.verbose > 1) {
                         moxi_log_write("cproxy could not parse cas\n");
@@ -94,16 +94,16 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
 
             it = NULL;
 
-            c->sbytes = vlen + 2; // Number of bytes to swallow.
+            c->sbytes = vlen + 2; /* Number of bytes to swallow. */
 
             conn_set_state(c, conn_swallow);
 
-            // Note, eventually, we'll see an END later.
+            /* Note, eventually, we'll see an END later. */
         } else {
-            // We don't know how much to swallow, so close the downstream.
-            // The conn_closing should release the downstream,
-            // which should write a suffix/error to the upstream.
-            //
+            /* We don't know how much to swallow, so close the downstream. */
+            /* The conn_closing should release the downstream, */
+            /* which should write a suffix/error to the upstream. */
+
             conn_set_state(c, conn_closing);
         }
     } else if (strncmp(line, "END", 3) == 0) {
@@ -111,13 +111,13 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
     } else if (strncmp(line, "OK", 2) == 0) {
         conn_set_state(c, conn_pause);
 
-        // TODO: Handle flush_all's expiration parameter against
-        // the front_cache.
-        //
-        // TODO: We flush the front_cache too often, inefficiently
-        // on every downstream flush_all OK response, rather than
-        // on just the last flush_all OK response.
-        //
+        /* TODO: Handle flush_all's expiration parameter against */
+        /* the front_cache. */
+
+        /* TODO: We flush the front_cache too often, inefficiently */
+        /* on every downstream flush_all OK response, rather than */
+        /* on just the last flush_all OK response. */
+
         conn *uc = d->upstream_conn;
         if (uc != NULL &&
             uc->cmd_curr == PROTOCOL_BINARY_CMD_FLUSH) {
@@ -133,8 +133,8 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
             assert(uc->next == NULL);
 
             if (protocol_stats_merge_line(d->merger, line) == false) {
-                // Forward the line as-is if we couldn't merge it.
-                //
+                /* Forward the line as-is if we couldn't merge it. */
+
                 int nline = strlen(line);
 
                 item *it = item_alloc("s", 1, 0, 0, nline + 2);
@@ -174,9 +174,9 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
     } else {
         conn_set_state(c, conn_pause);
 
-        // The upstream conn might be NULL when closed already
-        // or while handling a noreply.
-        //
+        /* The upstream conn might be NULL when closed already */
+        /* or while handling a noreply. */
+
         conn *uc = d->upstream_conn;
         if (uc != NULL) {
             assert(uc->next == NULL);
@@ -215,16 +215,16 @@ void cproxy_process_a2a_downstream_nread(conn *c) {
     item *it = c->item;
     assert(it != NULL);
 
-    // Clear c->item because we either move it to the upstream or
-    // item_remove() it on error.
-    //
+    /* Clear c->item because we either move it to the upstream or */
+    /* item_remove() it on error. */
+
     c->item = NULL;
 
     conn_set_state(c, conn_new_cmd);
 
-    // pthread_mutex_lock(&c->thread->stats.mutex);
-    // c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++;
-    // pthread_mutex_unlock(&c->thread->stats.mutex);
+    /* pthread_mutex_lock(&c->thread->stats.mutex); */
+    /* c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++; */
+    /* pthread_mutex_unlock(&c->thread->stats.mutex); */
 
     multiget_ascii_downstream_response(d, it);
 
@@ -311,13 +311,13 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
     assert(d->multiget == NULL);
     assert(d->merger == NULL);
 
-    // Handles get and gets.
-    //
+    /* Handles get and gets. */
+
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETK ||
         uc->cmd_curr == PROTOCOL_BINARY_CMD_GETKQ ||
         uc->cmd_curr == PROTOCOL_BINARY_CMD_GETL) {
-        // Only use front_cache for 'get', not for 'gets'.
-        //
+        /* Only use front_cache for 'get', not for 'gets'. */
+
         mcache *front_cache =
             (command[3] == ' ') ? &d->ptd->proxy->front_cache : NULL;
 
@@ -350,21 +350,21 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
         }
     }
 
-    // TODO: Inefficient repeated scan_tokens.
-    //
+    /* TODO: Inefficient repeated scan_tokens. */
+
     int      cmd_len = 0;
     token_t  tokens[MAX_TOKENS];
     size_t   ntokens = scan_tokens(command, tokens, MAX_TOKENS, &cmd_len);
     char    *key     = tokens[KEY_TOKEN].value;
     int      key_len = tokens[KEY_TOKEN].length;
 
-    if (ntokens <= 1) { // This was checked long ago, while parsing
-        assert(false);  // the upstream conn.
+    if (ntokens <= 1) { /* This was checked long ago, while parsing */
+        assert(false);  /* the upstream conn. */
         return false;
     }
 
-    // Assuming we're already connected to downstream.
-    //
+    /* Assuming we're already connected to downstream. */
+
     if (!strcmp(command, "version")) {
         /* fake key for version command handling */
         key = "v";
@@ -393,12 +393,12 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
                 } else {
                     c->write_and_go = conn_pause;
 
-                    // Do mcache_delete() here only during a noreply,
-                    // otherwise for with-reply requests, we could
-                    // be in a race with other clients repopulating
-                    // the front_cache.  For with-reply requests, we
-                    // clear the front_cache when we get a success reply.
-                    //
+                    /* Do mcache_delete() here only during a noreply, */
+                    /* otherwise for with-reply requests, we could */
+                    /* be in a race with other clients repopulating */
+                    /* the front_cache.  For with-reply requests, we */
+                    /* clear the front_cache when we get a success reply. */
+
                     cproxy_front_cache_delete(d->ptd, key, key_len);
                 }
 
@@ -504,9 +504,9 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
 
             cproxy_start_downstream_timeout(d, NULL);
         } else {
-            // TODO: Handle flush_all's expiration parameter against
-            // the front_cache.
-            //
+            /* TODO: Handle flush_all's expiration parameter against */
+            /* the front_cache. */
+
             if (strncmp(command, "flush_all", 9) == 0) {
                 mcache_flush_all(&d->ptd->proxy->front_cache, 0);
             }
@@ -531,8 +531,8 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
     assert(uc != NULL);
     assert(uc->next == NULL);
 
-    // Assuming we're already connected to downstream.
-    //
+    /* Assuming we're already connected to downstream. */
+
 
     conn *c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey, NULL);
     if (c != NULL) {
@@ -584,9 +584,9 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
                         if (cproxy_dettach_if_noreply(d, uc) == false) {
                             cproxy_start_downstream_timeout(d, c);
 
-                            // During a synchronous (with-reply) SET,
-                            // handle fire-&-forget SET optimization.
-                            //
+                            /* During a synchronous (with-reply) SET, */
+                            /* handle fire-&-forget SET optimization. */
+
                             if (cmd == NREAD_SET &&
                                 cproxy_optimize_set_ascii(d, uc,
                                                           ITEM_key(it),
@@ -607,7 +607,7 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
                 d->ptd->stats.stats.err_oom++;
                 cproxy_close_conn(c);
             } else {
-                // TODO: Handle this weird error case.
+                /* TODO: Handle this weird error case. */
             }
         } else {
             d->ptd->stats.stats.err_downstream_write_prep++;

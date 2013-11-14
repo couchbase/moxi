@@ -32,8 +32,8 @@ void matcher_start(matcher *m, char *spec) {
         pthread_mutex_lock(m->lock);
     }
 
-    // The spec currently is a string of '|' separated prefixes.
-    //
+    /* The spec currently is a string of '|' separated prefixes. */
+
     if (spec != NULL &&
         strlen(spec) > 0) {
         char *copy = strdup(spec);
@@ -114,7 +114,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
     assert(copy);
     matcher_init(copy, m->lock != NULL);
 
-    copy->patterns_max = m->patterns_num; // Optimize copy's array size.
+    copy->patterns_max = m->patterns_num; /* Optimize copy's array size. */
     copy->patterns_num = m->patterns_num;
 
     if (copy->patterns_max > 0) {
@@ -133,7 +133,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
 
                 copy->lengths[i] = m->lengths[i];
 
-                // Note we don't copy statistics.
+                /* Note we don't copy statistics. */
             }
 
             if (m->lock)
@@ -166,7 +166,7 @@ void matcher_add(matcher *m, char *pattern) {
     }
 
     if (m->patterns_num >= m->patterns_max) {
-        int    nmax = (m->patterns_num * 2) + 4; // 4 is slop when 0.
+        int    nmax = (m->patterns_num * 2) + 4; /* 4 is slop when 0. */
         char **npatterns = realloc(m->patterns, nmax * sizeof(char *));
         int   *nlengths  = realloc(m->lengths,  nmax * sizeof(int));
         uint64_t *nhits  = realloc(m->hits,     nmax * sizeof(uint64_t));
@@ -182,7 +182,7 @@ void matcher_add(matcher *m, char *pattern) {
             free(nlengths);
             free(nhits);
 
-            return; // Failed to alloc.
+            return; /* Failed to alloc. */
         }
     }
 

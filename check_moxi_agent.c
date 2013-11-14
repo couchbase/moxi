@@ -53,15 +53,15 @@ START_TEST(test_first_config)
 {
   kvpair_t *head = mk_kvpair("pools", empty);
 
-  // No crash on weak config.
-  //
+  /* No crash on weak config. */
+
   on_conflate_new_config(pmain, head);
   on_conflate_new_config(pmain, head);
 
   fail_unless(pmain->proxy_head == NULL, "pools empty");
 
-  // Add a pool.
-  //
+  /* Add a pool. */
+
   char *ca[] = {
     "pools",
     "poolx",
@@ -235,7 +235,7 @@ void randomize_uint64t_struct(void *_ptr, struct field_description *desc,
 static
 proxy_stats_td gathered_stats;
 
-static char *cmd_names[] = { // Keep sync'ed with enum_stats_cmd.
+static char *cmd_names[] = { /* Keep sync'ed with enum_stats_cmd. */
     "get",
     "get_key",
     "set",
@@ -350,9 +350,9 @@ START_TEST(test_cmd_stats_gathering)
   kvpair_t *c = mk_kvpairs(ca);
   int i,j,t;
 
-  // we're hardcoding knowledge of all commands and command types here.
-  // this assertions ensure that the tests will be updated when
-  // anything of the above will change
+  /* we're hardcoding knowledge of all commands and command types here. */
+  /* this assertions ensure that the tests will be updated when */
+  /* anything of the above will change */
   ck_assert(STATS_CMD_ERROR + 1 == STATS_CMD_last);
   ck_assert(STATS_CMD_TYPE_QUIET + 1 == STATS_CMD_TYPE_last);
 
@@ -456,8 +456,8 @@ START_TEST(test_easy_reconfig)
                      "localhost") == 0, "fc");
   fail_unless(pmain->proxy_head->behavior_pool.arr[0].port == 11211, "fc");
 
-  // Reconfig to d.
-  //
+  /* Reconfig to d. */
+
   char *da[] = {
     "pools",
     "poolx",
@@ -487,8 +487,8 @@ START_TEST(test_easy_reconfig)
                      "host1") == 0, "fc");
   fail_unless(pmain->proxy_head->behavior_pool.arr[0].port == 11111, "fc");
 
-  // Reconfig to e.
-  //
+  /* Reconfig to e. */
+
   char *ea[] = {
     "pools",
     "poolx",
@@ -527,8 +527,8 @@ START_TEST(test_easy_reconfig)
                      "mc2") == 0, "fc");
   fail_unless(pmain->proxy_head->behavior_pool.arr[1].port == 2222, "fc");
 
-  // Go back to d
-  //
+  /* Go back to d */
+
   on_conflate_new_config(pmain, d);
 
   fail_if(pmain->proxy_head == NULL, "fc");
@@ -551,8 +551,8 @@ void setup(void)
   proxy_behavior pbg = behavior_default_g;
 
   unlink("t/check_moxi_agent.cfg");
-  pmain = cproxy_init_agent_start("check_moxi_agent@localhost", // Fake JID.
-                  "password",                   // Fake password.
+  pmain = cproxy_init_agent_start("check_moxi_agent@localhost", /* Fake JID. */
+                  "password",                   /* Fake password. */
                   "t/check_moxi_agent.cfg",
                   NULL,
                   pbg,

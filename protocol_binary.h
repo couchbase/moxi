@@ -121,7 +121,7 @@ extern "C"
     PROTOCOL_BINARY_CMD_SASL_AUTH = 0x21,
     PROTOCOL_BINARY_CMD_SASL_STEP = 0x22,
 
-    PROTOCOL_BINARY_CMD_BUCKET = 0x2a, // TODO: This is not seen in memcached's protocol_binary.h.
+    PROTOCOL_BINARY_CMD_BUCKET = 0x2a, /* TODO: This is not seen in memcached's protocol_binary.h. */
 
     /* These commands are used for range operations and exist within
      * this header for use in other projects.  Range operations are

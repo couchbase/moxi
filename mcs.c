@@ -13,12 +13,12 @@
 #include "mcs.h"
 #include "log.h"
 
-// TODO: This timeout is inherited from zstored, but use it where?
-//
+/* TODO: This timeout is inherited from zstored, but use it where? */
+
 #define DOWNSTREAM_DEFAULT_LINGER 1000
 
-// The lvb stands for libvbucket.
-//
+/* The lvb stands for libvbucket. */
+
 mcs_st  *lvb_create(mcs_st *ptr, const char *config,
                     const char *default_usr,
                     const char *default_pwd,
@@ -30,8 +30,8 @@ uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
 void     lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
                                     int vbucket);
 
-// The lmc stands for libmemcached.
-//
+/* The lmc stands for libmemcached. */
+
 mcs_st  *lmc_create(mcs_st *ptr, const char *config,
                     const char *default_usr,
                     const char *default_pwd,
@@ -40,7 +40,7 @@ void     lmc_free_data(mcs_st *ptr);
 uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length,
                       int *vbucket);
 
-// ----------------------------------------------------------------------
+/* ---------------------------------------------------------------------- */
 
 mcs_st *mcs_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
@@ -93,7 +93,7 @@ bool mcs_stable_update(mcs_st *curr_version, mcs_st *next_version) {
         return lvb_stable_update(curr_version, next_version);
     }
 
-    // TODO: MCS_KIND_LIBMEMCACHED impl for stable update.
+    /* TODO: MCS_KIND_LIBMEMCACHED impl for stable update. */
 
     return false;
 }
@@ -124,7 +124,7 @@ void mcs_server_invalid_vbucket(mcs_st *ptr, int server_index,
     }
 }
 
-// ----------------------------------------------------------------------
+/* ---------------------------------------------------------------------- */
 
 mcs_st *lvb_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
@@ -277,7 +277,7 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
 }
 
 
-// ----------------------------------------------------------------------
+/* ---------------------------------------------------------------------- */
 
 mcs_st *lmc_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
@@ -384,13 +384,13 @@ uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbuc
     return memcached_generate_hash((memcached_st *) ptr->data, key, key_length);
 }
 
-// ----------------------------------------------------------------------
+/* ---------------------------------------------------------------------- */
 
 void mcs_server_st_quit(mcs_server_st *ptr, uint8_t io_death) {
     (void) io_death;
 
-    // TODO: Should send QUIT cmd.
-    //
+    /* TODO: Should send QUIT cmd. */
+
     if (ptr->fd != -1) {
         close(ptr->fd);
     }
@@ -438,11 +438,11 @@ int mcs_connect(const char *hostname, int portnum,
     int error = getaddrinfo(hostname, port, &hints, &ai);
     if (error != 0) {
         if (error != EAI_SYSTEM) {
-            // settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL,
-            //                                 "getaddrinfo(): %s\n", gai_strerror(error));
+            /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
+            /*                                 "getaddrinfo(): %s\n", gai_strerror(error)); */
         } else {
-            // settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL,
-            //                                 "getaddrinfo(): %s\n", strerror(error));
+            /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
+            /*                                 "getaddrinfo(): %s\n", strerror(error)); */
         }
 
         return -1;
@@ -451,15 +451,15 @@ int mcs_connect(const char *hostname, int portnum,
     for (next = ai; next; next = next->ai_next) {
         int sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (sock == -1) {
-            // settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL,
-            //                                 "Failed to create socket: %s\n",
-            //                                 strerror(errno));
+            /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
+            /*                                 "Failed to create socket: %s\n", */
+            /*                                 strerror(errno)); */
             continue;
         }
 
-        // If the caller wants non-blocking, set the sock options
-        // now so even the connect() becomes non-blocking.
-        //
+        /* If the caller wants non-blocking, set the sock options */
+        /* now so even the connect() becomes non-blocking. */
+
         if (!blocking && (mcs_set_sock_opt(sock) != MCS_SUCCESS)) {
             close(sock);
             continue;
@@ -482,9 +482,9 @@ int mcs_connect(const char *hostname, int portnum,
                 break;
             }
 
-            // settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL,
-            //                                 "Failed to connect socket: %s\n",
-            //                                 strerror(errno));
+            /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
+            /*                                 "Failed to connect socket: %s\n", */
+            /*                                 strerror(errno)); */
             close(sock);
             continue;
         }
@@ -585,7 +585,7 @@ ssize_t mcs_io_write(int fd, const void *buffer, size_t length) {
 }
 
 mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
-    struct timeval my_timeout; // Linux select() modifies its timeout param.
+    struct timeval my_timeout; /* Linux select() modifies its timeout param. */
     struct timeval *timeout = NULL;
 
     if (timeout_in != NULL &&
@@ -630,7 +630,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
 void mcs_io_reset(int fd) {
     (void) fd;
 
-    // TODO: memcached_io_reset(ptr);
+    /* TODO: memcached_io_reset(ptr); */
 }
 
 const char *mcs_server_st_hostname(mcs_server_st *ptr) {

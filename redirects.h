@@ -20,7 +20,7 @@ void redirected_conflate_add_field_multi(conflate_form_result *r, const char *k,
 void redirected_conflate_next_fieldset(conflate_form_result *r);
 void redirected_conflate_init_form(conflate_form_result *r);
 
-#endif // HAVE_CONFLATE_H
+#endif /* HAVE_CONFLATE_H */
 
 struct main_stats_collect_info;
 

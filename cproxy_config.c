@@ -14,8 +14,8 @@
 #include "work.h"
 #include "log.h"
 
-// Local declarations.
-//
+/* Local declarations. */
+
 static char *readfile(char *path);
 
 volatile uint64_t  msec_current_time = 0;
@@ -23,7 +23,7 @@ int                msec_cycle = 0;
 struct event       msec_clockevent;
 struct event_base *msec_clockevent_base = NULL;
 
-char cproxy_hostname[300] = {0}; // Immutable after init.
+char cproxy_hostname[300] = {0}; /* Immutable after init. */
 
 void msec_clock_handler(const int fd, const short which, void *arg);
 void msec_set_current_time(void);
@@ -41,9 +41,9 @@ int cproxy_init_mcmux_mode(int proxy_port,
                            int nthreads);
 
 proxy_behavior behavior_default_g = {
-    .cycle = 200, // Clock cycle or quantum, in milliseconds.
+    .cycle = 200, /* Clock cycle or quantum, in milliseconds. */
     .downstream_max = 1024,
-    .downstream_conn_max = 4, // Use 0 for unlimited.
+    .downstream_conn_max = 4, /* Use 0 for unlimited. */
     .downstream_weight = 0,
     .downstream_retry = 1,
     .downstream_protocol = proxy_downstream_ascii_prot,
@@ -69,8 +69,8 @@ proxy_behavior behavior_default_g = {
     },
     .time_stats = false,
     .mcs_opts = {0},
-    .connect_max_errors = 5,         // In zstored, 10.
-    .connect_retry_interval = 30000, // In zstored, 30000.
+    .connect_max_errors = 5,         /* In zstored, 10. */
+    .connect_retry_interval = 30000, /* In zstored, 30000. */
     .front_cache_max = 200,
     .front_cache_lifespan = 0,
     .front_cache_spec = {0},
@@ -223,7 +223,7 @@ bool wordeq(char *s, char *word) {
     return strncmp(s, word, end - s) == 0;
 }
 
-// ---------------------------------------
+/* --------------------------------------- */
 
 static bool cproxy_core_initted = false;
 
@@ -247,7 +247,7 @@ int cproxy_init(char *cfg_str,
                 char *behavior_str,
                 int nthreads,
                 struct event_base *main_base) {
-    assert(nthreads > 1); // Main + at least one worker.
+    assert(nthreads > 1); /* Main + at least one worker. */
     assert(nthreads == settings.num_threads);
 
     if (cproxy_core_initted == false) {
@@ -302,8 +302,8 @@ int cproxy_init(char *cfg_str,
         behavior_str = "";
     }
 
-    // The vbucket feature only works in binary protocol.
-    //
+    /* The vbucket feature only works in binary protocol. */
+
     behavior_default_g.downstream_protocol = proxy_downstream_binary_prot;
 
     char *env_usr = getenv("MOXI_SASL_PLAIN_USR");
@@ -341,9 +341,9 @@ int cproxy_init(char *cfg_str,
                                       nthreads);
     }
 
-    // Not jid format and not a URL, so it must be a simple cmd-line
-    // or file-based config.
-    //
+    /* Not jid format and not a URL, so it must be a simple cmd-line */
+    /* or file-based config. */
+
     if (strchr(cfg_str, '@') == NULL &&
         strstr(cfg_str, "http://") == NULL) {
         return cproxy_init_string(cfg_str,
@@ -370,7 +370,7 @@ int cproxy_init_mcmux_mode(int proxy_port,
         cproxy_dump_behavior(&behavior, "init_string", 2);
     }
 
-    int behaviors_num = 1; // Number of servers.
+    int behaviors_num = 1; /* Number of servers. */
     proxy_behavior_pool behavior_pool;
     memset(&behavior_pool, 0, sizeof(proxy_behavior_pool));
 
@@ -395,7 +395,7 @@ int cproxy_init_mcmux_mode(int proxy_port,
                 proxy_name,
                 proxy_port,
                 "mcmux_config",
-                0, // config_ver.
+                0, /* config_ver. */
                 &behavior_pool,
                 nthreads);
         if (p != NULL) {
@@ -470,7 +470,7 @@ int cproxy_init_string(char *cfg_str,
         }
         proxy_sect = trimstr(proxy_sect);
 
-        int behaviors_num = 1; // Number of servers.
+        int behaviors_num = 1; /* Number of servers. */
         for (char *x = proxy_sect; *x != '\0'; x++) {
             if (*x == ',') {
                 behaviors_num++;
@@ -501,7 +501,7 @@ int cproxy_init_string(char *cfg_str,
                                      proxy_name,
                                      proxy_port,
                                      proxy_sect,
-                                     0, // config_ver.
+                                     0, /* config_ver. */
                                      &behavior_pool,
                                      nthreads);
             if (p != NULL) {
@@ -566,8 +566,8 @@ proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior, int nthreads,
 
 proxy_behavior cproxy_parse_behavior(char          *behavior_str,
                                      proxy_behavior behavior_default) {
-    // These are the default proxy behaviors.
-    //
+    /* These are the default proxy behaviors. */
+
     struct proxy_behavior behavior = behavior_default;
 
     if (behavior_str == NULL ||
@@ -575,8 +575,8 @@ proxy_behavior cproxy_parse_behavior(char          *behavior_str,
         return behavior;
     }
 
-    // Parse the key-value behavior_str, to override the defaults.
-    //
+    /* Parse the key-value behavior_str, to override the defaults. */
+
     char *buff = trimstrdup(behavior_str);
     char *next = buff;
 
@@ -749,7 +749,7 @@ void cproxy_parse_behavior_key_val(char *key,
                 strcpy(behavior->default_bucket_name, val);
                 ok = true;
             }
-        } else if (key[0] == '#') { // Comment.
+        } else if (key[0] == '#') { /* Comment. */
             ok = true;
         } else {
             if (settings.verbose > 1) {
@@ -853,21 +853,21 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
     vdump("downstream_weight",   "%u", b->downstream_weight);
     vdump("downstream_retry",    "%u", b->downstream_retry);
     vdump("downstream_protocol", "%d", b->downstream_protocol);
-    vdump("downstream_timeout", "%ld", // In millisecs.
+    vdump("downstream_timeout", "%ld", /* In millisecs. */
           (b->downstream_timeout.tv_sec * 1000 +
            b->downstream_timeout.tv_usec / 1000));
-    vdump("downstream_conn_queue_timeout", "%ld", // In millisecs.
+    vdump("downstream_conn_queue_timeout", "%ld", /* In millisecs. */
           (b->downstream_conn_queue_timeout.tv_sec * 1000 +
            b->downstream_conn_queue_timeout.tv_usec / 1000));
 
     if (level >= 1) {
-        vdump("wait_queue_timeout", "%ld", // In millisecs.
+        vdump("wait_queue_timeout", "%ld", /* In millisecs. */
               (b->wait_queue_timeout.tv_sec * 1000 +
                b->wait_queue_timeout.tv_usec / 1000));
-        vdump("connect_timeout", "%ld", // In millisecs.
+        vdump("connect_timeout", "%ld", /* In millisecs. */
               (b->connect_timeout.tv_sec * 1000 +
                b->connect_timeout.tv_usec / 1000));
-        vdump("auth_timeout", "%ld", // In millisecs.
+        vdump("auth_timeout", "%ld", /* In millisecs. */
               (b->auth_timeout.tv_sec * 1000 +
                b->auth_timeout.tv_usec / 1000));
         vdump("time_stats", "%d", b->time_stats);
@@ -912,7 +912,7 @@ void cproxy_dump_behavior_stderr(const void *dump_opaque,
             prefix, key, val);
 }
 
-// ---------------------------------------
+/* --------------------------------------- */
 
 uint64_t usec_now(void) {
     struct timeval timer;
@@ -939,8 +939,8 @@ void msec_clock_handler(const int fd, const short which, void *arg) {
         return;
     }
 
-    // Subsecond resolution timer.
-    //
+    /* Subsecond resolution timer. */
+
     struct timeval t = { .tv_sec = 0,
                          .tv_usec = msec_cycle * 1000 };
 
@@ -960,7 +960,7 @@ void msec_clock_handler(const int fd, const short which, void *arg) {
     msec_set_current_time();
 }
 
-// ---------------------------------------
+/* --------------------------------------- */
 
 static char *readfile(char *path) {
     FILE *fp = fopen(path, "r");

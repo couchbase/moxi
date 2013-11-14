@@ -17,11 +17,11 @@
 #ifndef CONFIG_STATIC_H
 #define CONFIG_STATIC_H 1
 
-// The intention of this file is to avoid cluttering the code with #ifdefs
+/* The intention of this file is to avoid cluttering the code with #ifdefs */
 #include <sys/types.h>
 
 #ifdef WIN32
-// HAVE_CONFIG_H is causing problems with pthreads.h on in32
+/* HAVE_CONFIG_H is causing problems with pthreads.h on in32 */
 #undef HAVE_CONFIG_H
 
 #define _WIN32_WINNT    0x0501

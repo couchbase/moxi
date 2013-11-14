@@ -16,9 +16,9 @@
 #endif
 #endif
 
-// The mcs API's are a level of indirection from direct libmemcached
-// and libvbucket API usage.
-//
+/* The mcs API's are a level of indirection from direct libmemcached */
+/* and libvbucket API usage. */
+
 typedef enum {
     MCS_SUCCESS = 0,
     MCS_FAILURE,
@@ -41,14 +41,14 @@ typedef struct {
     int fd;
     char *usr;
     char *pwd;
-    char ident_a[MCS_IDENT_SIZE]; // A string suitable as a hash key, ascii protocol.
-    char ident_b[MCS_IDENT_SIZE]; // A string suitable as a hash key, binary protocol.
+    char ident_a[MCS_IDENT_SIZE]; /* A string suitable as a hash key, ascii protocol. */
+    char ident_b[MCS_IDENT_SIZE]; /* A string suitable as a hash key, binary protocol. */
 } mcs_server_st;
 
 typedef struct {
     mcs_kind       kind;
-    void          *data;     // Depends on kind.
-    int            nservers; // Size of servers array.
+    void          *data;     /* Depends on kind. */
+    int            nservers; /* Size of servers array. */
     mcs_server_st *servers;
 } mcs_st;
 
@@ -90,16 +90,16 @@ mcs_return mcs_set_sock_opt(int sock);
 int mcs_connect(const char *hostname, int portnum,
                 int *errno_out, bool blocking);
 
-// ----------------------------------------
+/* ---------------------------------------- */
 
 #define MOXI_DEFAULT_LISTEN_PORT      0
 #define MEMCACHED_DEFAULT_LISTEN_PORT 11210
 
-// ----------------------------------------
+/* ---------------------------------------- */
 
 #include <libmemcached/memcached.h>
 
-// ----------------------------------------
+/* ---------------------------------------- */
 
 
 #include <libvbucket/vbucket.h>
@@ -110,4 +110,4 @@ int mcs_connect(const char *hostname, int portnum,
 #undef  MEMCACHED_DEFAULT_LISTEN_PORT
 #define MEMCACHED_DEFAULT_LISTEN_PORT 0
 
-#endif // MCS_H
+#endif /* MCS_H */

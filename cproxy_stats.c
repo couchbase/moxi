@@ -11,11 +11,11 @@
 #include "work.h"
 #include "log.h"
 
-// Protocol STATS command handling.
-//
-// Special STATS value merging rules, instead of the
-// default to just sum the values.  Note the trailing space.
-//
+/* Protocol STATS command handling. */
+
+/* Special STATS value merging rules, instead of the */
+/* default to just sum the values.  Note the trailing space. */
+
 char *protocol_stats_keys_first =
     "pid version libevent "
     "ep_version ep_dbname ep_storage_type ep_flusher_state ep_warmup_thread ";
@@ -28,7 +28,7 @@ char *protocol_stats_keys_smallest =
     "accepting_conns "
     ":chunk_size "
     ":chunk_per_page "
-    ":age "; // TODO: Should age merge be largest, not smallest?
+    ":age "; /* TODO: Should age merge be largest, not smallest? */
 
 bool protocol_stats_merge_sum(char *v1, int v1len,
                               char *v2, int v2len,
@@ -40,8 +40,8 @@ bool protocol_stats_merge_smallest(char *v1, int v1len,
 int count_dot_pair(char *x, int xlen, char *y, int ylen);
 int count_dot(char *x, int len);
 
-// Per-key stats.
-//
+/* Per-key stats. */
+
 static char *key_stats_key(void *it);
 static int key_stats_key_len(void *it);
 static int key_stats_len(void *it);
@@ -76,7 +76,7 @@ bool protocol_stats_merge_line(genhash_t *merger, char *line) {
     assert(merger != NULL);
     assert(line != NULL);
 
-    int nline = strlen(line); // Ex: "STATS uptime 123455"
+    int nline = strlen(line); /* Ex: "STATS uptime 123455" */
     if (nline <= 0 ||
         nline >= MERGE_BUF_SIZE) {
         return false;
@@ -85,7 +85,7 @@ bool protocol_stats_merge_line(genhash_t *merger, char *line) {
     token_t tokens[MAX_TOKENS];
     size_t  ntokens = scan_tokens(line, tokens, MAX_TOKENS, NULL);
 
-    if (ntokens != 4) { // 3 + 1 for the terminal token.
+    if (ntokens != 4) { /* 3 + 1 for the terminal token. */
         return false;
     }
 
@@ -107,8 +107,8 @@ bool protocol_stats_merge_line(genhash_t *merger, char *line) {
                                          tokens[VALUE_TOKEN].length);
 }
 
-// TODO: The stats merge assumes an ascii upstream.
-//
+/* TODO: The stats merge assumes an ascii upstream. */
+
 bool protocol_stats_merge_name_val(genhash_t *merger,
                                    char *prefix,
                                    int   prefix_len,
@@ -120,8 +120,8 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
     assert(name);
     assert(val);
 
-    char *key = name + name_len - 1;     // Key part for merge rule lookup.
-    while (key >= name && *key != ':') { // Scan for last colon.
+    char *key = name + name_len - 1;     /* Key part for merge rule lookup. */
+    while (key >= name && *key != ':') { /* Scan for last colon. */
         key--;
     }
     if (key < name) {
@@ -211,9 +211,9 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
             }
         }
 
-        // Note, if we couldn't merge, then just keep
-        // the previous value.
-        //
+        /* Note, if we couldn't merge, then just keep */
+        /* the previous value. */
+
         return true;
     }
 
@@ -362,7 +362,7 @@ int count_dot_pair(char *x, int xlen, char *y, int ylen) {
     return (xdot > ydot ? xdot : ydot);
 }
 
-int count_dot(char *x, int len) { // Number of '.' chars in a string.
+int count_dot(char *x, int len) { /* Number of '.' chars in a string. */
     int dot = 0;
 
     for (char *end = x + len; x < end; x++) {
@@ -373,7 +373,7 @@ int count_dot(char *x, int len) { // Number of '.' chars in a string.
     return dot;
 }
 
-// ----------------------------------------
+/* ---------------------------------------- */
 
 void cproxy_reset_stats_td(proxy_stats_td *pstd) {
     assert(pstd);
@@ -390,8 +390,8 @@ void cproxy_reset_stats_td(proxy_stats_td *pstd) {
 void cproxy_reset_stats(proxy_stats *ps) {
     assert(ps);
 
-    // Only clear the tot_xxx stats, not the num_xxx ones.
-    //
+    /* Only clear the tot_xxx stats, not the num_xxx ones. */
+
     ps->tot_upstream = 0;
     ps->tot_downstream_conn = 0;
     ps->tot_downstream_conn_acquired = 0;
@@ -449,7 +449,7 @@ void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
     memset(sc, 0, sizeof(proxy_stats_cmd));
 }
 
-// -------------------------------------------------
+/* ------------------------------------------------- */
 
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
                           uint64_t msec_time) {
@@ -501,7 +501,7 @@ void touch_key_stats(proxy_td *ptd, char *key, int key_len,
     }
 }
 
-// -------------------------------------------------
+/* ------------------------------------------------- */
 
 static char *key_stats_key(void *it) {
     key_stats *i = it;
