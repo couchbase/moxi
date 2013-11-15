@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <poll.h>
+#include <limits.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "mcs.h"
@@ -584,35 +586,60 @@ ssize_t mcs_io_write(int fd, const void *buffer, size_t length) {
     return write(fd, buffer, length);
 }
 
-mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
-    struct timeval my_timeout; /* Linux select() modifies its timeout param. */
-    struct timeval *timeout = NULL;
+static unsigned long long __get_time_ms(const struct timeval *tv) {
+    struct timeval now;
 
-    if (timeout_in != NULL &&
-        (timeout_in->tv_sec != 0 ||
-         timeout_in->tv_usec != 0)) {
-        my_timeout = *timeout_in;
-        timeout = &my_timeout;
+    if (tv == NULL) {
+        if (gettimeofday(&now, NULL) != 0) {
+            return 0;
+        }
+        tv = &now;
+    }
+    return (unsigned long long)tv->tv_sec * 1000 + (unsigned long long)tv->tv_usec / 1000;
+}
+
+mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
+    unsigned long long start_ms = 0;
+    unsigned long long timeout_ms = 0;
+    unsigned long long now_ms = 0;
+
+    if (timeout_in != NULL) {
+        start_ms = __get_time_ms(NULL);
+        timeout_ms = __get_time_ms(timeout_in);
+        now_ms = start_ms;
     }
 
     char *data = dta;
     size_t done = 0;
+    struct pollfd pfd[1];
 
     while (done < size) {
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(fd, &readfds);
+        pfd[0].fd = fd;
+        pfd[0].events = POLLIN;
+        pfd[0].revents = 0;
 
-        fd_set errfds;
-        FD_ZERO(&errfds);
-        FD_SET(fd, &errfds);
-
-        int s = select(fd + 1, &readfds, NULL, &errfds, timeout);
+        int timeout = INFTIM;
+        if (timeout_in != NULL) {
+            if (timeout_ms == 0) {
+                /* ensure we poll at least once. */
+                timeout = 0;
+            } else {
+                unsigned long long taken_ms = now_ms - start_ms;
+                if (taken_ms >= timeout_ms) {
+                    /* just check (boundary case). */
+                    timeout = 0;
+                } else {
+                    unsigned long long left_ms = timeout_ms - taken_ms;
+                    timeout = (left_ms > INT_MAX) ? INT_MAX : left_ms;
+                }
+            }
+        }
+        int s = poll(pfd, 1, timeout);
         if (s == 0) {
             return MCS_TIMEOUT;
         }
 
-        if (s != 1 || FD_ISSET(fd, &errfds) || !FD_ISSET(fd, &readfds)) {
+        if (s != 1 || (pfd[0].revents & (POLLERR|POLLHUP|POLLNVAL)) || !(pfd[0].revents & POLLIN)) {
             return MCS_FAILURE;
         }
 
@@ -622,6 +649,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
         }
 
         done += (size_t) n;
+        now_ms = __get_time_ms(NULL);
     }
 
     return MCS_SUCCESS;
