@@ -1,3 +1,8 @@
+#include <platform/platform.h>
+
+#ifndef MOXI_UTIL_H
+#define MOXI_UTIL_H
+
 /*
  * Wrappers around strtoull/strtoll that are safer and easier to
  * use.  For tests and assumptions, see internal_tests.c.
@@ -66,5 +71,4 @@ void vperror(const char *fmt, ...)
 
 #undef __gcc_attribute__
 
-uint64_t ntohll(uint64_t value);
-uint64_t htonll(uint64_t value);
+#endif
