@@ -155,19 +155,19 @@ static
 void collect_memcached_stats_for_proxy(struct main_stats_collect_info *msci,
                                        const char *proxy_name, int proxy_port) {
     memcached_st mst;
+    memcached_return error;
+    memcached_stat_st *st;
+    char bufk[500];
 
     memcached_create(&mst);
     memcached_server_add(&mst, "127.0.0.1", proxy_port);
     memcached_behavior_set(&mst, MEMCACHED_BEHAVIOR_TCP_NODELAY, 1);
 
-    memcached_return error;
-    memcached_stat_st *st = memcached_stat(&mst, NULL, &error);
+    st = memcached_stat(&mst, NULL, &error);
 
     if (st == NULL) {
         goto out_free;
     }
-
-    char bufk[500];
 
 #define emit_s(key, val)                                 \
     snprintf(bufk, sizeof(bufk), "%u:%s:stats:%s",       \
@@ -175,16 +175,18 @@ void collect_memcached_stats_for_proxy(struct main_stats_collect_info *msci,
              proxy_name != NULL ? proxy_name : "", key); \
     conflate_add_field(msci->result, bufk, val);
 
-    char **keys = memcached_stat_get_keys(&mst, st, &error);
-    for (; *keys; keys++) {
-        char *key = *keys;
-        char *value = memcached_stat_get_value(&mst, st, key, &error);
-        if (value == NULL) {
-            continue;
-        }
+    {
+        char **keys = memcached_stat_get_keys(&mst, st, &error);
+        for (; *keys; keys++) {
+            char *key = *keys;
+            char *value = memcached_stat_get_value(&mst, st, key, &error);
+            if (value == NULL) {
+                continue;
+            }
 
-        emit_s(key, value);
-        free(value);
+            emit_s(key, value);
+            free(value);
+        }
     }
 #undef emit_s
 
@@ -212,6 +214,14 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
                                                    kvpair_t *form,
                                                    conflate_form_result *r)
 {
+    proxy_main *m = userdata;
+    LIBEVENT_THREAD *mthread;
+    char *type;
+    bool do_all;
+    struct main_stats_collect_info msci;
+    char buf[800];
+    work_collect *ca;
+
     (void)handle;
     (void)cmd;
     (void)direct;
@@ -219,33 +229,29 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
     assert(STATS_CMD_last      == sizeof(cmd_names) / sizeof(char *));
     assert(STATS_CMD_TYPE_last == sizeof(cmd_type_names) / sizeof(char *));
 
-    proxy_main *m = userdata;
     assert(m);
     assert(m->nthreads > 1);
 
-    LIBEVENT_THREAD *mthread = thread_by_index(0);
+    mthread = thread_by_index(0);
     assert(mthread);
     assert(mthread->work_queue);
 
-    char *type = get_simple_kvpair_val(form, "-subtype-");
-    bool do_all = (type == NULL ||
-                   strlen(type) <= 0 ||
-                   strcmp(type, "all") == 0);
+    type = get_simple_kvpair_val(form, "-subtype-");
+    do_all = (type == NULL ||
+              strlen(type) <= 0 ||
+              strcmp(type, "all") == 0);
 
-    struct main_stats_collect_info msci = {
-        .m        = m,
-        .result   = r,
-        .prefix   = "",
-        .type     = type,
-        .do_settings = (do_all || strcmp(type, "settings") == 0),
-        .do_stats    = (do_all || strcmp(type, "stats") == 0),
-        .do_zeros    = (type != NULL &&
-                        strcmp(type, "all") == 0), /* Only when explicit "all". */
+    memset(&msci, 0, sizeof(msci));
+    msci.m        = m;
+    msci.result   = r;
+    msci.prefix   = "";
+    msci.type     = type;
+    msci.do_settings = (do_all || strcmp(type, "settings") == 0);
+    msci.do_stats    = (do_all || strcmp(type, "stats") == 0);
+    msci.do_zeros    = (type != NULL &&
+                        strcmp(type, "all") == 0); /* Only when explicit "all". */
         /* .nproxy   = 0, */
-        .proxies = 0
-    };
-
-    char buf[800];
+    msci.proxies = 0;
 
 #define more_stat(spec, key, val)              \
     if (msci.do_zeros || val) {                \
@@ -266,18 +272,18 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
     }
 
     if (msci.do_stats) {
-        more_stat("%llu", "main_configs",
-                  (long long unsigned int) m->stat_configs);
-        more_stat("%llu", "main_config_fails",
-                  (long long unsigned int) m->stat_config_fails);
-        more_stat("%llu", "main_proxy_starts",
-                  (long long unsigned int) m->stat_proxy_starts);
-        more_stat("%llu", "main_proxy_start_fails",
-                  (long long unsigned int) m->stat_proxy_start_fails);
-        more_stat("%llu", "main_proxy_existings",
-                  (long long unsigned int) m->stat_proxy_existings);
-        more_stat("%llu", "main_proxy_shutdowns",
-                  (long long unsigned int) m->stat_proxy_shutdowns);
+        more_stat("%"PRIu64, "main_configs",
+                  (uint64_t) m->stat_configs);
+        more_stat("%"PRIu64, "main_config_fails",
+                  (uint64_t) m->stat_config_fails);
+        more_stat("%"PRIu64, "main_proxy_starts",
+                  (uint64_t) m->stat_proxy_starts);
+        more_stat("%"PRIu64, "main_proxy_start_fails",
+                  (uint64_t) m->stat_proxy_start_fails);
+        more_stat("%"PRIu64, "main_proxy_existings",
+                  (uint64_t) m->stat_proxy_existings);
+        more_stat("%"PRIu64, "main_proxy_shutdowns",
+                  (uint64_t) m->stat_proxy_shutdowns);
     }
 
 #undef more_stat
@@ -298,7 +304,7 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
 
     /* Alloc here so the main listener thread has less work. */
 
-    work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
+    ca = calloc(m->nthreads, sizeof(work_collect));
     if (ca != NULL) {
         int i;
 
@@ -350,12 +356,14 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
                     for (i = 2; i < m->nthreads; i++) {
                         struct stats_gathering_pair *pair = ca[i].data;
                         genhash_t *map_pstd = pair->map_pstd;
+                        genhash_t *map_key_stats;
+
                         if (map_pstd != NULL) {
                             genhash_iter(map_pstd, map_pstd_foreach_merge,
                                          end_pstd);
                         }
 
-                        genhash_t *map_key_stats = pair->map_key_stats;
+                        map_key_stats = pair->map_key_stats;
                         if (map_key_stats != NULL) {
                             genhash_iter(map_key_stats,
                                          map_key_stats_foreach_merge,
@@ -379,16 +387,18 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
         free(msci.proxies);
 
         for (i = 1; i < m->nthreads; i++) {
+            genhash_t *map_key_stats;
+            genhash_t *map_pstd;
             struct stats_gathering_pair *pair = ca[i].data;
             if (!pair) {
                 continue;
             }
-            genhash_t *map_pstd = pair->map_pstd;
+            map_pstd = pair->map_pstd;
             if (map_pstd != NULL) {
                 genhash_iter(map_pstd, genhash_free_entry, NULL);
                 genhash_free(map_pstd);
             }
-            genhash_t *map_key_stats = pair->map_key_stats;
+            map_key_stats = pair->map_key_stats;
             if (map_key_stats != NULL) {
                 genhash_iter(map_key_stats, map_key_stats_foreach_free, NULL);
                 genhash_free(map_key_stats);
@@ -420,13 +430,14 @@ void map_pstd_foreach_merge(const void *key,
 void map_key_stats_foreach_free(const void *key,
                                 const void *value,
                                 void *user_data) {
+    genhash_t *map_key_stats;
     (void)user_data;
     assert(key);
     assert(value);
 
     free((void *)key);
 
-    genhash_t *map_key_stats = (genhash_t *)value;
+    map_key_stats = (genhash_t *)value;
     genhash_iter(map_key_stats, genhash_free_entry, NULL);
     genhash_free(map_key_stats);
 }
@@ -513,25 +524,25 @@ static void proxy_stats_dump_frontcache(ADD_STAT add_stats, conn *c,
     APPEND_PREFIX_STAT("max", "%u", p->front_cache.max);
     APPEND_PREFIX_STAT("oldest_live", "%u", p->front_cache.oldest_live);
     APPEND_PREFIX_STAT("tot_get_hits",
-           "%llu", (long long unsigned int) p->front_cache.tot_get_hits);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_get_hits);
     APPEND_PREFIX_STAT("tot_get_expires",
-           "%llu", (long long unsigned int) p->front_cache.tot_get_expires);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_get_expires);
     APPEND_PREFIX_STAT("tot_get_misses",
-           "%llu", (long long unsigned int) p->front_cache.tot_get_misses);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_get_misses);
     APPEND_PREFIX_STAT("tot_get_bytes",
-           "%llu", (long long unsigned int) p->front_cache.tot_get_bytes);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_get_bytes);
     APPEND_PREFIX_STAT("tot_adds",
-           "%llu", (long long unsigned int) p->front_cache.tot_adds);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_adds);
     APPEND_PREFIX_STAT("tot_add_skips",
-           "%llu", (long long unsigned int) p->front_cache.tot_add_skips);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_add_skips);
     APPEND_PREFIX_STAT("tot_add_fails",
-           "%llu", (long long unsigned int) p->front_cache.tot_add_fails);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_add_fails);
     APPEND_PREFIX_STAT("tot_add_bytes",
-           "%llu", (long long unsigned int) p->front_cache.tot_add_bytes);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_add_bytes);
     APPEND_PREFIX_STAT("tot_deletes",
-           "%llu", (long long unsigned int) p->front_cache.tot_deletes);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_deletes);
     APPEND_PREFIX_STAT("tot_evictions",
-           "%llu", (long long unsigned int) p->front_cache.tot_evictions);
+           "%"PRIu64, (uint64_t) p->front_cache.tot_evictions);
 
     pthread_mutex_unlock(p->front_cache.lock);
 }
@@ -542,115 +553,115 @@ static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
     assert(pstats != NULL);
 
     APPEND_PREFIX_STAT("num_upstream",
-              "%llu", (long long unsigned int) pstats->num_upstream);
+              "%"PRIu64, (uint64_t) pstats->num_upstream);
     APPEND_PREFIX_STAT("tot_upstream",
-              "%llu", (long long unsigned int) pstats->tot_upstream);
+              "%"PRIu64, (uint64_t) pstats->tot_upstream);
     APPEND_PREFIX_STAT("num_downstream_conn",
-              "%llu", (long long unsigned int) pstats->num_downstream_conn);
+              "%"PRIu64, (uint64_t) pstats->num_downstream_conn);
     APPEND_PREFIX_STAT("tot_downstream_conn",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn);
     APPEND_PREFIX_STAT("tot_downstream_conn_acquired",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn_acquired);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn_acquired);
     APPEND_PREFIX_STAT("tot_downstream_conn_released",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn_released);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn_released);
     APPEND_PREFIX_STAT("tot_downstream_released",
-              "%llu", (long long unsigned int) pstats->tot_downstream_released);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_released);
     APPEND_PREFIX_STAT("tot_downstream_reserved",
-              "%llu", (long long unsigned int) pstats->tot_downstream_reserved);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_reserved);
     APPEND_PREFIX_STAT("tot_downstream_reserved_time",
-              "%llu", (long long unsigned int) pstats->tot_downstream_reserved_time);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_reserved_time);
     APPEND_PREFIX_STAT("max_downstream_reserved_time",
-              "%llu", (long long unsigned int) pstats->max_downstream_reserved_time);
+              "%"PRIu64, (uint64_t) pstats->max_downstream_reserved_time);
     APPEND_PREFIX_STAT("tot_downstream_freed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_freed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_freed);
     APPEND_PREFIX_STAT("tot_downstream_quit_server",
-              "%llu", (long long unsigned int) pstats->tot_downstream_quit_server);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_quit_server);
     APPEND_PREFIX_STAT("tot_downstream_max_reached",
-              "%llu", (long long unsigned int) pstats->tot_downstream_max_reached);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_max_reached);
     APPEND_PREFIX_STAT("tot_downstream_create_failed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_create_failed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_create_failed);
     APPEND_PREFIX_STAT("tot_downstream_connect_started",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_started);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_started);
     APPEND_PREFIX_STAT("tot_downstream_connect_wait",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_wait);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_wait);
     APPEND_PREFIX_STAT("tot_downstream_connect",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect);
     APPEND_PREFIX_STAT("tot_downstream_connect_failed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_failed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_failed);
     APPEND_PREFIX_STAT("tot_downstream_connect_timeout",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_timeout);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_timeout);
     APPEND_PREFIX_STAT("tot_downstream_connect_interval",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_interval);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_interval);
     APPEND_PREFIX_STAT("tot_downstream_connect_max_reached",
-              "%llu", (long long unsigned int) pstats->tot_downstream_connect_max_reached);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_connect_max_reached);
     APPEND_PREFIX_STAT("tot_downstream_waiting_errors",
-              "%llu", (long long unsigned int) pstats->tot_downstream_waiting_errors);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_waiting_errors);
     APPEND_PREFIX_STAT("tot_downstream_auth",
-              "%llu", (long long unsigned int) pstats->tot_downstream_auth);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_auth);
     APPEND_PREFIX_STAT("tot_downstream_auth_failed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_auth_failed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_auth_failed);
     APPEND_PREFIX_STAT("tot_downstream_bucket",
-              "%llu", (long long unsigned int) pstats->tot_downstream_bucket);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_bucket);
     APPEND_PREFIX_STAT("tot_downstream_bucket_failed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_bucket_failed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_bucket_failed);
     APPEND_PREFIX_STAT("tot_downstream_propagate_failed",
-              "%llu", (long long unsigned int) pstats->tot_downstream_propagate_failed);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_propagate_failed);
     APPEND_PREFIX_STAT("tot_downstream_close_on_upstream_close",
-              "%llu", (long long unsigned int) pstats->tot_downstream_close_on_upstream_close);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_close_on_upstream_close);
     APPEND_PREFIX_STAT("tot_downstream_conn_queue_timeout",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_timeout);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn_queue_timeout);
     APPEND_PREFIX_STAT("tot_downstream_conn_queue_add",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_add);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn_queue_add);
     APPEND_PREFIX_STAT("tot_downstream_conn_queue_remove",
-              "%llu", (long long unsigned int) pstats->tot_downstream_conn_queue_remove);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_conn_queue_remove);
     APPEND_PREFIX_STAT("tot_downstream_timeout",
-              "%llu", (long long unsigned int) pstats->tot_downstream_timeout);
+              "%"PRIu64, (uint64_t) pstats->tot_downstream_timeout);
     APPEND_PREFIX_STAT("tot_wait_queue_timeout",
-              "%llu", (long long unsigned int) pstats->tot_wait_queue_timeout);
+              "%"PRIu64, (uint64_t) pstats->tot_wait_queue_timeout);
     APPEND_PREFIX_STAT("tot_auth_timeout",
-              "%llu", (long long unsigned int) pstats->tot_auth_timeout);
+              "%"PRIu64, (uint64_t) pstats->tot_auth_timeout);
     APPEND_PREFIX_STAT("tot_assign_downstream",
-              "%llu", (long long unsigned int) pstats->tot_assign_downstream);
+              "%"PRIu64, (uint64_t) pstats->tot_assign_downstream);
     APPEND_PREFIX_STAT("tot_assign_upstream",
-              "%llu", (long long unsigned int) pstats->tot_assign_upstream);
+              "%"PRIu64, (uint64_t) pstats->tot_assign_upstream);
     APPEND_PREFIX_STAT("tot_assign_recursion",
-              "%llu", (long long unsigned int) pstats->tot_assign_recursion);
+              "%"PRIu64, (uint64_t) pstats->tot_assign_recursion);
     APPEND_PREFIX_STAT("tot_reset_upstream_avail",
-              "%llu", (long long unsigned int) pstats->tot_reset_upstream_avail);
+              "%"PRIu64, (uint64_t) pstats->tot_reset_upstream_avail);
     APPEND_PREFIX_STAT("tot_multiget_keys",
-              "%llu", (long long unsigned int) pstats->tot_multiget_keys);
+              "%"PRIu64, (uint64_t) pstats->tot_multiget_keys);
     APPEND_PREFIX_STAT("tot_multiget_keys_dedupe",
-              "%llu", (long long unsigned int) pstats->tot_multiget_keys_dedupe);
+              "%"PRIu64, (uint64_t) pstats->tot_multiget_keys_dedupe);
     APPEND_PREFIX_STAT("tot_multiget_bytes_dedupe",
-              "%llu", (long long unsigned int) pstats->tot_multiget_bytes_dedupe);
+              "%"PRIu64, (uint64_t) pstats->tot_multiget_bytes_dedupe);
     APPEND_PREFIX_STAT("tot_optimize_sets",
-              "%llu", (long long unsigned int) pstats->tot_optimize_sets);
+              "%"PRIu64, (uint64_t) pstats->tot_optimize_sets);
     APPEND_PREFIX_STAT("tot_retry",
-              "%llu", (long long unsigned int) pstats->tot_retry);
+              "%"PRIu64, (uint64_t) pstats->tot_retry);
     APPEND_PREFIX_STAT("tot_retry_time",
-              "%llu", (long long unsigned int) pstats->tot_retry_time);
+              "%"PRIu64, (uint64_t) pstats->tot_retry_time);
     APPEND_PREFIX_STAT("max_retry_time",
-              "%llu", (long long unsigned int) pstats->max_retry_time);
+              "%"PRIu64, (uint64_t) pstats->max_retry_time);
     APPEND_PREFIX_STAT("tot_retry_vbucket",
-              "%llu", (long long unsigned int) pstats->tot_retry_vbucket);
+              "%"PRIu64, (uint64_t) pstats->tot_retry_vbucket);
     APPEND_PREFIX_STAT("tot_upstream_paused",
-              "%llu", (long long unsigned int) pstats->tot_upstream_paused);
+              "%"PRIu64, (uint64_t) pstats->tot_upstream_paused);
     APPEND_PREFIX_STAT("tot_upstream_unpaused",
-              "%llu", (long long unsigned int) pstats->tot_upstream_unpaused);
+              "%"PRIu64, (uint64_t) pstats->tot_upstream_unpaused);
     APPEND_PREFIX_STAT("err_oom",
-              "%llu", (long long unsigned int) pstats->err_oom);
+              "%"PRIu64, (uint64_t) pstats->err_oom);
     APPEND_PREFIX_STAT("err_upstream_write_prep",
-              "%llu", (long long unsigned int) pstats->err_upstream_write_prep);
+              "%"PRIu64, (uint64_t) pstats->err_upstream_write_prep);
     APPEND_PREFIX_STAT("err_downstream_write_prep",
-              "%llu", (long long unsigned int) pstats->err_downstream_write_prep);
+              "%"PRIu64, (uint64_t) pstats->err_downstream_write_prep);
     APPEND_PREFIX_STAT("tot_cmd_time",
-              "%llu", (long long unsigned int) pstats->tot_cmd_time);
+              "%"PRIu64, (uint64_t) pstats->tot_cmd_time);
     APPEND_PREFIX_STAT("tot_cmd_count",
-              "%llu", (long long unsigned int) pstats->tot_cmd_count);
+              "%"PRIu64, (uint64_t) pstats->tot_cmd_count);
     APPEND_PREFIX_STAT("tot_local_cmd_time",
-              "%llu", (long long unsigned int) pstats->tot_local_cmd_time);
+              "%"PRIu64, (uint64_t) pstats->tot_local_cmd_time);
     APPEND_PREFIX_STAT("tot_local_cmd_count",
-              "%llu", (long long unsigned int) pstats->tot_local_cmd_count);
+              "%"PRIu64, (uint64_t) pstats->tot_local_cmd_count);
 
 }
 
@@ -658,44 +669,46 @@ static void proxy_stats_dump_stats_cmd(ADD_STAT add_stats, conn *c, bool do_zero
                                        const char *prefix,
                                        proxy_stats_cmd stats_cmd[][STATS_CMD_last]) {
     char keybuf[128];
+    int j;
+    int k;
 
-    for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
-        for (int k = 0; k < STATS_CMD_last; k++) {
+    for (j = 0; j < STATS_CMD_TYPE_last; j++) {
+        for (k = 0; k < STATS_CMD_last; k++) {
             if (do_zeros || stats_cmd[j][k].seen != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "seen");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].seen);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].seen);
             }
             if (do_zeros || stats_cmd[j][k].hits != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "hits");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].hits);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].hits);
             }
             if (do_zeros || stats_cmd[j][k].misses != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "misses");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].misses);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].misses);
             }
             if (do_zeros || stats_cmd[j][k].read_bytes != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "read_bytes");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].read_bytes);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].read_bytes);
             }
             if (do_zeros || stats_cmd[j][k].write_bytes != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "write_bytes");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].write_bytes);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].write_bytes);
             }
             if (do_zeros || stats_cmd[j][k].cas != 0) {
                 snprintf(keybuf, sizeof(keybuf), "%s_%s:%s",
                          cmd_type_names[j], cmd_names[k], "cas");
                 APPEND_PREFIX_STAT(keybuf,
-                         "%llu", (long long unsigned int) stats_cmd[j][k].cas);
+                         "%"PRIu64, (uint64_t) stats_cmd[j][k].cas);
             }
         }
     }
@@ -711,18 +724,20 @@ struct key_stats_dump_state {
 static void map_key_stats_foreach_dump(const void *key, const void *value,
                                        void *user_data) {
     const char *name = (const char *)key;
-    assert(name != NULL);
     struct key_stats *kstats = (struct key_stats *)value;
+    struct key_stats_dump_state *state = user_data;
+    ADD_STAT add_stats;
+    conn *c;
+    char prefix[200+KEY_MAX_LENGTH];
+
+    assert(name != NULL);
     assert(kstats != NULL);
-    struct key_stats_dump_state *state =
-        (struct key_stats_dump_state *)user_data;
     assert(state != NULL);
 
     assert(strcmp(name, kstats->key) == 0);
 
-    ADD_STAT add_stats = state->add_stats;
-    conn *c = state->conn;
-    char prefix[200+KEY_MAX_LENGTH];
+    add_stats = state->add_stats;
+    c = state->conn;
     snprintf(prefix, sizeof(prefix), "%s:%s", state->prefix, name);
 
     proxy_stats_dump_stats_cmd(add_stats, c, false, prefix, kstats->stats_cmd);
@@ -738,16 +753,19 @@ void proxy_stats_dump_basic(ADD_STAT add_stats, conn *c, const char *prefix) {
 
 void proxy_stats_dump_proxy_main(ADD_STAT add_stats, conn *c,
                                  struct proxy_stats_cmd_info *pscip) {
+    proxy_td *ptd;
+    proxy_main *pm;
+
     assert(c != NULL);
 
-    proxy_td *ptd = c->extra;
+    ptd = c->extra;
     if (ptd == NULL ||
         ptd->proxy == NULL ||
         ptd->proxy->main == NULL) {
         return;
     }
 
-    proxy_main *pm = ptd->proxy->main;
+    pm = ptd->proxy->main;
 
     if (pscip->do_info) {
         const char *prefix = "proxy_main:";
@@ -763,17 +781,17 @@ void proxy_stats_dump_proxy_main(ADD_STAT add_stats, conn *c,
     if (pscip->do_stats) {
         const char *prefix = "proxy_main:stats:";
         APPEND_PREFIX_STAT("stat_configs",
-                    "%llu", (long long unsigned int) pm->stat_configs);
+                    "%"PRIu64, (uint64_t) pm->stat_configs);
         APPEND_PREFIX_STAT("stat_config_fails",
-                    "%llu", (long long unsigned int) pm->stat_config_fails);
+                    "%"PRIu64, (uint64_t) pm->stat_config_fails);
         APPEND_PREFIX_STAT("stat_proxy_starts",
-                    "%llu", (long long unsigned int) pm->stat_proxy_starts);
+                    "%"PRIu64, (uint64_t) pm->stat_proxy_starts);
         APPEND_PREFIX_STAT("stat_proxy_start_fails",
-                    "%llu", (long long unsigned int) pm->stat_proxy_start_fails);
+                    "%"PRIu64, (uint64_t) pm->stat_proxy_start_fails);
         APPEND_PREFIX_STAT("stat_proxy_existings",
-                    "%llu", (long long unsigned int) pm->stat_proxy_existings);
+                    "%"PRIu64, (uint64_t) pm->stat_proxy_existings);
         APPEND_PREFIX_STAT("stat_proxy_shutdowns",
-                    "%llu", (long long unsigned int) pm->stat_proxy_shutdowns);
+                    "%"PRIu64, (uint64_t) pm->stat_proxy_shutdowns);
     }
 }
 
@@ -801,18 +819,21 @@ void xpassword(char *p) {
 
 void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
                               struct proxy_stats_cmd_info *pscip) {
+    proxy_td *ptd;
+    proxy_main *pm;
+    char prefix[200];
+    proxy *p;
+
     assert(c != NULL);
 
-    proxy_td *ptd = c->extra;
+    ptd = c->extra;
     if (ptd == NULL ||
         ptd->proxy == NULL ||
         ptd->proxy->main == NULL) {
         return;
     }
 
-    proxy_main *pm = ptd->proxy->main;
-
-    char prefix[200];
+    pm = ptd->proxy->main;
 
     if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
         /* Do not dump proxy stats
@@ -821,24 +842,26 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
         return;
     }
 
-    for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
-
+    for (p = pm->proxy_head; p != NULL; p = p->next) {
         bool go = true;
+        pthread_mutex_lock(&p->proxy_lock);
 
         if (p->name != NULL &&
             strcmp(p->name, NULL_BUCKET) != 0 &&
             p->config != NULL) {
             if (pscip->do_info) {
+                char *buf;
+
                 snprintf(prefix, sizeof(prefix), "%u:%s:info:", p->port, p->name);
                 APPEND_PREFIX_STAT("port",          "%u", p->port);
                 APPEND_PREFIX_STAT("name",          "%s", p->name);
 
-                char *buf = trimstrdup(p->config);
+                buf = trimstrdup(p->config);
                 if (buf != NULL) {
                     /* Remove embedded newlines, as config might be a JSON string. */
                     char *slow = buf;
-                    for (char *fast = buf; *fast != '\0'; fast++) {
+                    char *fast;
+                    for (fast = buf; *fast != '\0'; fast++) {
                         *slow = *fast;
                         if (*slow != '\n' && *slow != '\r') {
                             slow++;
@@ -858,12 +881,14 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
             }
 
             if (pscip->do_behaviors) {
+                int i;
+
                 snprintf(prefix, sizeof(prefix), "%u:%s:behavior:",
                          p->port, p->name);
                 proxy_stats_dump_behavior(add_stats, c, prefix,
                                           &p->behavior_pool.base, 1);
 
-                for (int i = 0; i < p->behavior_pool.num; i++) {
+                for (i = 0; i < p->behavior_pool.num; i++) {
                     snprintf(prefix, sizeof(prefix), "%u:%s:behavior-%u:",
                              p->port, p->name, i);
                     proxy_stats_dump_behavior(add_stats, c, prefix,
@@ -873,10 +898,10 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
             if (pscip->do_stats) {
                 snprintf(prefix, sizeof(prefix), "%u:%s:stats:", p->port, p->name);
-                APPEND_PREFIX_STAT("listening", "%llu",
-                                   (long long unsigned int) p->listening);
-                APPEND_PREFIX_STAT("listening_failed", "%llu",
-                                   (long long unsigned int) p->listening_failed);
+                APPEND_PREFIX_STAT("listening", "%"PRIu64,
+                                   (uint64_t) p->listening);
+                APPEND_PREFIX_STAT("listening_failed", "%"PRIu64,
+                                   (uint64_t) p->listening_failed);
             }
         } else {
             go = false;
@@ -897,8 +922,9 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
         if (pscip->do_stats) {
             proxy_stats_td *pstd = calloc(1, sizeof(proxy_stats_td));
             if (pstd != NULL) {
+                int i;
                 pthread_mutex_lock(&p->proxy_lock);
-                for (int i = 1; i < pm->nthreads; i++) {
+                for (i = 1; i < pm->nthreads; i++) {
                     proxy_td *thread_ptd = &p->thread_data[i];
                     if (thread_ptd != NULL) {
                         add_proxy_stats_td(pstd, &thread_ptd->stats);
@@ -923,8 +949,13 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
             genhash_t *key_stats_map = NULL;
 
             if (key_stats_map != NULL) {
+                struct key_stats_dump_state state;
+                int i;
+
+                memset(&state, 0, sizeof(state));
+
                 pthread_mutex_lock(&p->proxy_lock);
-                for (int i = 1; i < pm->nthreads; i++) {
+                for (i = 1; i < pm->nthreads; i++) {
                      proxy_td *thread_ptd = &p->thread_data[i];
                      if (ptd != NULL) {
                          add_raw_key_stats(key_stats_map, &thread_ptd->key_stats);
@@ -934,10 +965,10 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
                 snprintf(prefix, sizeof(prefix), "%u:%s:key_stats:",
                          p->port, p->name);
-                struct key_stats_dump_state state = { .prefix = prefix,
-                                                      .add_stats = add_stats,
-                                                      .conn      = c,
-                                                      .pscip     = pscip };
+                state.prefix = prefix;
+                state.add_stats = add_stats;
+                state.conn = c;
+                state.pscip = pscip;
                 genhash_iter(key_stats_map, map_key_stats_foreach_dump, &state);
                 genhash_free(key_stats_map);
             }
@@ -953,30 +984,34 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
  */
 static void main_stats_collect(void *data0, void *data1) {
     struct main_stats_collect_info *msci = data0;
+    proxy_main *m;
+    work_collect *ca;
+    struct main_stats_collect_info ase;
+    int sent = 0;
+    int nproxy = 0;
+    char bufk[200];
+    char bufv[4000];
+    int i;
+    proxy *p;
+
     assert(msci);
     assert(msci->result);
 
-    proxy_main *m = msci->m;
+    m = msci->m;
     assert(m);
     assert(m->nthreads > 1);
 
-    work_collect *ca = data1;
+    ca = data1;
     assert(ca);
 
     assert(is_listen_thread());
 
-    struct main_stats_collect_info ase = *msci;
+    ase = *msci;
     ase.prefix = "";
-
-    int sent   = 0;
-    int nproxy = 0;
-
-    char bufk[200];
-    char bufv[4000];
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL; p = p->next) {
         nproxy++;
 
 #define emit_s(key, val)                               \
@@ -1004,7 +1039,7 @@ static void main_stats_collect(void *data0, void *data1) {
             cproxy_dump_behavior_ex(&p->behavior_pool.base, bufk, 1,
                                     add_stat_prefix, &ase);
 
-            for (int i = 0; i < p->behavior_pool.num; i++) {
+            for (i = 0; i < p->behavior_pool.num; i++) {
                 snprintf(bufk, sizeof(bufk),
                          "%u:%s:behavior-%u", p->port, p->name, i);
 
@@ -1015,9 +1050,9 @@ static void main_stats_collect(void *data0, void *data1) {
 
         if (msci->do_stats) {
             emit_f("listening",
-                   "%llu", (long long unsigned int) p->listening);
+                   "%"PRIu64, (uint64_t) p->listening);
             emit_f("listening_failed",
-                   "%llu", (long long unsigned int) p->listening_failed);
+                   "%"PRIu64, (uint64_t) p->listening_failed);
         }
 
         pthread_mutex_unlock(&p->proxy_lock);
@@ -1037,35 +1072,35 @@ static void main_stats_collect(void *data0, void *data1) {
                    "%u", p->front_cache.oldest_live);
 
             emit_f("front_cache_tot_get_hits",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_get_hits);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_get_hits);
             emit_f("front_cache_tot_get_expires",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_get_expires);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_get_expires);
             emit_f("front_cache_tot_get_misses",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_get_misses);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_get_misses);
             emit_f("front_cache_tot_get_bytes",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_get_bytes);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_get_bytes);
             emit_f("front_cache_tot_adds",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_adds);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_adds);
             emit_f("front_cache_tot_add_skips",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_add_skips);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_add_skips);
             emit_f("front_cache_tot_add_fails",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_add_fails);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_add_fails);
             emit_f("front_cache_tot_add_bytes",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_add_bytes);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_add_bytes);
             emit_f("front_cache_tot_deletes",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_deletes);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_deletes);
             emit_f("front_cache_tot_evictions",
-                   "%llu",
-                   (long long unsigned int) p->front_cache.tot_evictions);
+                   "%"PRIu64,
+                   (uint64_t) p->front_cache.tot_evictions);
 
             pthread_mutex_unlock(p->front_cache.lock);
         }
@@ -1075,7 +1110,7 @@ static void main_stats_collect(void *data0, void *data1) {
 
     /* Starting at 1 because 0 is the main listen thread. */
 
-    for (int i = 1; i < m->nthreads; i++) {
+    for (i = 1; i < m->nthreads; i++) {
         work_collect *c = &ca[i];
 
         work_collect_count(c, nproxy);
@@ -1087,7 +1122,7 @@ static void main_stats_collect(void *data0, void *data1) {
 
             pthread_mutex_lock(&m->proxy_main_lock);
 
-            for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+            for (p = m->proxy_head; p != NULL; p = p->next) {
                 proxy_td *ptd = &p->thread_data[i];
                 if (ptd != NULL &&
                     work_send(t->work_queue, work_stats_collect, ptd, c)) {
@@ -1105,8 +1140,8 @@ static void main_stats_collect(void *data0, void *data1) {
 
         pthread_mutex_lock(&m->proxy_main_lock);
 
-        proxy *p = m->proxy_head;
-        for (int i = 0; i < nproxy; i++, p = p->next) {
+        p = m->proxy_head;
+        for (i = 0; i < nproxy; i++, p = p->next) {
             if (p == NULL) {
                 break;
             }
@@ -1139,33 +1174,41 @@ static void main_stats_collect(void *data0, void *data1) {
 
 static void work_stats_collect(void *data0, void *data1) {
     proxy_td *ptd = data0;
+    proxy *p;
+    work_collect *c;
+    struct stats_gathering_pair *pair;
+    genhash_t *map_pstd;
+    bool locked = true;
+
     assert(ptd);
 
-    proxy *p = ptd->proxy;
+    p = ptd->proxy;
     assert(p);
 
-    work_collect *c = data1;
+    c = data1;
     assert(c);
 
     assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
-    struct stats_gathering_pair *pair = c->data;
-    genhash_t *map_pstd = pair->map_pstd;
+    pair = c->data;
+    map_pstd = pair->map_pstd;
     assert(map_pstd != NULL);
 
     pthread_mutex_lock(&p->proxy_lock);
-    bool locked = true;
 
     if (p->name != NULL) {
         int   key_len = strlen(p->name) + 50;
         char *key_buf = malloc(key_len);
         if (key_buf != NULL) {
+            proxy_stats_td *pstd;
+            genhash_t *key_stats_map;
+
             snprintf(key_buf, key_len, "%d:%s", p->port, p->name);
 
             pthread_mutex_unlock(&p->proxy_lock);
             locked = false;
 
-            proxy_stats_td *pstd = genhash_find(map_pstd, key_buf);
+            pstd = genhash_find(map_pstd, key_buf);
             if (pstd == NULL) {
                 pstd = calloc(1, sizeof(proxy_stats_td));
                 if (pstd != NULL) {
@@ -1183,7 +1226,7 @@ static void work_stats_collect(void *data0, void *data1) {
                 add_proxy_stats_td(pstd, &ptd->stats);
             }
 
-            genhash_t *key_stats_map = genhash_find(pair->map_key_stats, key_buf);
+            key_stats_map = genhash_find(pair->map_key_stats, key_buf);
             if (key_stats_map == NULL) {
                 key_stats_map = genhash_init(16, strhash_ops);
                 if (key_stats_map != NULL) {
@@ -1212,15 +1255,17 @@ static void work_stats_collect(void *data0, void *data1) {
     work_collect_one(c);
 }
 
-static void add_proxy_stats_td(proxy_stats_td *agg,
-                               proxy_stats_td *x) {
+static void add_proxy_stats_td(proxy_stats_td *agg, proxy_stats_td *x) {
+    int j;
+
     assert(agg);
     assert(x);
 
     add_proxy_stats(&agg->stats, &x->stats);
 
-    for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
-        for (int k = 0; k < STATS_CMD_last; k++) {
+    for (j = 0; j < STATS_CMD_TYPE_last; j++) {
+        int k;
+        for (k = 0; k < STATS_CMD_last; k++) {
             add_stats_cmd(&agg->stats_cmd[j][k],
                           &x->stats_cmd[j][k]);
         }
@@ -1339,6 +1384,9 @@ static void add_key_stats_inner(const void *data, void *userdata) {
     genhash_t *key_stats_map = userdata;
     const struct key_stats *kstats = data;
     struct key_stats *dest_stats = genhash_find(key_stats_map, kstats->key);
+    int j;
+    uint64_t current_time_msec;
+    float rescale_factor_dest = 1.0, rescale_factor_src = 1.0;
 
     if (dest_stats == NULL) {
         dest_stats = calloc(1, sizeof(struct key_stats));
@@ -1349,8 +1397,7 @@ static void add_key_stats_inner(const void *data, void *userdata) {
         return;
     }
 
-    uint64_t current_time_msec = msec_current_time;
-    float rescale_factor_dest = 1.0, rescale_factor_src = 1.0;
+    current_time_msec = msec_current_time;
     if (dest_stats->added_at < kstats->added_at) {
         rescale_factor_src = (float)(current_time_msec - dest_stats->added_at)/(current_time_msec - kstats->added_at);
     } else {
@@ -1361,8 +1408,9 @@ static void add_key_stats_inner(const void *data, void *userdata) {
     assert(rescale_factor_dest >= 1.0);
     assert(rescale_factor_src >= 1.0);
 
-    for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
-        for (int k = 0; k < STATS_CMD_last; k++) {
+    for (j = 0; j < STATS_CMD_TYPE_last; j++) {
+        int k;
+        for (k = 0; k < STATS_CMD_last; k++) {
             add_stats_cmd_with_rescale(&(dest_stats->stats_cmd[j][k]),
                                        &(kstats->stats_cmd[j][k]),
                                        rescale_factor_dest,
@@ -1411,22 +1459,24 @@ static void emit_proxy_stats_cmd(conflate_form_result *result,
     const size_t bufsize = 200;
     char buf_key[bufsize + prefix_len];
     char buf_val[100];
+    int j;
+    char *buf = buf_key+prefix_len;
 
     memcpy(buf_key, prefix, prefix_len);
 
-    char *buf = buf_key+prefix_len;
 
 #define more_cmd_stat(type, cmd, key, val)                       \
     if (val != 0) {                                              \
         snprintf(buf, bufsize,                                   \
                  format, type, cmd, key);                        \
         snprintf(buf_val, sizeof(buf_val),                       \
-                 "%llu", (long long unsigned int) val);          \
+                 "%"PRIu64, (uint64_t) val);          \
         conflate_add_field(result, buf_key, buf_val);      \
     }
 
-    for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
-        for (int k = 0; k < STATS_CMD_last; k++) {
+    for (j = 0; j < STATS_CMD_TYPE_last; j++) {
+        int k;
+        for (k = 0; k < STATS_CMD_last; k++) {
             more_cmd_stat(cmd_type_names[j], cmd_names[k],
                           "seen",
                           stats_cmd[j][k].seen);
@@ -1454,25 +1504,24 @@ static void emit_proxy_stats_cmd(conflate_form_result *result,
 void map_pstd_foreach_emit(const void *k,
                            const void *value,
                            void *user_data) {
+    char buf_key[200];
+    char buf_val[100];
     const char *name = (const char*)k;
-    assert(name != NULL);
-
     proxy_stats_td *pstd = (proxy_stats_td *) value;
-    assert(pstd != NULL);
-
     const struct main_stats_collect_info *emit = user_data;
+
+    assert(name != NULL);
+    assert(pstd != NULL);
     assert(emit != NULL);
     assert(emit->result);
 
-    char buf_key[200];
-    char buf_val[100];
 
 #define more_stat(key, val)                             \
     if (emit->do_zeros || val) {                        \
         snprintf(buf_key, sizeof(buf_key),              \
                  "%s:stats_%s", name, key);             \
         snprintf(buf_val, sizeof(buf_val),              \
-                 "%llu", (long long unsigned int) val); \
+                 "%"PRIu64, (uint64_t) val); \
         conflate_add_field(emit->result, buf_key, buf_val); \
     }
 
@@ -1599,15 +1648,14 @@ struct key_stats_emit_state {
 };
 
 static void map_key_stats_foreach_emit_inner(const void *_key,
-                                              const void *value,
-                                              void *user_data) {
+                                             const void *value,
+                                             void *user_data) {
     struct key_stats_emit_state *state = user_data;
     const char *key = _key;
     struct key_stats *kstats = (struct key_stats *) value;
+    char buf[200+KEY_MAX_LENGTH];
 
     assert(strcmp(key, kstats->key) == 0);
-
-    char buf[200+KEY_MAX_LENGTH];
 
     snprintf(buf, sizeof(buf), "%s:keys_stats:%s:", state->name, key);
     emit_proxy_stats_cmd(state->emit->result, buf, "%s_%s_%s",
@@ -1617,8 +1665,8 @@ static void map_key_stats_foreach_emit_inner(const void *_key,
         char buf_val[32];
         snprintf(buf, sizeof(buf), "%s:keys_stats:%s:added_at_msec",
                  state->name, key);
-        snprintf(buf_val, sizeof(buf_val), "%llu",
-                 (long long unsigned int) kstats->added_at);
+        snprintf(buf_val, sizeof(buf_val), "%"PRIu64,
+                 (uint64_t) kstats->added_at);
         conflate_add_field(state->emit->result, buf, buf_val);
     }
 }
@@ -1627,18 +1675,17 @@ void map_key_stats_foreach_emit(const void *k,
                                 const void *value,
                                 void *user_data) {
 
+    struct key_stats_emit_state state;
     const char *name = (const char *) k;
-    assert(name != NULL);
-
     genhash_t *map_key_stats = (genhash_t *) value;
-    assert(map_key_stats != NULL);
-
     const struct main_stats_collect_info *emit = user_data;
+    assert(name != NULL);
+    assert(map_key_stats != NULL);
     assert(emit != NULL);
     assert(emit->result);
 
-    struct key_stats_emit_state state = {.name = name,
-                                         .emit = emit };
+    state.name = name;
+    state.emit = emit;
 
     genhash_iter(map_key_stats, map_key_stats_foreach_emit_inner, &state);
 }
@@ -1656,13 +1703,14 @@ enum conflate_mgmt_cb_result on_conflate_reset_stats(void *userdata,
                                                      bool direct,
                                                      kvpair_t *form,
                                                      conflate_form_result *r) {
+    proxy_main *m = userdata;
+
     (void)handle;
     (void)cmd;
     (void)direct;
     (void)form;
     (void)r;
 
-    proxy_main *m = userdata;
     assert(m);
     assert(m->nthreads > 1);
 
@@ -1684,9 +1732,12 @@ void proxy_stats_reset(proxy_main *m) {
  * Puts stats reset work on every worker thread's work_queue.
  */
 static void main_stats_reset(void *data0, void *data1) {
-    (void) data1;
-
+    proxy *p;
     proxy_main *m = data0;
+    int sent   = 0;
+    int nproxy = 0;
+
+    (void) data1;
     assert(m);
     assert(m->nthreads > 1);
 
@@ -1699,12 +1750,9 @@ static void main_stats_reset(void *data0, void *data1) {
     m->stat_proxy_existings = 0;
     m->stat_proxy_shutdowns = 0;
 
-    int sent   = 0;
-    int nproxy = 0;
-
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL; p = p->next) {
         nproxy++;
 
         /* We don't clear p->listening because it's meant to */
@@ -1721,19 +1769,21 @@ static void main_stats_reset(void *data0, void *data1) {
         work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
         if (ca != NULL) {
             /* Starting at 1 because 0 is the main listen thread. */
+            int i;
 
-            for (int i = 1; i < m->nthreads; i++) {
+            for (i = 1; i < m->nthreads; i++) {
                 work_collect *c = &ca[i];
+                LIBEVENT_THREAD *t;
 
                 work_collect_init(c, nproxy, NULL);
 
-                LIBEVENT_THREAD *t = thread_by_index(i);
+                t = thread_by_index(i);
                 assert(t);
                 assert(t->work_queue);
 
                 pthread_mutex_lock(&m->proxy_main_lock);
 
-                for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+                for (p = m->proxy_head; p != NULL; p = p->next) {
                     proxy_td *ptd = &p->thread_data[i];
                     if (ptd != NULL &&
                         work_send(t->work_queue, work_stats_reset, ptd, c)) {
@@ -1746,7 +1796,7 @@ static void main_stats_reset(void *data0, void *data1) {
 
             /* Wait for all resets to finish. */
 
-            for (int i = 1; i < m->nthreads; i++) {
+            for (i = 1; i < m->nthreads; i++) {
                 work_collect_wait(&ca[i]);
             }
 
@@ -1767,9 +1817,8 @@ static void main_stats_reset(void *data0, void *data1) {
 
 static void work_stats_reset(void *data0, void *data1) {
     proxy_td *ptd = data0;
-    assert(ptd);
-
     work_collect *c = data1;
+    assert(ptd);
     assert(c);
 
     assert(is_listen_thread() == false); /* Expecting a worker thread. */
@@ -1793,10 +1842,10 @@ static void add_stat_prefix(const void *dump_opaque,
                             const char *prefix,
                             const char *key,
                             const char *val) {
+    char buf[2000];
     const struct main_stats_collect_info *ase = dump_opaque;
     assert(ase);
 
-    char buf[2000];
     snprintf(buf, sizeof(buf), "%s_%s", prefix, key);
 
     conflate_add_field(ase->result, buf, val);
@@ -1805,13 +1854,12 @@ static void add_stat_prefix(const void *dump_opaque,
 static void add_stat_prefix_ase(const char *key, const uint16_t klen,
                                 const char *val, const uint32_t vlen,
                                 const void *cookie) {
-    (void)klen;
-    (void)vlen;
-
     const struct main_stats_collect_info *ase = cookie;
     assert(ase);
 
     add_stat_prefix(cookie, ase->prefix, key, val);
+    (void)klen;
+    (void)vlen;
 }
 
 struct htgram_dump_callback_data {
@@ -1821,40 +1869,44 @@ struct htgram_dump_callback_data {
 };
 
 static void htgram_dump_callback(HTGRAM_HANDLE h, const char *dump_line, void *cbdata) {
-    (void) h;
-
     ADD_STAT add_stats = ((struct htgram_dump_callback_data *) cbdata)->add_stats;
     char *prefix       = ((struct htgram_dump_callback_data *) cbdata)->prefix;
     conn *c            = ((struct htgram_dump_callback_data *) cbdata)->conn;
 
     APPEND_STAT(prefix, "%s", dump_line);
+    (void) h;
 }
 
 void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
+    char prefix[200];
+    proxy_td *ptd;
+    proxy_main *pm;
+    proxy *p;
+
     assert(c != NULL);
 
-    proxy_td *ptd = c->extra;
+    ptd = c->extra;
     if (ptd == NULL ||
         ptd->proxy == NULL ||
         ptd->proxy->main == NULL) {
         return;
     }
 
-    proxy_main *pm = ptd->proxy->main;
+    pm = ptd->proxy->main;
 
     if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
         return;
     }
 
-    char prefix[200];
-
-    for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
+    for (p = pm->proxy_head; p != NULL; p = p->next) {
         HTGRAM_HANDLE hreserved = cproxy_create_timing_histogram();
         HTGRAM_HANDLE hconnect = cproxy_create_timing_histogram();
-        if (hreserved != NULL &&
-            hconnect != NULL) {
+        if (hreserved != NULL && hconnect != NULL) {
+            struct htgram_dump_callback_data cbdata;
+            int i;
+
             pthread_mutex_lock(&p->proxy_lock);
-            for (int i = 1; i < pm->nthreads; i++) {
+            for (i = 1; i < pm->nthreads; i++) {
                 proxy_td *thread_ptd = &p->thread_data[i];
                 if (thread_ptd != NULL &&
                     thread_ptd->stats.downstream_reserved_time_htgram != NULL) {
@@ -1864,7 +1916,6 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
             }
             pthread_mutex_unlock(&p->proxy_lock);
 
-            struct htgram_dump_callback_data cbdata;
             cbdata.add_stats = add_stats;
             cbdata.prefix    = prefix;
             cbdata.conn      = c;
@@ -1889,24 +1940,27 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
 }
 
 void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
+    char prefix[200];
+    proxy_td *ptd;
+    proxy_main *pm;
+    proxy *p;
+
     assert(c != NULL);
 
-    proxy_td *ptd = c->extra;
+    ptd = c->extra;
     if (ptd == NULL ||
         ptd->proxy == NULL ||
         ptd->proxy->main == NULL) {
         return;
     }
 
-    proxy_main *pm = ptd->proxy->main;
+    pm = ptd->proxy->main;
 
     if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
         return;
     }
 
-    char prefix[200];
-
-    for (proxy *p = pm->proxy_head; p != NULL; p = p->next) {
+    for (p = pm->proxy_head; p != NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
 
         if (p->name != NULL &&

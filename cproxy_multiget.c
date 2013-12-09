@@ -15,27 +15,30 @@
 void multiget_foreach_free(const void *key,
                            const void *value,
                            void *user_data) {
+    downstream *d;
+    proxy_td *ptd;
+    proxy_stats_cmd *psc_get_key;
+    int length = 0;
+    multiget_entry *entry;
+
     (void)key;
-    downstream *d = user_data;
+    d = user_data;
     assert(d);
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd);
 
-    proxy_stats_cmd *psc_get_key =
-        &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
-
-    int length = 0;
-    multiget_entry *entry = (multiget_entry*)value;
+    psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
+    entry = (multiget_entry*)value;
 
     while (entry != NULL) {
+        multiget_entry *curr = entry;
         if (entry->hits == 0) {
             psc_get_key->misses++;
         }
 
         /* TODO: Update key-level stats misses. */
 
-        multiget_entry *curr = entry;
         entry = entry->next;
         curr->upstream_conn = NULL;
         curr->next          = NULL;
@@ -53,11 +56,14 @@ void multiget_foreach_free(const void *key,
 void multiget_remove_upstream(const void *key,
                               const void *value,
                               void *user_data) {
+    multiget_entry *entry;
+    conn *uc;
+
     (void)key;
-    multiget_entry *entry = (multiget_entry *) value;
+    entry = (multiget_entry *) value;
     assert(entry != NULL);
 
-    conn *uc = user_data;
+    uc = user_data;
     assert(uc != NULL);
 
     while (entry != NULL) {
@@ -74,27 +80,33 @@ void multiget_remove_upstream(const void *key,
 }
 
 bool multiget_ascii_downstream(downstream *d, conn *uc,
-    int (*emit_start)(conn *c, char *cmd, int cmd_len),
-    int (*emit_skey)(conn *c, char *skey, int skey_len, int vbucket, int key_index),
-    int (*emit_end)(conn *c),
-    mcache *front_cache) {
+                               int (*emit_start)(conn *c, char *cmd, int cmd_len),
+                               int (*emit_skey)(conn *c, char *skey, int skey_len, int vbucket, int key_index),
+                               int (*emit_end)(conn *c),
+                               mcache *front_cache) {
+    int i;
+    proxy_td *ptd;
+    proxy_stats_cmd *psc_get;
+    proxy_stats_cmd *psc_get_key;
+    int nwrite = 0;
+    int nconns;
+    uint64_t msec_current_time_snapshot;
+    int   uc_num = 0;
+    conn *uc_cur;
+
     assert(d != NULL);
     assert(d->downstream_conns != NULL);
     assert(uc != NULL);
     assert(uc->noreply == false);
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd != NULL);
 
-    proxy_stats_cmd *psc_get =
-        &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET];
-    proxy_stats_cmd *psc_get_key =
-        &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
+    psc_get = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET];
+    psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
+    nconns = mcs_server_count(&d->mst);
 
-    int nwrite = 0;
-    int nconns = mcs_server_count(&d->mst);
-
-    for (int i = 0; i < nconns; i++) {
+    for (i = 0; i < nconns; i++) {
         if (d->downstream_conns[i] != NULL &&
             d->downstream_conns[i] != NULL_CONN &&
             cproxy_prep_conn_for_write(d->downstream_conns[i]) == false) {
@@ -105,33 +117,35 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
     }
 
     /* Snapshot the volatile only once. */
-
-    uint64_t msec_current_time_snapshot = msec_current_time;
-
-    int   uc_num = 0;
-    conn *uc_cur = uc;
+    msec_current_time_snapshot = msec_current_time;
+    uc_cur = uc;
 
     while (uc_cur != NULL) {
+        char *command;
+        char *space;
+        int cmd_len;
+        int cas_emit;
+
         assert(uc_cur->cmd == -1);
         assert(uc_cur->item == NULL);
         assert(uc_cur->state == conn_pause);
         assert(IS_ASCII(uc_cur->protocol));
         assert(IS_PROXY(uc_cur->protocol));
 
-        char *command = uc_cur->cmd_start;
+        command = uc_cur->cmd_start;
         assert(command != NULL);
 
         while (*command != '\0' && *command == ' ') {
             command++;
         }
 
-        char *space = strchr(command, ' ');
+        space = strchr(command, ' ');
         assert(space > command);
 
-        int cmd_len = space - command;
+        cmd_len = space - command;
         assert(cmd_len == 3 || cmd_len == 4); /* Either get or gets. */
 
-        int cas_emit = (command[3] == 's');
+        cas_emit = (command[3] == 's');
 
         if (settings.verbose > 1) {
             moxi_log_write("%d: forward multiget %s (%d %d)\n",
@@ -159,6 +173,10 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
             /* This key_len check helps skip consecutive spaces. */
 
             if (key_len > 0) {
+                int vbucket = -1;
+                conn *c;
+                bool do_key_stats;
+
                 ptd->stats.stats.tot_multiget_keys++;
 
                 psc_get_key->seen++;
@@ -166,7 +184,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
 
                 /* Update key-based statistics. */
 
-                bool do_key_stats =
+                do_key_stats =
                     matcher_check(&ptd->key_stats_matcher,
                                   key, key_len, false) == true &&
                     matcher_check(&ptd->key_stats_unmatcher,
@@ -220,11 +238,10 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                     }
                 }
 
-                int  vbucket = -1;
-
-                conn *c = cproxy_find_downstream_conn_ex(d, key, key_len,
-                                                         NULL, &vbucket);
+                c = cproxy_find_downstream_conn_ex(d, key, key_len,
+                                                   NULL, &vbucket);
                 if (c != NULL) {
+                    bool first_request = true;
 
                     /* If there's more than one key, create a de-duplication map. */
                     /* This is used to handle not-my-vbucket errors */
@@ -246,9 +263,8 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                     /* the multiget hash table, in order to */
                     /* de-duplicate repeated keys. */
 
-                    bool first_request = true;
-
                     if (d->multiget != NULL) {
+                        multiget_entry *entry;
                         if (settings.verbose > 2) {
                             char key_buf[KEY_MAX_LENGTH + 10];
                             assert(key_len <= KEY_MAX_LENGTH);
@@ -261,8 +277,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
 
                         /* TODO: Use Trond's allocator here. */
 
-                        multiget_entry *entry =
-                            calloc(1, sizeof(multiget_entry));
+                        entry = calloc(1, sizeof(multiget_entry));
                         if (entry != NULL) {
                             entry->upstream_conn = uc_cur;
                             entry->opaque = 0;
@@ -320,7 +335,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         uc_cur = uc_cur->next;
     }
 
-    for (int i = 0; i < nconns; i++) {
+    for (i = 0; i < nconns; i++) {
         conn *c = d->downstream_conns[i];
         if (c != NULL &&
             c != NULL_CONN &&
@@ -370,18 +385,21 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
 }
 
 void multiget_ascii_downstream_response(downstream *d, item *it) {
+    proxy_td *ptd;
+    proxy_stats_cmd *psc_get_key;
+    proxy *p;
+
     assert(d);
     assert(it);
     assert(it->nkey > 0);
     assert(ITEM_key(it) != NULL);
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd);
 
-    proxy_stats_cmd *psc_get_key =
-        &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
+    psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
 
-    proxy *p = ptd->proxy;
+    p = ptd->proxy;
     assert(p);
 
     if (cproxy_front_cache_key(ptd, ITEM_key(it), it->nkey) == true) {
@@ -395,18 +413,18 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
 
     if (d->multiget != NULL) {
         /* The ITEM_key is not NULL or space terminated. */
-
+        multiget_entry *entry_first;
         char key_buf[KEY_MAX_LENGTH + 10];
+
         assert(it->nkey <= KEY_MAX_LENGTH);
         memcpy(key_buf, ITEM_key(it), it->nkey);
         key_buf[it->nkey] = '\0';
-
-        multiget_entry *entry_first = genhash_find(d->multiget, key_buf);
+        entry_first = genhash_find(d->multiget, key_buf);
 
         if (entry_first != NULL) {
+            multiget_entry *entry = entry_first;
             entry_first->hits++;
 
-            multiget_entry *entry = entry_first;
             while (entry != NULL) {
                 /* The upstream might have been closed mid-request. */
 
@@ -469,4 +487,3 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
         }
     }
 }
-

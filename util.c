@@ -11,11 +11,13 @@
 #include "memcached.h"
 
 bool safe_strtoull(const char *str, uint64_t *out) {
+    char *endptr;
+    unsigned long long ull;
+
     assert(out != NULL);
     errno = 0;
     *out = 0;
-    char *endptr;
-    unsigned long long ull = strtoull(str, &endptr, 10);
+    ull = strtoull(str, &endptr, 10);
     if (errno == ERANGE)
         return false;
     if (isspace(*endptr) || (*endptr == '\0' && endptr != str)) {
@@ -34,11 +36,13 @@ bool safe_strtoull(const char *str, uint64_t *out) {
 }
 
 bool safe_strtoll(const char *str, int64_t *out) {
+    char *endptr;
+    long long ll;
+
     assert(out != NULL);
     errno = 0;
     *out = 0;
-    char *endptr;
-    long long ll = strtoll(str, &endptr, 10);
+    ll = strtoll(str, &endptr, 10);
     if (errno == ERANGE)
         return false;
     if (isspace(*endptr) || (*endptr == '\0' && endptr != str)) {
@@ -78,11 +82,12 @@ bool safe_strtoul(const char *str, uint32_t *out) {
 }
 
 bool safe_strtol(const char *str, int32_t *out) {
+    char *endptr;
+    long l;
     assert(out != NULL);
     errno = 0;
     *out = 0;
-    char *endptr;
-    long l = strtol(str, &endptr, 10);
+    l = strtol(str, &endptr, 10);
     if (errno == ERANGE)
         return false;
     if (isspace(*endptr) || (*endptr == '\0' && endptr != str)) {
@@ -130,6 +135,9 @@ static int cmp_doubles(const void *pa, const void *pb)
 
 void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
 {
+    double sum = 0;
+    int i;
+
     assert(out);
     assert(vals);
     assert(num_vals > 0);
@@ -137,10 +145,8 @@ void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
     out->min = vals[0];
     out->max = vals[0];
 
-    double sum = 0;
-
     /* min, max and sum */
-    for (int i = 0; i < num_vals; i++) {
+    for (i = 0; i < num_vals; i++) {
         sum += vals[i];
         out->min = fmin(out->min, vals[i]);
         out->max = fmax(out->max, vals[i]);
@@ -151,7 +157,7 @@ void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
 
     /* stddev */
     sum = 0;
-    for (int i = 0; i < num_vals; i++) {
+    for (i = 0; i < num_vals; i++) {
         sum += pow(vals[i] - out->avg, 2);
     }
 
@@ -180,7 +186,7 @@ void vperror(const char *fmt, ...) {
 
 /* Byte swap a 64-bit number. */
 #ifndef swap64
-static inline uint64_t swap64(uint64_t in)
+static uint64_t swap64(uint64_t in)
 {
 # ifndef BYTEORDER_BIG_ENDIAN
   /* Little endian, flip the bytes around until someone makes a faster/better

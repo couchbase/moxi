@@ -42,10 +42,12 @@ static bool starts_with(const char* needle, const char *haystack)
 static void load_ping_recipe(char **params,
                              struct ping_test_recipe *out)
 {
+    int i;
+
     assert(params);
     assert(out);
 
-    for (int i = 0; params[i]; i++) {
+    for (i = 0; params[i]; i++) {
         int value = 0;
         char *p = NULL;
 
@@ -78,6 +80,18 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
                                                    kvpair_t *form,
                                                    conflate_form_result *r)
 {
+    int j;
+
+    char detail_key[200];
+
+    /* Discover test configuration. */
+    char **tests;
+    int nrecipes;
+
+    /* @todo add calloc */
+    struct ping_test_recipe *recipes;
+    char **servers;
+
     (void)userdata;
     (void)handle;
     (void)cmd;
@@ -117,14 +131,16 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
         return RV_BADARG;
     }
 
-    char detail_key[200];
-
     /* Discover test configuration. */
-    char **tests = get_key_values(form, "tests");
-    int nrecipes = charlistlen(tests);
-    struct ping_test_recipe recipes[nrecipes+1];
-    memset(recipes, 0x00, sizeof(struct ping_test_recipe) * (nrecipes+1));
-    for (int j = 0; j < nrecipes; j++) {
+    tests = get_key_values(form, "tests");
+    nrecipes = charlistlen(tests);
+
+    recipes = calloc(nrecipes + 1, sizeof(*recipes));
+    /* @todo check return value */
+    if (recipes == NULL) {
+        return RV_ERROR;
+    }
+    for (j = 0; j < nrecipes; j++) {
         snprintf(detail_key, sizeof(detail_key), "def-%s", tests[j]);
         recipes[j].name = strdup(detail_key);
         assert(recipes[j].name);
@@ -132,8 +148,12 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
     }
 
     /* Initialize each server and run the tests */
-    char **servers = get_key_values(form, "servers");
-    for (int j = 0; servers != NULL && servers[j]; j++) {
+    servers = get_key_values(form, "servers");
+    for (j = 0; servers != NULL && servers[j]; j++) {
+        proxy_behavior behavior;
+        char **props;
+        int k;
+
         snprintf(detail_key, sizeof(detail_key),
                  "svr-%s", servers[j]);
 
@@ -141,12 +161,10 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
             moxi_log_write("ping_test %s\n", detail_key);
         }
 
-        proxy_behavior behavior;
-
         memset(&behavior, 0, sizeof(behavior));
 
-        char **props = get_key_values(form, detail_key);
-        for (int k = 0; props && props[k]; k++) {
+        props = get_key_values(form, detail_key);
+        for (k = 0; props && props[k]; k++) {
             cproxy_parse_behavior_key_val_str(props[k], &behavior);
         }
 
@@ -154,10 +172,11 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
     }
 
     /* The recipe memory allocations */
-    for (int j = 0; j < nrecipes; j++) {
+    for (j = 0; j < nrecipes; j++) {
         free(recipes[j].name);
     }
 
+    free(recipes);
     return RV_OK;
 }
 
@@ -165,20 +184,21 @@ static void perform_ping_test(struct ping_test_recipe recipe,
                               memcached_st *mst,
                               struct moxi_stats *out, int *failures)
 {
+    int i;
     double *timing_results = calloc(recipe.iterations, sizeof(double));
-    assert(timing_results);
-
-    struct timeval timing = { 0, 0 };
-
     char *key = calloc(recipe.keysize, sizeof(char));
-    assert(key);
     char *value = calloc(recipe.valsize, sizeof(char));
+    struct timeval timing;
+
+    memset(&timing, 0, sizeof(timing));
+    assert(timing_results);
+    assert(key);
     assert(value);
 
     /* Key is all 't's...just because */
     memset(key, 't', recipe.keysize);
     /* Value is a random bunch of stuff */
-    for (int i = 0; i < recipe.valsize; i++) {
+    for (i = 0; i < recipe.valsize; i++) {
         value[i] = random() & 0xff;
     }
 
@@ -189,18 +209,22 @@ static void perform_ping_test(struct ping_test_recipe recipe,
         /* XXX: Failure */
     }
 
-    for (int i = 0 ; i < recipe.iterations; i++) {
-        struct timeval tv_pre = { 0, 0 } , tv_post = { 0, 0 };
+    for (i = 0 ; i < recipe.iterations; i++) {
+        struct timeval tv_pre, tv_post;
         size_t retrieved_len = 0;
         uint32_t flags = 0;
         memcached_return error;
+        char *retrieved;
+
+        memset(&tv_pre, 0, sizeof(tv_pre));
+        memset(&tv_post, 0, sizeof(tv_post));
 
         gettimeofday(&tv_pre, NULL);
 
-        char *retrieved = memcached_get(mst,
-                                        key, recipe.keysize,
-                                        &retrieved_len, &flags,
-                                        &error);
+        retrieved = memcached_get(mst,
+                                  key, recipe.keysize,
+                                  &retrieved_len, &flags,
+                                  &error);
 
         gettimeofday(&tv_post, NULL);
         timeval_subtract(&timing, &tv_post, &tv_pre);
@@ -223,6 +247,11 @@ static void ping_server(char *server_name,
                         struct ping_test_recipe *recipes,
                         proxy_behavior *behavior,
                         conflate_form_result *r) {
+    memcached_st         mst;
+    memcached_server_st *mservers;
+    struct timeval timing;
+    char  buf[300] = { 0x00 };
+
     assert(server_name);
     assert(behavior);
     assert(r);
@@ -231,15 +260,8 @@ static void ping_server(char *server_name,
         behavior->port <= 0)
         return;
 
-    memcached_st         mst;
-    memcached_server_st *mservers;
-
-    struct timeval timing;
-
     conflate_next_fieldset(r);
     conflate_add_field(r, "-set-", server_name);
-
-    char  buf[300] = { 0x00 };
 
 #define dbl_report(name, dval)                  \
     snprintf(buf, sizeof(buf), "%f", dval);     \
@@ -268,22 +290,29 @@ static void ping_server(char *server_name,
 
         mservers = memcached_servers_parse(buf);
         if (mservers != NULL) {
+            int i;
+            int nconns;
+            bool connected;
+
             memcached_server_push(&mst, mservers);
             memcached_server_list_free(mservers);
             mservers = NULL;
 
-            int nconns = memcached_server_count(&mst);
-            bool connected  = false;
+            nconns = memcached_server_count(&mst);
+            connected = false;
 
-            for (int i = 0; i < nconns; i++) {
+            for (i = 0; i < nconns; i++) {
+                struct timeval start;
+                mcs_server_st *st;
+                mcs_return rc;
+
                 if (settings.verbose > 1)
                     moxi_log_write("ping_test connecting %d\n", i);
 
-                struct timeval start;
                 gettimeofday(&start, NULL);
 
-                mcs_server_st *st = mcs_server_index((void *) &mst, i);
-                mcs_return rc = mcs_server_st_connect(st, NULL, true);
+                st = mcs_server_index((void *) &mst, i);
+                rc = mcs_server_st_connect(st, NULL, true);
                 if (rc == MCS_SUCCESS) {
                     struct timeval tv_conn;
                     gettimeofday(&tv_conn, NULL);
@@ -304,29 +333,36 @@ static void ping_server(char *server_name,
             }
 
             if (connected) {
-                for (int j = 0; recipes[j].name; j++) {
-                    struct moxi_stats recipe_stats = { .min = 0.0 };
+                int j;
+                for (j = 0; recipes[j].name; j++) {
+                    struct moxi_stats recipe_stats;
                     int failures = 0;
+                    int vlen;
+                    char *val_name;
+
+                    memset(&recipe_stats, 0, sizeof(recipe_stats));
 
                     perform_ping_test(recipes[j], &mst,
                                       &recipe_stats, &failures);
-                    int vlen = strlen(recipes[j].name) + 8;
-                    char val_name[vlen];
+                    vlen = strlen(recipes[j].name) + 8;
+                    val_name = malloc(vlen + 1);
+                    if (val_name != NULL) {
+                        stat_report(val_name, vlen, recipes[j].name,
+                                    "min", recipe_stats.min);
+                        stat_report(val_name, vlen, recipes[j].name,
+                                    "avg", recipe_stats.avg);
+                        stat_report(val_name, vlen, recipes[j].name,
+                                    "max", recipe_stats.max);
+                        stat_report(val_name, vlen, recipes[j].name,
+                                    "stddev", recipe_stats.stddev);
+                        stat_report(val_name, vlen, recipes[j].name,
+                                    "95th", recipe_stats.ninetyfifth);
 
-                    stat_report(val_name, vlen, recipes[j].name,
-                                "min", recipe_stats.min);
-                    stat_report(val_name, vlen, recipes[j].name,
-                                "avg", recipe_stats.avg);
-                    stat_report(val_name, vlen, recipes[j].name,
-                                "max", recipe_stats.max);
-                    stat_report(val_name, vlen, recipes[j].name,
-                                "stddev", recipe_stats.stddev);
-                    stat_report(val_name, vlen, recipes[j].name,
-                                "95th", recipe_stats.ninetyfifth);
 
-
-                    snprintf(val_name, vlen, "%s_fail", recipes[j].name);
-                    int_report(val_name, failures);
+                        snprintf(val_name, vlen, "%s_fail", recipes[j].name);
+                        int_report(val_name, failures);
+                        free(val_name);
+                    }
                 }
             }
         } else {

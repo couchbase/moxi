@@ -19,7 +19,6 @@ const int initial_pool_size = 64;
 cache_t* cache_create(const char *name, size_t bufsize, size_t align,
                       cache_constructor_t* constructor,
                       cache_destructor_t* destructor) {
-    (void)align;
     cache_t* ret = calloc(1, sizeof(cache_t));
     char* nm = strdup(name);
     void** ptr = calloc(initial_pool_size, bufsize);
@@ -42,11 +41,12 @@ cache_t* cache_create(const char *name, size_t bufsize, size_t align,
 #else
     ret->bufsize = bufsize;
 #endif
+    (void)align;
 
     return ret;
 }
 
-static inline void* get_object(void *ptr) {
+static void* get_object(void *ptr) {
 #ifndef NDEBUG
     uint64_t *pre = ptr;
     return pre + 1;
@@ -103,6 +103,10 @@ void* cache_alloc(cache_t *cache) {
 }
 
 void cache_free(cache_t *cache, void *ptr) {
+#ifndef NDEBUG
+    uint64_t *pre;
+#endif
+
     pthread_mutex_lock(&cache->mutex);
 
 #ifndef NDEBUG
@@ -114,7 +118,7 @@ void cache_free(cache_t *cache, void *ptr) {
         pthread_mutex_unlock(&cache->mutex);
         return;
     }
-    uint64_t *pre = ptr;
+    pre = ptr;
     --pre;
     if (*pre != redzone_pattern) {
         raise(SIGABRT);
@@ -144,4 +148,3 @@ void cache_free(cache_t *cache, void *ptr) {
     }
     pthread_mutex_unlock(&cache->mutex);
 }
-

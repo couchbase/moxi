@@ -6,6 +6,7 @@
 #include <string.h>
 #include <strings.h>
 #include <limits.h>
+#include <inttypes.h>
 
 #include "htgram.h"
 
@@ -42,6 +43,8 @@ HTGRAM_HANDLE htgram_mk(int64_t bin_start,
                         double  bin_width_growth,
                         size_t  num_bins,
                         HTGRAM_HANDLE next) {
+    int64_t r = bin_start;
+    int64_t w = bin_start_width;
     struct htgram_st *h = calloc(sizeof(struct htgram_st), 1);
     if (h == NULL) {
         return NULL;
@@ -54,15 +57,14 @@ HTGRAM_HANDLE htgram_mk(int64_t bin_start,
     h->next = next;
 
     if (num_bins > 0) {
+        size_t i;
         h->bins = calloc(sizeof(struct htgram_bin_st), num_bins);
         if (h->bins == NULL) {
             free(h);
             return NULL;
         }
 
-        int64_t r = bin_start;
-        int64_t w = bin_start_width;
-        for (size_t i = 0; i < num_bins; i++) {
+        for (i = 0; i < num_bins; i++) {
             h->bins[i].start = r;
             h->bins[i].width = w;
             r = r + w;
@@ -100,12 +102,12 @@ size_t htgram_get_num_bins(HTGRAM_HANDLE h) {
 }
 
 void htgram_incr(HTGRAM_HANDLE h, int64_t data_point, uint64_t count) {
+    size_t i = 0;
+
     if (data_point < h->bin_start) {
         h->lt_count += count;
         return;
     }
-
-    size_t i = 0;
 
     if (h->bin_width_growth == 1.0) {
         i = data_point / h->bin_start_width;
@@ -158,7 +160,8 @@ bool htgram_get_bin_data(HTGRAM_HANDLE h, int bin_index,
 }
 
 void htgram_reset(HTGRAM_HANDLE h) {
-    for (size_t i = 0; i < h->num_bins; i++) {
+    size_t i;
+    for (i = 0; i < h->num_bins; i++) {
         h->bins[i].count = 0;
     }
 
@@ -194,10 +197,6 @@ void htgram_add(HTGRAM_HANDLE agg, HTGRAM_HANDLE x) {
 
 void htgram_dump(HTGRAM_HANDLE h,
                  HTGRAM_DUMP_CALLBACK dump_callback, void *dump_callback_data) {
-    if (h == NULL) {
-        return;
-    }
-
     int64_t  max_start = 0;
     int64_t  max_width = 0;
     uint64_t max_count = 0;
@@ -205,11 +204,19 @@ void htgram_dump(HTGRAM_HANDLE h,
     int      beg_bin = INT_MAX;
     uint64_t tot_count = 0;
     uint64_t run_count; /* Cummulative count. */
-
     int64_t  start;
     int64_t  width;
     uint64_t count;
     int      num_bins = 0;
+    int  max_plus = 0;  /* Width of the 'plus' column ('+'). */
+    int  max_equal = 0; /* Width of the 'equal' column ('='). */
+    int  max_space = 0; /* Width of the 'space' column (' '). */
+    char buf[2000];
+    int i;
+
+    if (h == NULL) {
+        return;
+    }
 
     while (htgram_get_bin_data(h, num_bins, &start, &width, &count)) {
         num_bins++;
@@ -235,30 +242,25 @@ void htgram_dump(HTGRAM_HANDLE h,
     }
 
     /* Columns in a row look like "START+WIDTH=COUNT PCT% BAR_GRAPH_LINE" */
-
-    int  max_plus = 0;  /* Width of the 'plus' column ('+'). */
-    int  max_equal = 0; /* Width of the 'equal' column ('='). */
-    int  max_space = 0; /* Width of the 'space' column (' '). */
-
-    char buf[2000];
-
     run_count = 0;
-    for (int i = beg_bin; i < end_num_bins + 1 && i < num_bins; i++) {
+    for (i = beg_bin; i < end_num_bins + 1 && i < num_bins; i++) {
         if (htgram_get_bin_data(h, i, &start, &width, &count)) {
+            char *s0, *s1, *s2;
+
             emit_bar(start, width, count, max_count, tot_count, run_count,
                      buf, sizeof(buf) - 1, 0, 0, 0);
 
-            char *s0 = strchr(buf, '+');
+            s0 = strchr(buf, '+');
             assert(s0 != NULL);
             if (max_plus < s0 - buf) {
                 max_plus = s0 - buf;
             }
-            char *s1 = strchr(s0, '=');
+            s1 = strchr(s0, '=');
             assert(s1 != NULL);
             if (max_equal < s1 - s0) {
                 max_equal = s1 - s0;
             }
-            char *s2 = strchr(s1, '%');
+            s2 = strchr(s1, '%');
             assert(s2 != NULL);
             if (max_space < s2 - s1) {
                 max_space = s2 - s1;
@@ -269,14 +271,16 @@ void htgram_dump(HTGRAM_HANDLE h,
     }
 
     run_count = 0;
-    for (int i = beg_bin; i < end_num_bins + 1 && i < num_bins; i++) {
+    for (i = beg_bin; i < end_num_bins + 1 && i < num_bins; i++) {
         if (htgram_get_bin_data(h, i, &start, &width, &count)) {
+            char *s0, *s1, *s2;
+
             emit_bar(start, width, count, max_count, tot_count, run_count,
                      buf, sizeof(buf) - 1, 0, 0, 0);
 
-            char *s0 = strchr(buf, '+');
-            char *s1 = strchr(s0, '=');
-            char *s2 = strchr(s1, '%');
+            s0 = strchr(buf, '+');
+            s1 = strchr(s0, '=');
+            s2 = strchr(s1, '%');
 
             emit_bar(start, width, count, max_count, tot_count, run_count,
                      buf, sizeof(buf) - 1,
@@ -323,7 +327,7 @@ static void emit_bar(int64_t start, int64_t width, uint64_t count,
     fill_spaces(equal_buf, sizeof(equal_buf), equal_spaces);
     fill_spaces(space_buf, sizeof(space_buf), space_spaces);
 
-    snprintf(buf, buf_len - 1, "%s%lld+%lld%s=%llu %s%.2f%% %s",
+    snprintf(buf, buf_len - 1, "%s%"PRIu64"+%"PRIu64"%s=%"PRIu64" %s%.2f%% %s",
              plus_buf, start, width, equal_buf, count, space_buf,
              100.0 * ((float) (count + run_count) / (float) tot_count), bar_buf);
 }

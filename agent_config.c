@@ -110,6 +110,11 @@ static void init_extensions(void)
 int cproxy_init_agent(char *cfg_str,
                       proxy_behavior behavior,
                       int nthreads) {
+    int cfg_len;
+    char *buff;
+    char *next;
+    int rv = 0;
+
     init_extensions();
 
     if (cfg_str == NULL) {
@@ -120,7 +125,7 @@ int cproxy_init_agent(char *cfg_str,
         exit(EXIT_FAILURE);
     }
 
-    int cfg_len = strlen(cfg_str);
+    cfg_len = strlen(cfg_str);
     if (cfg_len <= 0) {
         moxi_log_write("ERROR: empty cfg\n");
         if (ml->log_mode != ERRORLOG_STDERR) {
@@ -128,8 +133,6 @@ int cproxy_init_agent(char *cfg_str,
         }
         exit(EXIT_FAILURE);
     }
-
-    char *buff;
 
     if (strncmp(cfg_str, "apikey=", 7) == 0 ||
         strncmp(cfg_str, "auth=", 5) == 0 ||
@@ -139,13 +142,14 @@ int cproxy_init_agent(char *cfg_str,
         buff = calloc(cfg_len + 50, sizeof(char));
         if (buff != NULL) {
             if (strncmp(cfg_str, "http://", 7) == 0) {
+                char *x;
                 snprintf(buff, cfg_len + 50, "url=%s", cfg_str);
 
                 /* Allow the user to specify multiple comma-separated URL's, */
                 /* which we auto-translate right now to the '|' separators */
                 /* that the rest of the code expects. */
 
-                for (char *x = buff; *x; x++) {
+                for (x = buff; *x; x++) {
                     if (*x == ',') {
                         *x = '|';
                     }
@@ -157,9 +161,7 @@ int cproxy_init_agent(char *cfg_str,
         buff = trimstr(buff);
     }
 
-    char *next = buff;
-
-    int rv = 0;
+    next = buff;
 
     while (next != NULL) {
         char *jid    = behavior.usr;
@@ -167,6 +169,7 @@ int cproxy_init_agent(char *cfg_str,
         char *jpwmem = NULL;
         char *dbpath = NULL;
         char *host   = NULL;
+        int dbpath_alloc = 0;
 
         char *cur = trimstr(strsep(&next, ";"));
         while (cur != NULL) {
@@ -236,7 +239,7 @@ int cproxy_init_agent(char *cfg_str,
             jpw = "";
         }
 
-        int dbpath_alloc = 0;
+        dbpath_alloc = 0;
         if (dbpath == NULL) {
             dbpath_alloc = strlen(jid) + strlen(CONFLATE_DB_PATH) + 100;
             dbpath = calloc(dbpath_alloc, 1);
@@ -282,15 +285,17 @@ proxy_main *cproxy_init_agent_start(char *jid,
                                     char *host,
                                     proxy_behavior behavior,
                                     int nthreads) {
+    proxy_main *m;
     assert(dbpath);
 
     if (settings.verbose > 2) {
         moxi_log_write("cproxy_init_agent_start\n");;
     }
 
-    proxy_main *m = cproxy_gen_proxy_main(behavior, nthreads,
-                                          PROXY_CONF_TYPE_DYNAMIC);
+    m = cproxy_gen_proxy_main(behavior, nthreads,
+                              PROXY_CONF_TYPE_DYNAMIC);
     if (m != NULL) {
+        conflate_config_t config;
         /* Create a NULL_BUCKET when we're not in "FIRST_BUCKET" mode. */
 
         /* FIRST_BUCKET mode means clients start off in the first */
@@ -316,8 +321,6 @@ proxy_main *cproxy_init_agent_start(char *jid,
                 moxi_log_write("using first bucket\n");
             }
         }
-
-        conflate_config_t config;
 
         memset(&config, 0, sizeof(config));
 
@@ -370,11 +373,11 @@ static void cproxy_init_null_bucket(proxy_main *m) {
     int nodes_num = 0;
 
     if (pool_port > 0) {
-        proxy_behavior_pool behavior_pool = {
-            .base = proxyb,
-            .num  = nodes_num,
-            .arr  = calloc(nodes_num + 1, sizeof(proxy_behavior))
-        };
+        proxy_behavior_pool behavior_pool;
+        memset(&behavior_pool, 0, sizeof(behavior_pool));
+        behavior_pool.base = proxyb;
+        behavior_pool.num  = nodes_num;
+        behavior_pool.arr  = calloc(nodes_num + 1, sizeof(proxy_behavior));
 
         if (behavior_pool.arr != NULL) {
             cproxy_on_config_pool(m, NULL_BUCKET, pool_port,
@@ -385,33 +388,33 @@ static void cproxy_init_null_bucket(proxy_main *m) {
 }
 
 conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
-    assert(config != NULL);
-
+    char **urlv;
+    char  *url;
+    char **contentsv;
+    char  *contents;
+    kvpair_t *copy;
+    LIBEVENT_THREAD *mthread;
     proxy_main *m = userdata;
     assert(m != NULL);
+    assert(config != NULL);
 
-    LIBEVENT_THREAD *mthread = thread_by_index(0);
+    mthread = thread_by_index(0);
     assert(mthread != NULL);
 
     if (settings.verbose > 0) {
         moxi_log_write("configuration received\n");
     }
 
-    char **urlv = get_key_values(config, "url"); /* NULL delimited array of char *. */
-    char  *url  = urlv != NULL ? urlv[0] : NULL;
+    urlv = get_key_values(config, "url"); /* NULL delimited array of char *. */
+    url  = urlv != NULL ? urlv[0] : NULL;
+    contentsv = get_key_values(config, "contents");
+    contents  = contentsv != NULL ? contentsv[0] : NULL;
 
-    char **contentsv = get_key_values(config, "contents");
-    char  *contents  = contentsv != NULL ? contentsv[0] : NULL;
-
-    if (url != NULL &&
-        contents != NULL &&
-        strlen(contents) > 0) {
+    if (url != NULL && contents != NULL && strlen(contents) > 0) {
         /* Must be a REST/JSON config.  Wastefully test parse it here, */
         /* before we asynchronously invoke the real worker who can't */
         /* respond nicely with an error code. */
-
         bool ok = false;
-
         cJSON *c = cJSON_Parse(contents);
         if (c != NULL) {
             ok = true;
@@ -426,7 +429,7 @@ conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
         }
     }
 
-    kvpair_t *copy = dup_kvpair(config);
+    copy = dup_kvpair(config);
     if (copy != NULL) {
         if (work_send(mthread->work_queue, cproxy_on_config, m, copy)) {
             return CONFLATE_SUCCESS;
@@ -507,11 +510,14 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
     bool rv = false;
 
     int numBuckets = cJSON_GetArraySize(jBuckets);
-    for (int i = 0; i < numBuckets; i++) {
+    int i;
+
+    for (i = 0; i < numBuckets; i++) {
         cJSON *jBucket = cJSON_GetArrayItem(jBuckets, i);
         if (jBucket != NULL &&
             jBucket->type == cJSON_Object) {
             char *name = "default";
+            bool is_default;
 
             cJSON *jName = cJSON_GetObjectItem(jBucket, "name");
             if (jName != NULL &&
@@ -520,7 +526,7 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
                 name = jName->valuestring;
             }
 
-            bool is_default = (strcmp(name, "default") == 0);
+            is_default = (strcmp(name, "default") == 0);
             if (!(is_default ^ want_default)) { /* XOR. */
                 char *jBucketStr = cJSON_Print(jBucket);
                 if (jBucketStr != NULL) {
@@ -539,17 +545,16 @@ static
 bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                                char *config, char *name,
                                char *src) {
+    bool rv = false;
     assert(m != NULL);
     assert(config != NULL);
     assert(name != NULL);
 
-    bool rv = false;
-
     /* Handle reconfiguration of a single proxy. */
 
-    if (m != NULL &&
-        config != NULL &&
-        strlen(config) > 0) {
+    if (m != NULL && config != NULL && strlen(config) > 0) {
+        cJSON *jConfig;
+
         if (settings.verbose > 2) {
             moxi_log_write("conjo contents config from %s: %s\n", src, config);
         }
@@ -573,8 +578,9 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
         /*     "serverList":["10.17.1.46:11212"], */
         /*     ...more json here...}} */
 
-        cJSON *jConfig = cJSON_Parse(config);
+        jConfig = cJSON_Parse(config);
         if (jConfig != NULL) {
+            cJSON *jNodeLocator;
             cJSON *jName = cJSON_GetObjectItem(jConfig, "name");
             if (jName != NULL &&
                 jName->type == cJSON_String &&
@@ -582,7 +588,7 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                 name = jName->valuestring;
             }
 
-            cJSON *jNodeLocator = cJSON_GetObjectItem(jConfig, "nodeLocator");
+            jNodeLocator = cJSON_GetObjectItem(jConfig, "nodeLocator");
             if (jNodeLocator != NULL &&
                 jNodeLocator->type == cJSON_String &&
                 jNodeLocator->valuestring != NULL) {
@@ -612,59 +618,65 @@ static
 bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
                                        char *config, char *name,
                                        char *src) {
-    assert(m != NULL);
-
     bool rv = false;
+    VBUCKET_CONFIG_HANDLE vch;
+    assert(m != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("parsing config nodeLocator:vbucket\n");
     }
 
-    VBUCKET_CONFIG_HANDLE vch = vbucket_config_parse_string(config);
+    vch = vbucket_config_parse_string(config);
     if (vch) {
+        proxy_behavior proxyb;
+        int pool_port;
+        int nodes_num;
+
         if (settings.verbose > 2) {
             moxi_log_write("conc vbucket_config_parse_string: %d for %s\n",
                            (vch != NULL), name);
         }
 
-        proxy_behavior proxyb = m->behavior;
+        proxyb = m->behavior;
         strcpy(proxyb.nodeLocator, "vbucket");
 
-        int pool_port = proxyb.port_listen;
-        int nodes_num = vbucket_config_get_num_servers(vch);
+        pool_port = proxyb.port_listen;
+        nodes_num = vbucket_config_get_num_servers(vch);
 
         if (settings.verbose > 2) {
             moxi_log_write("conc pool_port: %d nodes_num: %d\n",
                            pool_port, nodes_num);
         }
 
-        if (pool_port > 0 &&
-            nodes_num > 0) {
-            proxy_behavior_pool behavior_pool = {
-                .base = proxyb,
-                .num  = nodes_num,
-                .arr  = calloc(nodes_num, sizeof(proxy_behavior))
-            };
+        if (pool_port > 0 && nodes_num > 0) {
+            proxy_behavior_pool behavior_pool;
+            memset(&behavior_pool, 0, sizeof(behavior_pool));
+
+            behavior_pool.base = proxyb;
+            behavior_pool.num  = nodes_num;
+            behavior_pool.arr  = calloc(nodes_num, sizeof(proxy_behavior));
 
             if (behavior_pool.arr != NULL) {
+                int j = 0;
                 cproxy_parse_json_auth(config, name, &behavior_pool);
 
-                int j = 0;
                 for (; j < nodes_num; j++) {
                     /* Inherit default behavior. */
-
+                    const char *hostport;
                     behavior_pool.arr[j] = behavior_pool.base;
 
-                    const char *hostport = vbucket_config_get_server(vch, j);
+                    hostport = vbucket_config_get_server(vch, j);
                     if (hostport != NULL &&
                         strlen(hostport) > 0 &&
                         strlen(hostport) < sizeof(behavior_pool.arr[j].host) - 1) {
+                        char *colon;
+
                         strncpy(behavior_pool.arr[j].host,
                                 hostport,
                                 sizeof(behavior_pool.arr[j].host) - 1);
                         behavior_pool.arr[j].host[sizeof(behavior_pool.arr[j].host) - 1] = '\0';
 
-                        char *colon = strchr(behavior_pool.arr[j].host, ':');
+                        colon = strchr(behavior_pool.arr[j].host, ':');
                         if (colon != NULL) {
                             *colon = '\0';
                             behavior_pool.arr[j].port = atoi(colon + 1);
@@ -718,9 +730,12 @@ static
 bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                       char *config, char *name,
                                       char *src) {
-    assert(m != NULL);
-
     bool rv = false;
+    cJSON *jConfig;
+    cJSON *jArr;
+    cJSON *jVBSM;
+
+    assert(m != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("parsing config nodeLocator:ketama\n");
@@ -729,14 +744,14 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
     /* First, try to iterate through jConfig.vBucketServerMap.serverList */
     /* if it exists, otherwise iterate through jConfig.nodes. */
 
-    cJSON *jConfig = cJSON_Parse(config);
+    jConfig = cJSON_Parse(config);
     if (jConfig == NULL) {
         return false;
     }
 
-    cJSON *jArr = NULL;
+    jArr = NULL;
 
-    cJSON *jVBSM = cJSON_GetObjectItem(jConfig, "vBucketServerMap");
+    jVBSM = cJSON_GetObjectItem(jConfig, "vBucketServerMap");
     if (jVBSM != NULL) {
         jArr = cJSON_GetObjectItem(jVBSM, "serverList");
     }
@@ -746,50 +761,50 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
         jArr = cJSON_GetObjectItem(jConfig, "nodes");
     }
 
-    if (jArr != NULL &&
-        jArr->type == cJSON_Array) {
+    if (jArr != NULL && jArr->type == cJSON_Array) {
         int nodes_num = cJSON_GetArraySize(jArr);
         if (nodes_num > 0) {
             proxy_behavior proxyb = m->behavior;
+            proxy_behavior_pool behavior_pool;
+
             strcpy(proxyb.nodeLocator, "ketama");
 
             if (settings.verbose > 2) {
                 moxi_log_write("conjk nodes_num: %d\n", nodes_num);
             }
-
-            proxy_behavior_pool behavior_pool = {
-                .base = proxyb,
-                .num  = nodes_num,
-                .arr  = calloc(nodes_num + 1, sizeof(proxy_behavior))
-            };
+            memset(&behavior_pool, 0, sizeof(behavior_pool));
+            behavior_pool.base = proxyb;
+            behavior_pool.num  = nodes_num;
+            behavior_pool.arr  = calloc(nodes_num + 1, sizeof(proxy_behavior));
 
             if (behavior_pool.arr != NULL) {
-                cproxy_parse_json_auth(config, name, &behavior_pool);
-
                 int curr = 0; /* Moves slower than j so we can skip unhealthy nodes. */
 
                 int j = 0;
+
+                cproxy_parse_json_auth(config, name, &behavior_pool);
                 for (; j < nodes_num; j++) {
                     /* Inherit default behavior. */
+                    cJSON *jNode;
 
                     behavior_pool.arr[curr] = behavior_pool.base;
 
-                    cJSON *jNode = cJSON_GetArrayItem(jArr, j);
+                    jNode = cJSON_GetArrayItem(jArr, j);
                     if (jNode != NULL) {
                         if (jNode->type == cJSON_String &&
                             jNode->valuestring != NULL) {
                             /* Should look like "host:port". */
-
                             char *hostport = jNode->valuestring;
 
                             if (strlen(hostport) > 0 &&
                                 strlen(hostport) < sizeof(behavior_pool.arr[curr].host) - 1) {
+                                char *colon;
                                 strncpy(behavior_pool.arr[curr].host,
                                         hostport,
                                         sizeof(behavior_pool.arr[curr].host) - 1);
                                 behavior_pool.arr[curr].host[sizeof(behavior_pool.arr[curr].host) - 1] = '\0';
 
-                                char *colon = strchr(behavior_pool.arr[curr].host, ':');
+                                colon = strchr(behavior_pool.arr[curr].host, ':');
                                 if (colon != NULL) {
                                     *colon = '\0';
                                     behavior_pool.arr[curr].port = atoi(colon + 1);
@@ -811,6 +826,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                             /*   ports: { direct: port } */
                             /* } */
 
+                            cJSON *jHostname;
                             cJSON *jStatus = cJSON_GetObjectItem(jNode, "status");
                             if (jStatus != NULL &&
                                 jStatus->type == cJSON_String &&
@@ -821,7 +837,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                 continue;
                             }
 
-                            cJSON *jHostname = cJSON_GetObjectItem(jNode, "hostname");
+                            jHostname = cJSON_GetObjectItem(jNode, "hostname");
                             if (jHostname != NULL &&
                                 jHostname->type == cJSON_String &&
                                 jHostname->valuestring != NULL &&
@@ -833,6 +849,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                     if (jDirect != NULL &&
                                         jDirect->type == cJSON_Number &&
                                         jDirect->valueint > 0) {
+                                        char *colon;
                                         strncpy(behavior_pool.arr[curr].host,
                                                 jHostname->valuestring,
                                                 sizeof(behavior_pool.arr[curr].host) - 1);
@@ -841,7 +858,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                         /* The JSON might return a hostname that looks */
                                         /* like "HOST:REST_PORT", so strip off the ":REST_PORT". */
 
-                                        char *colon = strchr(behavior_pool.arr[curr].host, ':');
+                                        colon = strchr(behavior_pool.arr[curr].host, ':');
                                         if (colon != NULL) {
                                             *colon = '\0';
                                         }
@@ -867,6 +884,8 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                 }
 
                 if (j >= nodes_num && curr > 0) {
+                    int   config_len = 200;
+                    char *config_str;
                     /* Some unhealthy nodes might have been skipped, */
                     /* so curr might be <= behavior_pool.num. */
 
@@ -875,13 +894,13 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                     /* Create a config string that libmemcached likes, */
                     /* such as "HOST:PORT,HOST:PORT,HOST:PORT". */
 
-                    int   config_len = 200;
-                    char *config_str = calloc(config_len, 1);
+                    config_str = calloc(config_len, 1);
 
                     if (config_str != NULL) {
                         for (j = 0; j < behavior_pool.num; j++) {
                             /* Grow config string for libmemcached. */
 
+                            char *config_end;
                             int x = 40 + /* For port and weight. */
                                 strlen(config_str) +
                                 strlen(behavior_pool.arr[j].host);
@@ -893,7 +912,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
                                 }
                             }
 
-                            char *config_end = config_str + strlen(config_str);
+                            config_end = config_str + strlen(config_str);
                             if (config_end != config_str) {
                                 *config_end++ = ',';
                             }
@@ -968,10 +987,11 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
 static void cproxy_parse_json_auth(char *config,
                                    char *name,
                                    proxy_behavior_pool *bp) {
+    cJSON *jConfig;
     strncpy(bp->base.usr, name, sizeof(bp->base.usr) - 1);
     bp->base.usr[sizeof(bp->base.usr) - 1] = '\0';
 
-    cJSON *jConfig = cJSON_Parse(config);
+    jConfig = cJSON_Parse(config);
     if (jConfig != NULL) {
         cJSON *jPassword = cJSON_GetObjectItem(jConfig, "saslPassword");
         if (jPassword != NULL &&
@@ -990,19 +1010,24 @@ static void cproxy_parse_json_auth(char *config,
 static
 void cproxy_on_config(void *data0, void *data1) {
     proxy_main *m = data0;
-    assert(m);
-
     kvpair_t *kvs = data1;
+    uint32_t max_config_ver = 0;
+    proxy *p;
+    uint32_t new_config_ver;
+    char **urlv;
+    char  *url;
+    char **contents;
+
+
+    assert(m);
     assert(kvs);
     assert(is_listen_thread());
 
     m->stat_configs++;
 
-    uint32_t max_config_ver = 0;
-
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
         if (max_config_ver < p->config_ver) {
             max_config_ver = p->config_ver;
@@ -1012,18 +1037,17 @@ void cproxy_on_config(void *data0, void *data1) {
 
     pthread_mutex_unlock(&m->proxy_main_lock);
 
-    uint32_t new_config_ver = max_config_ver + 1;
+    new_config_ver = max_config_ver + 1;
 
     if (settings.verbose > 2) {
         moxi_log_write("conc new_config_ver %u\n", new_config_ver);
     }
 
-    char **urlv = get_key_values(kvs, "url"); /* NULL delimited array of char *. */
-    char  *url  = urlv != NULL ? (urlv[0] != NULL ? urlv[0] : "") : "";
+    urlv = get_key_values(kvs, "url"); /* NULL delimited array of char *. */
+    url  = urlv != NULL ? (urlv[0] != NULL ? urlv[0] : "") : "";
 
-    char **contents = get_key_values(kvs, "contents");
-    if (contents != NULL &&
-        contents[0] != NULL) {
+    contents = get_key_values(kvs, "contents");
+    if (contents != NULL && contents[0] != NULL) {
         char *config = trimstrdup(contents[0]);
         if (config != NULL &&
             strlen(config) > 0) {
@@ -1056,8 +1080,8 @@ void cproxy_on_config(void *data0, void *data1) {
     free_kvpair(kvs);
 
     if (settings.verbose > 1) {
-        moxi_log_write("ERROR: conc failed config %llu\n",
-                       (long long unsigned int) m->stat_config_fails);
+        moxi_log_write("ERROR: conc failed config %"PRIu64"\n",
+                       (uint64_t) m->stat_config_fails);
     }
 }
 
@@ -1069,6 +1093,7 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
     /*       upstreams are pointed at the proxy. */
 
     proxy_behavior_pool empty_pool;
+    proxy *p;
     memset(&empty_pool, 0, sizeof(proxy_behavior_pool));
 
     empty_pool.base = m->behavior;
@@ -1077,7 +1102,7 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL; p = p->next) {
         bool  down = false;
         int   port = 0;
         char *name = NULL;
@@ -1131,6 +1156,9 @@ void cproxy_on_config_pool(proxy_main *m,
                            char *config,
                            uint32_t config_ver,
                            proxy_behavior_pool *behavior_pool) {
+    bool found = false;
+    proxy *p;
+
     assert(m);
     assert(name != NULL);
     assert(port >= 0);
@@ -1139,11 +1167,10 @@ void cproxy_on_config_pool(proxy_main *m,
     /* See if we've already got a proxy running with that name and port, */
     /* and create one if needed. */
 
-    bool found = false;
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    proxy *p = m->proxy_head;
+    p = m->proxy_head;
     while (p != NULL && !found) {
         pthread_mutex_lock(&p->proxy_lock);
 
@@ -1171,6 +1198,8 @@ void cproxy_on_config_pool(proxy_main *m,
                           behavior_pool,
                           m->nthreads);
         if (p != NULL) {
+            int n;
+
             pthread_mutex_lock(&m->proxy_main_lock);
 
             p->next = m->proxy_head;
@@ -1178,7 +1207,7 @@ void cproxy_on_config_pool(proxy_main *m,
 
             pthread_mutex_unlock(&m->proxy_main_lock);
 
-            int n = cproxy_listen(p);
+            n = cproxy_listen(p);
             if (n > 0) {
                 if (settings.verbose > 2) {
                     moxi_log_write(
@@ -1200,13 +1229,14 @@ void cproxy_on_config_pool(proxy_main *m,
             }
         }
     } else {
+        bool changed  = false;
+        bool shutdown_flag = false;
+        int i;
+
         if (settings.verbose > 2) {
             moxi_log_write("conp existing config change %u\n",
                     p->port);
         }
-
-        bool changed  = false;
-        bool shutdown_flag = false;
 
         pthread_mutex_lock(&m->proxy_main_lock);
 
@@ -1295,12 +1325,14 @@ void cproxy_on_config_pool(proxy_main *m,
 
         /* Send update across worker threads, avoiding locks. */
 
-        for (int i = 1; i < m->nthreads; i++) {
+        for (i = 1; i < m->nthreads; i++) {
             LIBEVENT_THREAD *t = thread_by_index(i);
+            proxy_td *ptd;
+
             assert(t);
             assert(t->work_queue);
 
-            proxy_td *ptd = &p->thread_data[i];
+            ptd = &p->thread_data[i];
             if (t &&
                 t->work_queue) {
                 work_send(t->work_queue, update_ptd_config, ptd, NULL);
@@ -1319,21 +1351,26 @@ void cproxy_on_config_pool(proxy_main *m,
 /* ---------------------------------------------------------- */
 
 static void update_ptd_config(void *data0, void *data1) {
+    proxy_td *ptd;
+    proxy *p;
+    bool changed = false;
+    int  port;
+    int  prev;
+
     (void)data1;
 
-    proxy_td *ptd = data0;
+    ptd = data0;
     assert(ptd);
 
-    proxy *p = ptd->proxy;
+    p = ptd->proxy;
     assert(p);
 
     assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     pthread_mutex_lock(&p->proxy_lock);
 
-    bool changed = false;
-    int  port = p->port;
-    int  prev = ptd->config_ver;
+    port = p->port;
+    prev = ptd->config_ver;
 
     if (ptd->config_ver != p->config_ver) {
         ptd->config_ver = p->config_ver;
@@ -1463,6 +1500,11 @@ char *parse_kvs_servers(char *prefix,
                         kvpair_t *kvs,
                         char **servers,
                         proxy_behavior_pool *behavior_pool) {
+
+    int   config_len = 200;
+    char *config_str;
+    int j;
+
     assert(prefix);
     assert(pool_name);
     assert(kvs);
@@ -1477,10 +1519,12 @@ char *parse_kvs_servers(char *prefix,
     /* Create a config string that libmemcached likes. */
     /* See memcached_servers_parse(). */
 
-    int   config_len = 200;
-    char *config_str = calloc(config_len, 1);
+    config_str = calloc(config_len, 1);
 
-    for (int j = 0; servers[j]; j++) {
+    for (j = 0; servers[j]; j++) {
+        int x;
+        char *config_end;
+
         assert(j < behavior_pool->num);
 
         /* Inherit default behavior. */
@@ -1492,7 +1536,7 @@ char *parse_kvs_servers(char *prefix,
 
         /* Grow config string for libmemcached. */
 
-        int x = 40 + /* For port and weight. */
+        x = 40 + /* For port and weight. */
             strlen(config_str) +
             strlen(behavior_pool->arr[j].host);
         if (config_len < x) {
@@ -1500,7 +1544,7 @@ char *parse_kvs_servers(char *prefix,
             config_str = realloc(config_str, config_len);
         }
 
-        char *config_end = config_str + strlen(config_str);
+        config_end = config_str + strlen(config_str);
         if (config_end != config_str) {
             *config_end++ = ',';
         }
@@ -1545,17 +1589,20 @@ char **parse_kvs_behavior(kvpair_t *kvs,
                           char *prefix,
                           char *name,
                           proxy_behavior *behavior) {
+    char key[800];
+    char **props;
+    int k;
+
     assert(kvs);
     assert(prefix);
     assert(name);
     assert(behavior);
 
-    char key[800];
 
     snprintf(key, sizeof(key), "%s-%s", prefix, name);
 
-    char **props = get_key_values(kvs, key);
-    for (int k = 0; props && props[k]; k++) {
+    props = get_key_values(kvs, key);
+    for (k = 0; props && props[k]; k++) {
         char *key_val = trimstrdup(props[k]);
         if (key_val != NULL) {
             cproxy_parse_behavior_key_val_str(key_val, behavior);

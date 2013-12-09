@@ -652,6 +652,9 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
     unsigned long long start_ms = 0;
     unsigned long long timeout_ms = 0;
     unsigned long long now_ms = 0;
+    char *data;
+    size_t done;
+    struct pollfd pfd[1];
 
     if (timeout_in != NULL) {
         start_ms = __get_time_ms(NULL);
@@ -659,16 +662,18 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
         now_ms = start_ms;
     }
 
-    char *data = dta;
-    size_t done = 0;
-    struct pollfd pfd[1];
+    data = dta;
+    done = 0;
 
     while (done < size) {
+        int timeout = INFTIM;
+        int s;
+        ssize_t n;
+
         pfd[0].fd = fd;
         pfd[0].events = POLLIN;
         pfd[0].revents = 0;
 
-        int timeout = INFTIM;
         if (timeout_in != NULL) {
             if (timeout_ms == 0) {
                 /* ensure we poll at least once */
@@ -684,7 +689,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
                 }
             }
         }
-        int s = poll(pfd, 1, timeout);
+        s = poll(pfd, 1, timeout);
         if (s == 0) {
             return MCS_TIMEOUT;
         }
@@ -693,7 +698,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
             return MCS_FAILURE;
         }
 
-        ssize_t n = read(fd, data + done, 1);
+        n = read(fd, data + done, 1);
         if (n == -1 || n == 0) {
             return MCS_FAILURE;
         }
@@ -733,9 +738,10 @@ const char *mcs_server_st_pwd(mcs_server_st *ptr) {
 }
 
 char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii) {
+    char *buf;
     assert(msst != NULL);
 
-    char *buf = is_ascii ? msst->ident_a : msst->ident_b;
+    buf = is_ascii ? msst->ident_a : msst->ident_b;
     if (buf[0] == '\0') {
         const char *usr = mcs_server_st_usr(msst);
         const char *pwd = mcs_server_st_pwd(msst);
