@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 rm -f /tmp/issue-MB-3575.out*
 

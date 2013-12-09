@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 date > /tmp/issue-MB-2811.log
 
