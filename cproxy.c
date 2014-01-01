@@ -357,13 +357,10 @@ int cproxy_listen_port(int port,
     while (x != NULL) {
         if (x->extra != NULL &&
             x->funcs == funcs) {
-            struct in_addr in = {0};
             struct sockaddr_in s_in = {.sin_family = 0};
             socklen_t sin_len = sizeof(s_in);
 
             if (getsockname(x->sfd, (struct sockaddr *) &s_in, &sin_len) == 0) {
-                in.s_addr = s_in.sin_addr.s_addr;
-
                 int x_port = ntohs(s_in.sin_port);
                 if (x_port == port) {
                     if (settings.verbose > 1) {
