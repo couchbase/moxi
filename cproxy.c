@@ -1452,7 +1452,7 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
              */
             if (c && c->peer_host && c->peer_port) {
                 assert(i == 0);
-                strncpy(msst_actual->hostname, c->peer_host, MCS_IDENT_SIZE);
+                strncpy(msst_actual->hostname, c->peer_host, MCS_HOSTNAME_SIZE);
                 msst_actual->port = c->peer_port;
                 msst_actual->fd = -1;
                 msst_actual->ident_a[0] = msst_actual->ident_b[0] = 0;

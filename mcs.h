@@ -34,9 +34,10 @@ typedef enum {
 } mcs_kind;
 
 #define MCS_IDENT_SIZE 300
+#define MCS_HOSTNAME_SIZE 200
 
 typedef struct {
-    char hostname[200];
+    char hostname[MCS_HOSTNAME_SIZE];
     int port;
     int fd;
     char *usr;
