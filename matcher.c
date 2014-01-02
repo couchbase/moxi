@@ -34,8 +34,7 @@ void matcher_start(matcher *m, char *spec) {
 
     /* The spec currently is a string of '|' separated prefixes. */
 
-    if (spec != NULL &&
-        strlen(spec) > 0) {
+    if (spec != NULL && strlen(spec) > 0) {
         char *copy = strdup(spec);
         if (copy != NULL) {
             char *next = copy;
@@ -55,13 +54,15 @@ void matcher_start(matcher *m, char *spec) {
 }
 
 bool matcher_started(matcher *m) {
+    bool rv;
+
     assert(m);
 
     if (m->lock) {
         pthread_mutex_lock(m->lock);
     }
 
-    bool rv = m->patterns != NULL && m->patterns_num > 0;
+    rv = m->patterns != NULL && m->patterns_num > 0;
 
     if (m->lock) {
         pthread_mutex_unlock(m->lock);
@@ -78,7 +79,8 @@ void matcher_stop(matcher *m) {
     }
 
     if (m->patterns != NULL) {
-        for (int i = 0; i < m->patterns_num; i++) {
+        int i;
+        for (i = 0; i < m->patterns_num; i++) {
             free(m->patterns[i]);
         }
     }
@@ -121,10 +123,9 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
         copy->patterns = calloc(copy->patterns_max, sizeof(char *));
         copy->lengths  = calloc(copy->patterns_max, sizeof(int));
         copy->hits     = calloc(copy->patterns_max, sizeof(uint64_t));
-        if (copy->patterns != NULL &&
-            copy->lengths != NULL &&
-            copy->hits != NULL) {
-            for (int i = 0; i < copy->patterns_num; i++) {
+        if (copy->patterns != NULL && copy->lengths != NULL && copy->hits != NULL) {
+            int i;
+            for (i = 0; i < copy->patterns_num; i++) {
                 assert(m->patterns[i]);
                 copy->patterns[i] = strdup(m->patterns[i]);
                 if (copy->patterns[i] == NULL) {
@@ -156,11 +157,12 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
 /** Assuming caller has m->lock already.
  */
 void matcher_add(matcher *m, char *pattern) {
+    int length;
     assert(m);
     assert(m->patterns_num <= m->patterns_max);
     assert(pattern);
 
-    int length = strlen(pattern);
+    length = strlen(pattern);
     if (length <= 0) {
         return;
     }
@@ -197,24 +199,24 @@ void matcher_add(matcher *m, char *pattern) {
 
 bool matcher_check(matcher *m, char *str, int str_len,
                    bool default_when_unstarted) {
-    assert(m);
-
     bool found = false;
+    assert(m);
 
     if (m->lock) {
         pthread_mutex_lock(m->lock);
     }
 
-    if (m->patterns != NULL &&
-        m->patterns_num > 0) {
+    if (m->patterns != NULL && m->patterns_num > 0) {
+        int i;
         assert(m->patterns_num <= m->patterns_max);
 
-        for (int i = 0; i < m->patterns_num; i++) {
+        for (i = 0; i < m->patterns_num; i++) {
+            int n;
             assert(m->patterns);
             assert(m->lengths);
             assert(m->hits);
 
-            int n = m->lengths[i];
+            n = m->lengths[i];
             if (n <= str_len) {
                 if (strncmp(str, m->patterns[i], n) == 0) {
                     m->hits[i]++;

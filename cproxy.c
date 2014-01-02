@@ -217,8 +217,8 @@ proxy *cproxy_create(proxy_main *main,
             /* We start at 1, because thread[0] is the main listen/accept */
             /* thread, and not a true worker thread.  Too lazy to save */
             /* the wasted thread[0] slot memory. */
-
-            for (int i = 1; i < p->thread_data_num; i++) {
+            int i;
+            for (i = 1; i < p->thread_data_num; i++) {
                 proxy_td *ptd = &p->thread_data[i];
                 ptd->proxy = p;
 
@@ -295,6 +295,7 @@ int cproxy_listen(proxy *p) {
     /* Idempotent, remembers if it already created listening socket(s). */
 
     if (p->listening == 0) {
+        int listening;
         enum protocol listen_protocol = negotiating_proxy_prot;
 
         if (IS_ASCII(settings.binding_protocol)) {
@@ -304,10 +305,10 @@ int cproxy_listen(proxy *p) {
             listen_protocol = proxy_upstream_binary_prot;
         }
 
-        int listening = cproxy_listen_port(p->port, listen_protocol,
-                                           tcp_transport,
-                                           p,
-                                           &cproxy_listen_funcs);
+        listening = cproxy_listen_port(p->port, listen_protocol,
+                                       tcp_transport,
+                                       p,
+                                       &cproxy_listen_funcs);
         if (listening > 0) {
             p->listening += listening;
         } else {
@@ -345,20 +346,25 @@ int cproxy_listen_port(int port,
                        enum network_transport transport,
                        void       *conn_extra,
                        conn_funcs *funcs) {
+
+    int   listening;
+    conn *listen_conn_orig;
+    conn *x;
+
     assert(port > 0 || settings.socketpath != NULL);
     assert(conn_extra);
     assert(funcs);
     assert(is_listen_thread());
 
-    int   listening = 0;
-    conn *listen_conn_orig = listen_conn;
+    listening = 0;
+    listen_conn_orig = listen_conn;
 
-    conn *x = listen_conn_orig;
+    x = listen_conn_orig;
     while (x != NULL) {
-        if (x->extra != NULL &&
-            x->funcs == funcs) {
-            struct sockaddr_in s_in = {.sin_family = 0};
+        if (x->extra != NULL && x->funcs == funcs) {
+            struct sockaddr_in s_in;
             socklen_t sin_len = sizeof(s_in);
+            memset(&s_in, 0, sizeof(s_in));
 
             if (getsockname(x->sfd, (struct sockaddr *) &s_in, &sin_len) == 0) {
                 int x_port = ntohs(s_in.sin_port);
@@ -396,6 +402,7 @@ int cproxy_listen_port(int port,
 #else
     if (server_socket(port, transport, NULL) == 0) {
 #endif
+        conn *c;
         assert(listen_conn != NULL);
 
         /* The listen_conn global list is changed by server_socket(), */
@@ -406,7 +413,7 @@ int cproxy_listen_port(int port,
         /* might be two new listening conn's -- one for localhost, */
         /* another for 127.0.0.1. */
 
-        conn *c = listen_conn;
+        c = listen_conn;
         while (c != NULL &&
                c != listen_conn_orig) {
             if (settings.verbose > 1) {
@@ -450,6 +457,11 @@ proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id) {
 }
 
 bool cproxy_init_upstream_conn(conn *c) {
+    char *default_name;
+    proxy *p;
+    int n;
+    proxy_td *ptd;
+
     assert(c != NULL);
 
     /* We're called once per client/upstream conn early in its */
@@ -458,11 +470,11 @@ bool cproxy_init_upstream_conn(conn *c) {
 
     assert(!is_listen_thread());
 
-    proxy *p = c->extra;
+    p = c->extra;
     assert(p != NULL);
     assert(p->main != NULL);
 
-    int n = cproxy_num_active_proxies(p->main);
+    n = cproxy_num_active_proxies(p->main);
     if (n <= 0) {
         if (settings.verbose > 2) {
             moxi_log_write("<%d disallowing upstream conn due to no buckets\n",
@@ -472,21 +484,22 @@ bool cproxy_init_upstream_conn(conn *c) {
         return false;
     }
 
-    proxy_td *ptd = cproxy_find_thread_data(p, pthread_self());
+    ptd = cproxy_find_thread_data(p, pthread_self());
     assert(ptd != NULL);
 
     /* Reassign the client/upstream conn to a different bucket */
     /* if the default_bucket_name isn't the special FIRST_BUCKET */
     /* value. */
 
-    char *default_name = ptd->behavior_pool.base.default_bucket_name;
+    default_name = ptd->behavior_pool.base.default_bucket_name;
     if (strcmp(default_name, FIRST_BUCKET) != 0) {
+        proxy *default_proxy;
         if (settings.verbose > 2) {
             moxi_log_write("<%d assigning to default bucket: %s\n",
                            c->sfd, default_name);
         }
 
-        proxy *default_proxy =
+        default_proxy =
             cproxy_find_proxy_by_auth(p->main, default_name, "");
 
         /* If the ostensible default bucket is missing (possibly deleted), */
@@ -542,13 +555,16 @@ bool cproxy_init_downstream_conn(conn *c) {
 }
 
 void cproxy_on_close_upstream_conn(conn *c) {
+    downstream *d;
+    proxy_td *ptd;
+
     assert(c != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_on_close_upstream_conn\n", c->sfd);
     }
 
-    proxy_td *ptd = c->extra;
+    ptd = c->extra;
     assert(ptd != NULL);
     c->extra = NULL;
 
@@ -558,7 +574,7 @@ void cproxy_on_close_upstream_conn(conn *c) {
 
     /* Delink from any reserved downstream. */
 
-    for (downstream *d = ptd->downstream_reserved; d != NULL; d = d->next) {
+    for (d = ptd->downstream_reserved; d != NULL; d = d->next) {
         bool found = false;
 
         d->upstream_conn = conn_list_remove(d->upstream_conn, NULL,
@@ -580,6 +596,7 @@ void cproxy_on_close_upstream_conn(conn *c) {
         /* tracking structures. */
 
         if (found) {
+            int n, i;
             if (d->multiget != NULL) {
                 genhash_iter(d->multiget, multiget_remove_upstream, c);
             }
@@ -596,9 +613,9 @@ void cproxy_on_close_upstream_conn(conn *c) {
 
             ptd->stats.stats.tot_downstream_close_on_upstream_close++;
 
-            int n = mcs_server_count(&d->mst);
+            n = mcs_server_count(&d->mst);
 
-            for (int i = 0; i < n; i++) {
+            for (i = 0; i < n; i++) {
                 conn *downstream_conn = d->downstream_conns[i];
                 if (downstream_conn != NULL &&
                     downstream_conn != NULL_CONN &&
@@ -622,6 +639,7 @@ void cproxy_on_close_upstream_conn(conn *c) {
 }
 
 int delink_from_downstream_conns(conn *c) {
+    int n, k, i;
     downstream *d = c->extra;
     if (d == NULL) {
         if (settings.verbose > 2) {
@@ -632,10 +650,10 @@ int delink_from_downstream_conns(conn *c) {
         return -1;
     }
 
-    int n = mcs_server_count(&d->mst);
-    int k = -1; /* Index of conn. */
+    n = mcs_server_count(&d->mst);
+    k = -1; /* Index of conn. */
 
-    for (int i = 0; i < n; i++) {
+    for (i = 0; i < n; i++) {
         if (d->downstream_conns[i] == c) {
             d->downstream_conns[i] = NULL;
 
@@ -658,6 +676,11 @@ int delink_from_downstream_conns(conn *c) {
 }
 
 void cproxy_on_close_downstream_conn(conn *c) {
+    conn *uc_retry = NULL;
+    downstream *d;
+    int k;
+    proxy_td *ptd;
+
     assert(c != NULL);
     assert(c->sfd >= 0);
     assert(c->state == conn_closing);
@@ -666,7 +689,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
         moxi_log_write("<%d cproxy_on_close_downstream_conn\n", c->sfd);
     }
 
-    downstream *d = c->extra;
+    d = c->extra;
 
     /* Might have been set to NULL during cproxy_free_downstream(). */
     /* Or, when a downstream conn is in the thread-based free pool, it */
@@ -680,7 +703,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
         return;
     }
 
-    int k = delink_from_downstream_conns(c);
+    k = delink_from_downstream_conns(c);
 
     c->extra = NULL;
 
@@ -689,7 +712,7 @@ void cproxy_on_close_downstream_conn(conn *c) {
         zstored_error_count(c->thread, c->host_ident, true);
     }
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd);
 
     if (ptd->stats.stats.num_downstream_conn > 0) {
@@ -709,8 +732,6 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
         return;
     }
-
-    conn *uc_retry = NULL;
 
     if (d->upstream_conn != NULL &&
         d->downstream_used == 1) {
@@ -848,9 +869,9 @@ void cproxy_on_close_downstream_conn(conn *c) {
 
 void upstream_retry(void *data0, void *data1) {
     proxy_td *ptd = data0;
-    assert(ptd);
-
     conn *uc = data1;
+
+    assert(ptd);
     assert(uc);
 
     cproxy_pause_upstream_for_downstream(ptd, uc);
@@ -941,12 +962,13 @@ downstream *cproxy_reserve_downstream(proxy_td *ptd) {
         d->next_waiting = NULL;
 
         if (cproxy_check_downstream_config(d)) {
+            bool found;
             ptd->downstream_reserved =
                 downstream_list_remove(ptd->downstream_reserved, d);
             ptd->downstream_released =
                 downstream_list_remove(ptd->downstream_released, d);
 
-            bool found = zstored_downstream_waiting_remove(d);
+            found = zstored_downstream_waiting_remove(d);
             assert(!found);
 
             d->next = ptd->downstream_reserved;
@@ -977,6 +999,10 @@ bool cproxy_clear_timeout(downstream *d) {
 }
 
 bool cproxy_release_downstream(downstream *d, bool force) {
+    int i;
+    int n;
+    bool found;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
 
@@ -995,15 +1021,13 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     /* keeping the same downstream that would otherwise */
     /* be released. */
 
-    if (!force &&
-        d->upstream_conn != NULL &&
-        d->upstream_retry > 0) {
+    if (!force && d->upstream_conn != NULL && d->upstream_retry > 0) {
+        int max_retries;
         d->upstream_retry = 0;
         d->upstream_retries++;
 
         /* But, we can stop retrying if we've tried each server twice. */
-
-        int max_retries = cproxy_max_retries(d);
+        max_retries = cproxy_max_retries(d);
 
         if (d->upstream_retries <= max_retries) {
             if (settings.verbose > 2) {
@@ -1062,6 +1086,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     /* Delink upstream conns. */
 
     while (d->upstream_conn != NULL) {
+        conn *curr;
         if (d->merger != NULL) {
             /* TODO: Allow merger callback to be func pointer. */
 
@@ -1090,6 +1115,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
             /* the upstream_suffix might be "END\r\n" or other */
             /* way to mark the end of a scatter-gather or */
             /* multiline response. */
+            int suffix_len;
 
             if (settings.verbose > 2) {
                 if (d->upstream_suffix_len > 0) {
@@ -1108,7 +1134,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
                 }
             }
 
-            int suffix_len = d->upstream_suffix_len;
+            suffix_len = d->upstream_suffix_len;
             if (suffix_len == 0) {
                 suffix_len = strlen(d->upstream_suffix);
             }
@@ -1124,7 +1150,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
             }
         }
 
-        conn *curr = d->upstream_conn;
+        curr = d->upstream_conn;
         d->upstream_conn = d->upstream_conn->next;
         curr->next = NULL;
     }
@@ -1164,12 +1190,12 @@ bool cproxy_release_downstream(downstream *d, bool force) {
     d->ptd->downstream_released =
         downstream_list_remove(d->ptd->downstream_released, d);
 
-    bool found = zstored_downstream_waiting_remove(d);
+    found = zstored_downstream_waiting_remove(d);
     assert(!found);
 
-    int n = mcs_server_count(&d->mst);
+    n = mcs_server_count(&d->mst);
 
-    for (int i = 0; i < n; i++) {
+    for (i = 0; i < n; i++) {
         conn *dc = d->downstream_conns[i];
         d->downstream_conns[i] = NULL;
         if (dc != NULL) {
@@ -1198,6 +1224,9 @@ bool cproxy_release_downstream(downstream *d, bool force) {
 }
 
 void cproxy_free_downstream(downstream *d) {
+    bool found;
+    int n;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->upstream_conn == NULL);
@@ -1217,16 +1246,17 @@ void cproxy_free_downstream(downstream *d) {
     d->ptd->downstream_released =
         downstream_list_remove(d->ptd->downstream_released, d);
 
-    bool found = zstored_downstream_waiting_remove(d);
+    found = zstored_downstream_waiting_remove(d);
     assert(!found);
 
     d->ptd->downstream_num--;
     assert(d->ptd->downstream_num >= 0);
 
-    int n = mcs_server_count(&d->mst);
+    n = mcs_server_count(&d->mst);
 
     if (d->downstream_conns != NULL) {
-        for (int i = 0; i < n; i++) {
+        int i;
+        for (i = 0; i < n; i++) {
             if (d->downstream_conns[i] != NULL &&
                 d->downstream_conns[i] != NULL_CONN) {
                 d->downstream_conns[i]->extra = NULL;
@@ -1260,10 +1290,10 @@ void cproxy_free_downstream(downstream *d) {
 downstream *cproxy_create_downstream(char *config,
                                      uint32_t config_ver,
                                      proxy_behavior_pool *behavior_pool) {
+    downstream *d = calloc(1, sizeof(downstream));
     assert(config != NULL);
     assert(behavior_pool != NULL);
 
-    downstream *d = (downstream *) calloc(1, sizeof(downstream));
     if (d != NULL &&
         config != NULL &&
         config[0] != '\0') {
@@ -1337,11 +1367,11 @@ int init_mcs_st(mcs_st *mst, char *config,
 /* See if the downstream config matches the top-level proxy config.
  */
 bool cproxy_check_downstream_config(downstream *d) {
+    int rv = false;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
-
-    int rv = false;
 
     if (d->config_ver == d->ptd->config_ver) {
         rv = true;
@@ -1404,6 +1434,11 @@ bool cproxy_check_downstream_config(downstream *d) {
 
 int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                               int server_index) {
+    int i = 0;
+    int s = 0; /* Number connected. */
+    int n;
+    mcs_server_st *msst_actual;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->downstream_released != d); /* Should not be in free list. */
@@ -1412,9 +1447,7 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
     assert(thread != NULL);
     assert(thread->base != NULL);
 
-    int s = 0; /* Number connected. */
-    int n = mcs_server_count(&d->mst);
-    mcs_server_st *msst_actual;
+    n = mcs_server_count(&d->mst);
 
     assert(d->behaviors_num >= n);
     assert(d->behaviors_arr != NULL);
@@ -1424,7 +1457,6 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                        d->upstream_conn->sfd, server_index, n);
     }
 
-    int i = 0;
 
     if (server_index >= 0) {
         assert(server_index < n);
@@ -1444,6 +1476,7 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
         /* tried to connect yet). */
 
         if (d->downstream_conns[i] == NULL) {
+            bool downstream_conn_max_reached = false;
             conn *c = d->upstream_conn;
             /*
              * mcmux compatiblity mode, one downstream struct will be associated
@@ -1457,8 +1490,6 @@ int cproxy_connect_downstream(downstream *d, LIBEVENT_THREAD *thread,
                 msst_actual->fd = -1;
                 msst_actual->ident_a[0] = msst_actual->ident_b[0] = 0;
             }
-
-            bool downstream_conn_max_reached = false;
 
             d->downstream_conns[i] =
                 zstored_acquire_downstream_conn(d, thread,
@@ -1522,6 +1553,10 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                                      LIBEVENT_THREAD *thread,
                                      mcs_server_st *msst,
                                      proxy_behavior *behavior) {
+    uint64_t start = 0;
+    int err = -1;
+    int fd;
+
     assert(d);
     assert(d->ptd);
     assert(d->ptd->downstream_released != d); /* Should not be in free list. */
@@ -1533,18 +1568,15 @@ conn *cproxy_connect_downstream_conn(downstream *d,
     assert(mcs_server_st_port(msst) > 0);
     assert(mcs_server_st_fd(msst) == -1);
 
-    uint64_t start = 0;
-
     if (d->ptd->behavior_pool.base.time_stats) {
         start = usec_now();
     }
 
     d->ptd->stats.stats.tot_downstream_connect_started++;
 
-    int err = -1;
-    int fd = mcs_connect(mcs_server_st_hostname(msst),
-                         mcs_server_st_port(msst), &err,
-                         MOXI_BLOCKING_CONNECT);
+    fd = mcs_connect(mcs_server_st_hostname(msst),
+                     mcs_server_st_port(msst), &err,
+                     MOXI_BLOCKING_CONNECT);
 
     if (settings.verbose > 2) {
         moxi_log_write("%d: cproxy_connect_downstream_conn %s:%d %d %d\n", fd,
@@ -1597,9 +1629,12 @@ conn *cproxy_connect_downstream_conn(downstream *d,
 
 bool downstream_connect_init(downstream *d, mcs_server_st *msst,
                              proxy_behavior *behavior, conn *c) {
+    char *host_ident;
+    int rv;
+
     assert(c->thread != NULL);
 
-    char *host_ident = c->host_ident;
+    host_ident = c->host_ident;
     if (host_ident == NULL) {
         host_ident = mcs_server_st_ident(msst, IS_ASCII(c->protocol));
     }
@@ -1609,8 +1644,6 @@ bool downstream_connect_init(downstream *d, mcs_server_st *msst,
         downstream_connect_time_sample(&d->ptd->stats,
                                        usec_now() - c->cmd_start_time);
     }
-
-    int rv;
 
     rv = cproxy_auth_downstream(msst, behavior, c->sfd);
     if (rv == 0) {
@@ -1652,6 +1685,9 @@ conn *cproxy_find_downstream_conn_ex(downstream *d,
                                      char *key, int key_length,
                                      bool *local,
                                      int *vbucket) {
+    int v;
+    int s;
+
     assert(d != NULL);
     assert(d->downstream_conns != NULL);
     assert(key != NULL);
@@ -1661,8 +1697,8 @@ conn *cproxy_find_downstream_conn_ex(downstream *d,
         *local = false;
     }
 
-    int v = -1;
-    int s = cproxy_server_index(d, key, key_length, &v);
+    v = -1;
+    s = cproxy_server_index(d, key, key_length, &v);
 
     if (settings.verbose > 2 && s >= 0) {
         moxi_log_write("%d: server_index %d, vbucket %d, conn %d\n", s, v,
@@ -1758,6 +1794,10 @@ int cproxy_server_index(downstream *d, char *key, size_t key_length,
 }
 
 void cproxy_assign_downstream(proxy_td *ptd) {
+    uint64_t da;
+    conn *tail;
+    bool stop = false;
+
     assert(ptd != NULL);
 
     if (settings.verbose > 2) {
@@ -1766,8 +1806,7 @@ void cproxy_assign_downstream(proxy_td *ptd) {
 
     ptd->downstream_assigns++;
 
-    uint64_t da = ptd->downstream_assigns;
-
+    da = ptd->downstream_assigns;
     /* Key loop that tries to reserve any available, released */
     /* downstream resources to waiting upstream conns. */
 
@@ -1776,24 +1815,26 @@ void cproxy_assign_downstream(proxy_td *ptd) {
     /* processing.  This helps avoid infinite loop where upstream */
     /* conns just keep on moving to the tail. */
 
-    conn *tail = ptd->waiting_any_downstream_tail;
-    bool  stop = false;
-
+    tail = ptd->waiting_any_downstream_tail;
     while (ptd->waiting_any_downstream_head != NULL && !stop) {
+        conn *uc_last;
+        downstream *d;
+
         if (ptd->waiting_any_downstream_head == tail) {
             stop = true;
         }
 
-        downstream *d = cproxy_reserve_downstream(ptd);
+        d = cproxy_reserve_downstream(ptd);
         if (d == NULL) {
             if (ptd->downstream_num <= 0) {
                 /* Absolutely no downstreams connected, so */
                 /* might as well error out. */
 
                 while (ptd->waiting_any_downstream_head != NULL) {
+                    conn *uc;
                     ptd->stats.stats.tot_downstream_propagate_failed++;
 
-                    conn *uc = ptd->waiting_any_downstream_head;
+                    uc = ptd->waiting_any_downstream_head;
                     ptd->waiting_any_downstream_head =
                         ptd->waiting_any_downstream_head->next;
                     if (ptd->waiting_any_downstream_head == NULL) {
@@ -1835,8 +1876,7 @@ void cproxy_assign_downstream(proxy_td *ptd) {
         /* Add any compatible upstream conns to the downstream. */
         /* By compatible, for example, we mean multi-gets from */
         /* different upstreams so we can de-deplicate get keys. */
-
-        conn *uc_last = d->upstream_conn;
+        uc_last = d->upstream_conn;
 
         while (is_compatible_request(uc_last,
                                      ptd->waiting_any_downstream_head)) {
@@ -1909,6 +1949,7 @@ void propagate_error_msg(downstream *d, char *ascii_msg,
 
     while (d->upstream_conn != NULL) {
         conn *uc = d->upstream_conn;
+        conn *curr;
 
         if (settings.verbose > 1) {
             moxi_log_write("%d: could not forward upstream to downstream\n",
@@ -1917,7 +1958,7 @@ void propagate_error_msg(downstream *d, char *ascii_msg,
 
         upstream_error_msg(uc, ascii_msg, binary_status);
 
-        conn *curr = d->upstream_conn;
+        curr = d->upstream_conn;
         d->upstream_conn = d->upstream_conn->next;
         curr->next = NULL;
     }
@@ -1977,10 +2018,11 @@ bool cproxy_forward_or_error(downstream *d) {
 
 void upstream_error_msg(conn *uc, char *ascii_msg,
                         protocol_binary_response_status binary_status) {
+    proxy_td *ptd;
     assert(uc);
     assert(uc->state == conn_pause);
 
-    proxy_td *ptd = uc->extra;
+    ptd = uc->extra;
     assert(ptd != NULL);
 
     if (IS_ASCII(uc->protocol)) {
@@ -2042,9 +2084,10 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
 }
 
 void cproxy_reset_upstream(conn *uc) {
+    proxy_td *ptd;
     assert(uc != NULL);
 
-    proxy_td *ptd = uc->extra;
+    ptd = uc->extra;
     assert(ptd != NULL);
 
     conn_set_state(uc, conn_new_cmd);
@@ -2124,10 +2167,11 @@ void cproxy_wait_any_downstream(proxy_td *ptd, conn *uc) {
 }
 
 void cproxy_release_downstream_conn(downstream *d, conn *c) {
+    proxy_td *ptd;
     assert(c != NULL);
     assert(d != NULL);
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd != NULL);
 
     if (settings.verbose > 2) {
@@ -2151,6 +2195,7 @@ void cproxy_release_downstream_conn(downstream *d, conn *c) {
 }
 
 void cproxy_on_pause_downstream_conn(conn *c) {
+    downstream *d;
     assert(c != NULL);
 
     if (settings.verbose > 2) {
@@ -2158,17 +2203,18 @@ void cproxy_on_pause_downstream_conn(conn *c) {
                 c->sfd);
     }
 
-    downstream *d = c->extra;
+    d = c->extra;
 
     if (!d || c->rbytes > 0) {
+        zstored_downstream_conns *conns;
+
         if (settings.verbose) {
             moxi_log_write("%d: Closed the downstream since got"
                     "an event on downstream or extra data on downstream\n",
                     c->sfd);
         }
 
-        zstored_downstream_conns *conns =
-            zstored_get_downstream_conns(c->thread, c->host_ident);
+        conns = zstored_get_downstream_conns(c->thread, c->host_ident);
         if (conns) {
             bool found = false;
             conns->dc = conn_list_remove(conns->dc, NULL, c, &found);
@@ -2226,26 +2272,27 @@ void cproxy_pause_upstream_for_downstream(proxy_td *ptd, conn *upstream) {
 }
 
 struct timeval cproxy_get_downstream_timeout(downstream *d, conn *c) {
-    assert(d);
 
     struct timeval rv;
+    proxy_td *ptd;
+    assert(d);
 
     if (c != NULL) {
+        int i;
         assert(d->behaviors_num > 0);
         assert(d->behaviors_arr != NULL);
         assert(d->downstream_conns != NULL);
 
-        int i = downstream_conn_index(d, c);
+        i = downstream_conn_index(d, c);
         if (i >= 0 && i < d->behaviors_num) {
             rv = d->behaviors_arr[i].downstream_timeout;
-            if (rv.tv_sec != 0 ||
-                rv.tv_usec != 0) {
+            if (rv.tv_sec != 0 || rv.tv_usec != 0) {
                 return rv;
             }
         }
     }
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd);
 
     rv = ptd->behavior_pool.base.downstream_timeout;
@@ -2279,10 +2326,10 @@ bool cproxy_start_wait_queue_timeout(proxy_td *ptd, conn *uc) {
 void wait_queue_timeout(const int fd,
                         const short which,
                         void *arg) {
-    (void)fd;
-    (void)which;
     proxy_td *ptd = arg;
     assert(ptd != NULL);
+    (void)fd;
+    (void)which;
 
     if (settings.verbose > 2) {
         moxi_log_write("wait_queue_timeout\n");
@@ -2291,8 +2338,12 @@ void wait_queue_timeout(const int fd,
     /* This timer callback is invoked when an upstream conn */
     /* has been in the wait queue for too long. */
 
-    if (ptd->timeout_tv.tv_sec != 0 ||
-        ptd->timeout_tv.tv_usec != 0) {
+    if (ptd->timeout_tv.tv_sec != 0 || ptd->timeout_tv.tv_usec != 0) {
+        struct timeval wqt;
+        uint64_t wqt_msec;
+        uint64_t cut_msec;
+        conn *uc_curr;
+
         evtimer_del(&ptd->timeout_event);
 
         ptd->timeout_tv.tv_sec = 0;
@@ -2302,18 +2353,14 @@ void wait_queue_timeout(const int fd,
             moxi_log_write("wait_queue_timeout cleared\n");
         }
 
-        struct timeval wqt = ptd->behavior_pool.base.wait_queue_timeout;
-
-        uint64_t wqt_msec = (wqt.tv_sec * 1000) +
-                            (wqt.tv_usec / 1000);
-
-        uint64_t cut_msec = msec_current_time - wqt_msec;
+        wqt = ptd->behavior_pool.base.wait_queue_timeout;
+        wqt_msec = (wqt.tv_sec * 1000) + (wqt.tv_usec / 1000);
+        cut_msec = msec_current_time - wqt_msec;
 
         /* Run through all the old upstream conn's in */
         /* the wait queue, remove them, and emit errors */
         /* on them.  And then start a new timer if needed. */
-
-        conn *uc_curr = ptd->waiting_any_downstream_head;
+        uc_curr = ptd->waiting_any_downstream_head;
         while (uc_curr != NULL) {
             conn *uc = uc_curr;
 
@@ -2536,12 +2583,12 @@ conn *conn_list_remove(conn *head, conn **tail, conn *c, bool *found) {
 
     while (curr != NULL) {
         if (curr == c) {
+            conn *r;
             if (found != NULL) {
                 *found = true;
             }
 
-            if (tail != NULL &&
-                *tail == curr) {
+            if (tail != NULL && *tail == curr) {
                 *tail = prev;
             }
 
@@ -2553,7 +2600,7 @@ conn *conn_list_remove(conn *head, conn **tail, conn *c, bool *found) {
             }
 
             assert(curr == head);
-            conn *r = curr->next;
+            r = curr->next;
             curr->next = NULL;
             return r;
         }
@@ -2573,6 +2620,7 @@ downstream *downstream_list_remove(downstream *head, downstream *d) {
 
     while (curr != NULL) {
         if (curr == d) {
+            downstream *r;
             if (prev != NULL) {
                 assert(curr != head);
                 prev->next = curr->next;
@@ -2581,7 +2629,7 @@ downstream *downstream_list_remove(downstream *head, downstream *d) {
             }
 
             assert(curr == head);
-            downstream *r = curr->next;
+            r = curr->next;
             curr->next = NULL;
             return r;
         }
@@ -2603,8 +2651,8 @@ downstream *downstream_list_waiting_remove(downstream *head,
 
     while (curr != NULL) {
         if (curr == d) {
-            if (tail != NULL &&
-                *tail == curr) {
+            downstream *r;
+            if (tail != NULL && *tail == curr) {
                 *tail = prev;
             }
 
@@ -2616,7 +2664,7 @@ downstream *downstream_list_waiting_remove(downstream *head,
             }
 
             assert(curr == head);
-            downstream *r = curr->next_waiting;
+            r = curr->next_waiting;
             curr->next_waiting = NULL;
             return r;
         }
@@ -2682,13 +2730,12 @@ bool is_compatible_request(conn *existing, conn *candidate) {
 void downstream_timeout(const int fd,
                         const short which,
                         void *arg) {
-    (void)fd;
-    (void)which;
-
     downstream *d = arg;
+    proxy_td *ptd;
+
     assert(d != NULL);
 
-    proxy_td *ptd = d->ptd;
+    ptd = d->ptd;
     assert(ptd != NULL);
 
     /* This timer callback is invoked when one or more of */
@@ -2696,12 +2743,14 @@ void downstream_timeout(const int fd,
     /* closing downstream conns, which might help by */
     /* freeing up downstream resources. */
 
-    if (cproxy_clear_timeout(d) == true) {
+    if (cproxy_clear_timeout(d)) {
+        char *m;
+        int n;
+        int i;
         /* The downstream_timeout() callback is invoked for */
         /* two cases (downstream_conn_queue_timeouts and */
         /* downstream_timeouts), so cleanup and track stats */
         /* accordingly. */
-
         bool was_conn_queue_waiting =
             zstored_downstream_waiting_remove(d);
 
@@ -2719,17 +2768,18 @@ void downstream_timeout(const int fd,
             ptd->stats.stats.tot_downstream_timeout++;
         }
 
-        char *m = "SERVER_ERROR proxy downstream timeout\r\n";
+        m = "SERVER_ERROR proxy downstream timeout\r\n";
 
         if (d->target_host_ident != NULL) {
             m = add_conn_suffix(d->upstream_conn);
             if (m != NULL) {
+                char *s;
                 snprintf(m, SUFFIX_SIZE - 1,
                          "SERVER_ERROR proxy downstream timeout %s\r\n",
                          d->target_host_ident);
                 m[SUFFIX_SIZE - 1] = '\0';
 
-                char *s = strchr(m, ':'); /* Clip to avoid sending user/pswd. */
+                s = strchr(m, ':'); /* Clip to avoid sending user/pswd. */
                 if (s != NULL) {
                     *s++ = '\r';
                     *s++ = '\n';
@@ -2738,12 +2788,10 @@ void downstream_timeout(const int fd,
             }
         }
 
-        propagate_error_msg(d, m,
-                            PROTOCOL_BINARY_RESPONSE_EBUSY);
+        propagate_error_msg(d, m, PROTOCOL_BINARY_RESPONSE_EBUSY);
+        n = mcs_server_count(&d->mst);
 
-        int n = mcs_server_count(&d->mst);
-
-        for (int i = 0; i < n; i++) {
+        for (i = 0; i < n; i++) {
             conn *dc = d->downstream_conns[i];
             if (dc != NULL &&
                 dc != NULL_CONN) {
@@ -2760,6 +2808,9 @@ void downstream_timeout(const int fd,
         cproxy_release_downstream(d, false);
         cproxy_assign_downstream(ptd);
     }
+
+    (void)fd;
+    (void)which;
 }
 
 bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
@@ -2773,6 +2824,8 @@ bool cproxy_start_downstream_timeout(downstream *d, conn *c) {
 
 bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
                                         struct timeval dt) {
+    conn *uc;
+
     assert(d != NULL);
     assert(d->behaviors_num > 0);
     assert(d->behaviors_arr != NULL);
@@ -2784,7 +2837,7 @@ bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
         return true;
     }
 
-    conn *uc = d->upstream_conn;
+    uc = d->upstream_conn;
 
     assert(uc != NULL);
     assert(uc->state == conn_pause);
@@ -2812,23 +2865,33 @@ bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
 int cproxy_auth_downstream(mcs_server_st *server,
                            proxy_behavior *behavior,
                            int fd) {
+    protocol_binary_request_header req;
+    protocol_binary_response_header res;
+    struct timeval *timeout = NULL;
+    char buf[3000];
+    const char *usr;
+    const char *pwd;
+    int usr_len;
+    int pwd_len;
+    int buf_len;
+    mcs_return mr;
+
     assert(server);
     assert(behavior);
     assert(fd != -1);
 
-    char buf[3000];
 
     if (!IS_BINARY(behavior->downstream_protocol)) {
         return 0;
     }
 
-    const char *usr = mcs_server_st_usr(server) != NULL ?
+    usr = mcs_server_st_usr(server) != NULL ?
         mcs_server_st_usr(server) : behavior->usr;
-    const char *pwd = mcs_server_st_pwd(server) != NULL ?
+    pwd = mcs_server_st_pwd(server) != NULL ?
         mcs_server_st_pwd(server) : behavior->pwd;
 
-    int usr_len = strlen(usr);
-    int pwd_len = strlen(pwd);
+    usr_len = strlen(usr);
+    pwd_len = strlen(pwd);
 
     if (usr_len <= 0) {
         return 0;
@@ -2855,13 +2918,13 @@ int cproxy_auth_downstream(mcs_server_st *server,
 
     /* TODO: Allow binary passwords. */
 
-    int buf_len = snprintf(buf, sizeof(buf), "PLAIN%c%s%c%s",
-                           0, usr,
-                           0, pwd);
+    buf_len = snprintf(buf, sizeof(buf), "PLAIN%c%s%c%s",
+                       0, usr,
+                       0, pwd);
     assert(buf_len == 7 + usr_len + pwd_len);
 
-    protocol_binary_request_header req = { .bytes = {0} };
-
+    memset(req.bytes, 0, sizeof(req.bytes));
+    memset(res.bytes, 0, sizeof(res.bytes));
     req.request.magic    = PROTOCOL_BINARY_REQ;
     req.request.opcode   = PROTOCOL_BINARY_CMD_SASL_AUTH;
     req.request.keylen   = htons((uint16_t) 5); /* 5 == strlen("PLAIN"). */
@@ -2881,24 +2944,20 @@ int cproxy_auth_downstream(mcs_server_st *server,
         return -1;
     }
 
-    protocol_binary_response_header res = { .bytes = {0} };
-
-    struct timeval *timeout = NULL;
     if (behavior->auth_timeout.tv_sec != 0 ||
         behavior->auth_timeout.tv_usec != 0) {
         timeout = &behavior->auth_timeout;
     }
 
-    mcs_return mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
-    if (mr == MCS_SUCCESS &&
-        res.response.magic == PROTOCOL_BINARY_RES) {
+    mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
+    if (mr == MCS_SUCCESS && res.response.magic == PROTOCOL_BINARY_RES) {
+        int len;
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
         res.response.bodylen = ntohl(res.response.bodylen);
 
         /* Swallow whatever body comes. */
-
-        int len = res.response.bodylen;
+        len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
 
@@ -2955,6 +3014,12 @@ int cproxy_auth_downstream(mcs_server_st *server,
 int cproxy_bucket_downstream(mcs_server_st *server,
                              proxy_behavior *behavior,
                              int fd) {
+    protocol_binary_request_header req;
+    protocol_binary_response_header res;
+    struct timeval *timeout = NULL;
+    int bucket_len;
+    mcs_return mr;
+
     assert(server);
     assert(behavior);
     assert(IS_PROXY(behavior->downstream_protocol));
@@ -2964,12 +3029,13 @@ int cproxy_bucket_downstream(mcs_server_st *server,
         return 0;
     }
 
-    int bucket_len = strlen(behavior->bucket);
+    bucket_len = strlen(behavior->bucket);
     if (bucket_len <= 0) {
         return 0; /* When no bucket. */
     }
 
-    protocol_binary_request_header req = { .bytes = {0} };
+    memset(req.bytes, 0, sizeof(req.bytes));
+    memset(res.bytes, 0, sizeof(res.bytes));
 
     req.request.magic    = PROTOCOL_BINARY_REQ;
     req.request.opcode   = PROTOCOL_BINARY_CMD_BUCKET;
@@ -2990,26 +3056,23 @@ int cproxy_bucket_downstream(mcs_server_st *server,
         return -1;
     }
 
-    protocol_binary_response_header res = { .bytes = {0} };
 
-    struct timeval *timeout = NULL;
     if (behavior->auth_timeout.tv_sec != 0 ||
         behavior->auth_timeout.tv_usec != 0) {
         timeout = &behavior->auth_timeout;
     }
 
-    mcs_return mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
-    if (mr == MCS_SUCCESS &&
-        res.response.magic == PROTOCOL_BINARY_RES) {
+    mr = mcs_io_read(fd, &res.bytes, sizeof(res.bytes), timeout);
+    if (mr == MCS_SUCCESS && res.response.magic == PROTOCOL_BINARY_RES) {
+        char buf[300];
+        int len;
+
         res.response.status  = ntohs(res.response.status);
         res.response.keylen  = ntohs(res.response.keylen);
         res.response.bodylen = ntohl(res.response.bodylen);
 
         /* Swallow whatever body comes. */
-
-        char buf[300];
-
-        int len = res.response.bodylen;
+        len = res.response.bodylen;
         while (len > 0) {
             int amt = (len > (int) sizeof(buf) ? (int) sizeof(buf) : len);
 
@@ -3058,10 +3121,13 @@ int cproxy_max_retries(downstream *d) {
 }
 
 int downstream_conn_index(downstream *d, conn *c) {
+    int nconns;
+    int i;
+
     assert(d);
 
-    int nconns = mcs_server_count(&d->mst);
-    for (int i = 0; i < nconns; i++) {
+    nconns = mcs_server_count(&d->mst);
+    for (i = 0; i < nconns; i++) {
         if (d->downstream_conns[i] == c) {
             return i;
         }
@@ -3071,9 +3137,10 @@ int downstream_conn_index(downstream *d, conn *c) {
 }
 
 void cproxy_upstream_state_change(conn *c, enum conn_states next_state) {
-    assert(c != NULL);
+    proxy_td *ptd;
 
-    proxy_td *ptd = c->extra;
+    assert(c != NULL);
+    ptd = c->extra;
     if (ptd != NULL) {
         if (c->state == conn_pause) {
             ptd->stats.stats.tot_upstream_unpaused++;
@@ -3110,12 +3177,15 @@ void cproxy_upstream_state_change(conn *c, enum conn_states next_state) {
 /* ------------------------------------------------- */
 
 bool cproxy_on_connect_downstream_conn(conn *c) {
+    int error;
+    socklen_t errsz = sizeof(error);
     int k;
+    downstream *d;
 
     assert(c != NULL);
     assert(c->host_ident);
 
-    downstream *d = c->extra;
+    d = c->extra;
     assert(d != NULL);
 
     if (settings.verbose > 2) {
@@ -3132,9 +3202,6 @@ bool cproxy_on_connect_downstream_conn(conn *c) {
         }
         goto cleanup;
     }
-
-    int       error = -1;
-    socklen_t errsz = sizeof(error);
 
     /* Check if the connection completed */
     if (getsockopt(c->sfd, SOL_SOCKET, SO_ERROR, (void *) &error,
@@ -3224,13 +3291,17 @@ HTGRAM_HANDLE cproxy_create_timing_histogram(void) {
 
 zstored_downstream_conns *zstored_get_downstream_conns(LIBEVENT_THREAD *thread,
                                                        const char *host_ident) {
+
+    genhash_t *conn_hash;
+    zstored_downstream_conns *conns;
+
     assert(thread);
     assert(thread->base);
 
-    genhash_t *conn_hash = thread->conn_hash;
+    conn_hash = thread->conn_hash;
     assert(conn_hash != NULL);
 
-    zstored_downstream_conns *conns = genhash_find(conn_hash, host_ident);
+    conns = genhash_find(conn_hash, host_ident);
     if (conns == NULL) {
         conns = calloc(1, sizeof(zstored_downstream_conns));
         if (conns != NULL) {
@@ -3250,11 +3321,12 @@ zstored_downstream_conns *zstored_get_downstream_conns(LIBEVENT_THREAD *thread,
 void zstored_error_count(LIBEVENT_THREAD *thread,
                          const char *host_ident,
                          bool has_error) {
+    zstored_downstream_conns *conns;
+
     assert(thread != NULL);
     assert(host_ident != NULL);
 
-    zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(thread, host_ident);
+    conns = zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
         if (has_error) {
             conns->error_count++;
@@ -3288,18 +3360,19 @@ void zstored_error_count(LIBEVENT_THREAD *thread,
             /* waiting downstreams so they can proceed (possibly by */
             /* just returning ERROR's to upstream clients). */
 
-            if (conns->dc_acquired <= 0 &&
-                conns->dc == NULL) {
+            if (conns->dc_acquired <= 0 && conns->dc == NULL) {
                 downstream *head = conns->downstream_waiting_head;
 
                 conns->downstream_waiting_head = NULL;
                 conns->downstream_waiting_tail = NULL;
 
                 while (head != NULL) {
+                    downstream *prev;
+
                     head->ptd->stats.stats.tot_downstream_waiting_errors++;
                     head->ptd->stats.stats.tot_downstream_conn_queue_remove++;
 
-                    downstream *prev = head;
+                    prev = head;
                     head = head->next_waiting;
                     prev->next_waiting = NULL;
 
@@ -3315,6 +3388,11 @@ conn *zstored_acquire_downstream_conn(downstream *d,
                                       mcs_server_st *msst,
                                       proxy_behavior *behavior,
                                       bool *downstream_conn_max_reached) {
+    enum protocol downstream_protocol;
+    char *host_ident;
+    conn *dc;
+    zstored_downstream_conns *conns;
+
     assert(d);
     assert(d->ptd);
     assert(d->ptd->downstream_released != d); /* Should not be in free list. */
@@ -3329,18 +3407,13 @@ conn *zstored_acquire_downstream_conn(downstream *d,
 
     d->ptd->stats.stats.tot_downstream_conn_acquired++;
 
-    enum protocol downstream_protocol =
+    downstream_protocol =
         d->upstream_conn->peer_protocol ?
         d->upstream_conn->peer_protocol :
         behavior->downstream_protocol;
 
-    char *host_ident =
-        mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
-
-    conn *dc;
-
-    zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(thread, host_ident);
+    host_ident = mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
+    conns = zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
         dc = conns->dc;
         if (dc != NULL) {
@@ -3363,10 +3436,10 @@ conn *zstored_acquire_downstream_conn(downstream *d,
                 msec_current_time - conns->error_time;
 
             if (settings.verbose > 2) {
-                moxi_log_write("zacquire_dc, %s, %d, %llu, (%d)\n",
+                moxi_log_write("zacquire_dc, %s, %d, %"PRIu64", (%d)\n",
                                host_ident,
                                conns->error_count,
-                               (long long unsigned int) conns->error_time,
+                               (uint64_t)conns->error_time,
                                msecs_since_error);
             }
 
@@ -3412,13 +3485,16 @@ conn *zstored_acquire_downstream_conn(downstream *d,
 
 /* new fn by jsh */
 void zstored_release_downstream_conn(conn *dc, bool closing) {
-    assert(dc != NULL);
+    bool keep;
+    zstored_downstream_conns *conns;
+    downstream *d;
 
+    assert(dc != NULL);
     if (dc == NULL_CONN) {
         return;
     }
 
-    downstream *d = dc->extra;
+    d = dc->extra;
     assert(d != NULL);
 
     d->ptd->stats.stats.tot_downstream_conn_released++;
@@ -3435,18 +3511,16 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
     assert(dc->thread != NULL);
     assert(dc->host_ident != NULL);
 
-    bool keep = dc->state == conn_pause;
-
+    keep = dc->state == conn_pause;
     dc->extra = NULL;
-
-    zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(dc->thread, dc->host_ident);
+    conns = zstored_get_downstream_conns(dc->thread, dc->host_ident);
     if (conns != NULL) {
         if (conns->dc_acquired > 0) {
             conns->dc_acquired--;
         }
 
         if (keep) {
+            downstream *d_head;
             assert(dc->next == NULL);
             dc->next = conns->dc;
             conns->dc = dc;
@@ -3454,7 +3528,7 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
             /* Since one downstream conn was released, process a single */
             /* waiting downstream, if any. */
 
-            downstream *d_head = conns->downstream_waiting_head;
+            d_head = conns->downstream_waiting_head;
             if (d_head != NULL) {
                 assert(conns->downstream_waiting_tail != NULL);
 
@@ -3484,13 +3558,15 @@ void zstored_release_downstream_conn(conn *dc, bool closing) {
 
 bool zstored_downstream_waiting_remove(downstream *d) {
     bool found = false;
-
+    int i;
+    int n;
     LIBEVENT_THREAD *thread = thread_by_index(thread_index(pthread_self()));
     assert(thread != NULL);
 
-    int n = mcs_server_count(&d->mst);
-
-    for (int i = 0; i < n; i++) {
+    n = mcs_server_count(&d->mst);
+    for (i = 0; i < n; i++) {
+        char *host_ident;
+        zstored_downstream_conns *conns;
         mcs_server_st *msst = mcs_server_index(&d->mst, i);
 
         enum protocol downstream_protocol =
@@ -3500,11 +3576,8 @@ bool zstored_downstream_waiting_remove(downstream *d) {
 
         assert(IS_PROXY(downstream_protocol));
 
-        char *host_ident =
-            mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
-
-        zstored_downstream_conns *conns =
-            zstored_get_downstream_conns(thread, host_ident);
+        host_ident = mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
+        conns = zstored_get_downstream_conns(thread, host_ident);
 
         if (conns != NULL) {
             /* Linked-list removal, on the next_waiting pointer, */
@@ -3549,21 +3622,21 @@ bool zstored_downstream_waiting_remove(downstream *d) {
 bool zstored_downstream_waiting_add(downstream *d, LIBEVENT_THREAD *thread,
                                     mcs_server_st *msst,
                                     proxy_behavior *behavior) {
+    enum protocol downstream_protocol;
+    char *host_ident;
+    zstored_downstream_conns *conns;
+
     assert(thread != NULL);
     assert(d != NULL);
     assert(d->upstream_conn != NULL);
     assert(d->next_waiting == NULL);
 
-    enum protocol downstream_protocol =
-        d->upstream_conn->peer_protocol ?
+    downstream_protocol = d->upstream_conn->peer_protocol ?
         d->upstream_conn->peer_protocol :
         behavior->downstream_protocol;
 
-    char *host_ident =
-        mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
-
-    zstored_downstream_conns *conns =
-        zstored_get_downstream_conns(thread, host_ident);
+    host_ident = mcs_server_st_ident(msst, IS_ASCII(downstream_protocol));
+    conns = zstored_get_downstream_conns(thread, host_ident);
     if (conns != NULL) {
         assert(conns->dc == NULL);
 
@@ -3591,10 +3664,11 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
                                  const char *usr,
                                  const char *pwd) {
     proxy *found = NULL;
+    proxy *p;
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
         if (strcmp(p->behavior_pool.base.usr, usr) == 0 &&
             strcmp(p->behavior_pool.base.pwd, pwd) == 0) {
@@ -3610,10 +3684,11 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
 
 int cproxy_num_active_proxies(proxy_main *m) {
     int n = 0;
+    proxy *p;
 
     pthread_mutex_lock(&m->proxy_main_lock);
 
-    for (proxy *p = m->proxy_head; p != NULL; p = p->next) {
+    for (p = m->proxy_head; p != NULL; p = p->next) {
         pthread_mutex_lock(&p->proxy_lock);
         if (p->name != NULL &&
             p->config != NULL &&
@@ -3648,6 +3723,9 @@ void diag_connections(FILE *out, conn *head, int indent) {
 static
 void diag_single_downstream(FILE *out, downstream *d, int indent) {
     static char *blank = "";
+    int n;
+    int i;
+
     conn *upstream = d->upstream_conn;
     fprintf(out, "%*s" "upstream: ", indent, blank);
     if (upstream) {
@@ -3660,8 +3738,8 @@ void diag_single_downstream(FILE *out, downstream *d, int indent) {
     fprintf(out, "%*s" "downstream_used_start: %d\n", indent, blank, d->downstream_used_start);
     fprintf(out, "%*s" "downstream_conns:\n", indent, blank);
 
-    int n = mcs_server_count(&d->mst);
-    for (int i = 0; i < n; i++) {
+    n = mcs_server_count(&d->mst);
+    for (i = 0; i < n; i++) {
         if (d->downstream_conns[i] == NULL)
             continue;
         fprintf(out, "%*s", indent+2, blank);
@@ -3682,13 +3760,13 @@ void connections_diag(FILE *out);
 void connections_diag(FILE *out) {
     extern proxy_main *diag_last_proxy_main;
 
+    proxy *cur_proxy;
     proxy_main *m = diag_last_proxy_main;
     if (!m) {
         fputs("no proxy_main!\n", out);
         return;
     }
 
-    proxy *cur_proxy;
     for (cur_proxy = m->proxy_head; cur_proxy != NULL ; cur_proxy = cur_proxy->next) {
         int ti;
         fprintf(out, "proxy: name='%s', port=%d, cfg=%s (%u)\n",

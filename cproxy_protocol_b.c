@@ -309,8 +309,9 @@ void cproxy_dump_header(int prefix, char *bb) {
 
         int prefix_len = snprintf(buf, sizeof(buf), "%d   ", prefix);
         int start = prefix_len;
+        size_t ii;
 
-        for (size_t ii = 0; ii < sizeof(protocol_binary_request_header); ++ii) {
+        for (ii = 0; ii < sizeof(protocol_binary_request_header); ++ii) {
             if (ii > 0 && ii % 4 == 0) {
                 buf[start] = '\n';
                 buf[start + 1] = '\0';
@@ -357,6 +358,13 @@ bool cproxy_binary_ignore_reply(conn *c, protocol_binary_response_header *header
 }
 
 static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
+    protocol_binary_request_header *req;
+    char *key;
+    int keylen;
+    int bodylen;
+    char *clientin;
+    unsigned int clientinlen;
+
     proxy_td *ptd = c->extra;
     assert(ptd != NULL);
     assert(ptd->proxy != NULL);
@@ -364,12 +372,11 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
 
     /* Authenticate an upstream connection. */
 
-    protocol_binary_request_header *req =
-        (protocol_binary_request_header *) req_bytes;
+    req = (protocol_binary_request_header *) req_bytes;
 
-    char *key     = ((char *) req) + sizeof(*req) + req->request.extlen;
-    int   keylen  = ntohs(req->request.keylen);
-    int   bodylen = ntohl(req->request.bodylen);
+    key = ((char *) req) + sizeof(*req) + req->request.extlen;
+    keylen = ntohs(req->request.keylen);
+    bodylen = ntohl(req->request.bodylen);
 
     /* The key is the sasl mech. */
 
@@ -379,8 +386,8 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
         return;
     }
 
-    char     *clientin    = key + keylen;
-    unsigned  clientinlen = bodylen - keylen - req->request.extlen;
+    clientin = key + keylen;
+    clientinlen = bodylen - keylen - req->request.extlen;
 
     /* The clientin string looks like "[authzid]\0username\0password". */
 
@@ -399,10 +406,11 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
         int pwlen = clientinlen - 2 - uslen;
 
         if (pwlen < (int) sizeof(password)) {
+            proxy *p;
             memcpy(password, clientin + 2 + uslen, pwlen);
             password[pwlen] = '\0';
 
-            proxy *p = cproxy_find_proxy_by_auth(ptd->proxy->main,
+            p = cproxy_find_proxy_by_auth(ptd->proxy->main,
                                                  username, password);
             if (p != NULL) {
                 proxy_td *ptd_target = cproxy_find_thread_data(p, pthread_self());

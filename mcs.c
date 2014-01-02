@@ -81,7 +81,8 @@ void mcs_free(mcs_st *ptr) {
     ptr->kind = MCS_KIND_UNKNOWN;
 
     if (ptr->servers) {
-        for (int i = 0; i < ptr->nservers; i++) {
+        int i;
+        for (i = 0; i < ptr->nservers; i++) {
             if (ptr->servers[i].usr != NULL) {
                 free(ptr->servers[i].usr);
             }
@@ -137,33 +138,37 @@ mcs_st *lvb_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
                    const char *default_pwd,
                    const char *opts) {
+    VBUCKET_CONFIG_HANDLE vch;
     (void) opts;
 
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBVBUCKET;
 
-    VBUCKET_CONFIG_HANDLE vch = vbucket_config_parse_string(config);
+    vch = vbucket_config_parse_string(config);
     if (vch != NULL) {
-        ptr->data     = vch;
+        ptr->data = vch;
         ptr->nservers = vbucket_config_get_num_servers(vch);
         if (ptr->nservers > 0) {
             ptr->servers = calloc(sizeof(mcs_server_st), ptr->nservers);
             if (ptr->servers != NULL) {
-                for (int i = 0; i < ptr->nservers; i++) {
+                int i, j;
+                for (i = 0; i < ptr->nservers; i++) {
                     ptr->servers[i].fd = -1;
                 }
 
-                int j = 0;
-                for (; j < ptr->nservers; j++) {
+                for (j = 0; j < ptr->nservers; j++) {
+                    const char *user;
+                    const char *password;
                     const char *hostport = vbucket_config_get_server(vch, j);
                     if (hostport != NULL &&
                         strlen(hostport) > 0 &&
                         strlen(hostport) < sizeof(ptr->servers[j].hostname) - 1) {
+                        char *colon;
                         strncpy(ptr->servers[j].hostname,
                                 hostport,
                                 sizeof(ptr->servers[j].hostname) - 1);
-                        char *colon = strchr(ptr->servers[j].hostname, ':');
+                        colon = strchr(ptr->servers[j].hostname, ':');
                         if (colon != NULL) {
                             *colon = '\0';
                             ptr->servers[j].port = atoi(colon + 1);
@@ -183,14 +188,14 @@ mcs_st *lvb_create(mcs_st *ptr, const char *config,
                         break;
                     }
 
-                    const char *user = vbucket_config_get_user(vch);
+                    user = vbucket_config_get_user(vch);
                     if (user != NULL) {
                         ptr->servers[j].usr = strdup(user);
                     } else if (default_usr != NULL) {
                         ptr->servers[j].usr = strdup(default_usr);
                     }
 
-                    const char *password = vbucket_config_get_password(vch);
+                    password = vbucket_config_get_password(vch);
                     if (password != NULL) {
                         ptr->servers[j].pwd = strdup(password);
                     } else if (default_pwd != NULL) {
@@ -233,16 +238,16 @@ void lvb_free_data(mcs_st *ptr) {
  * should afterwards only call mcs_free() on the next_version.
  */
 bool lvb_stable_update(mcs_st *curr_version, mcs_st *next_version) {
+    bool rv = false;
+    VBUCKET_CONFIG_DIFF *diff;
+
     assert(curr_version->kind == MCS_KIND_LIBVBUCKET);
     assert(curr_version->data != NULL);
     assert(next_version->kind == MCS_KIND_LIBVBUCKET);
     assert(next_version->data != NULL);
 
-    bool rv = false;
-
-    VBUCKET_CONFIG_DIFF *diff =
-        vbucket_compare((VBUCKET_CONFIG_HANDLE) curr_version->data,
-                        (VBUCKET_CONFIG_HANDLE) next_version->data);
+    diff = vbucket_compare((VBUCKET_CONFIG_HANDLE) curr_version->data,
+                           (VBUCKET_CONFIG_HANDLE) next_version->data);
     if (diff != NULL) {
         if (!diff->sequence_changed) {
             vbucket_config_destroy((VBUCKET_CONFIG_HANDLE) curr_version->data);
@@ -260,12 +265,15 @@ bool lvb_stable_update(mcs_st *curr_version, mcs_st *next_version) {
 
 uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
                       int *vbucket) {
+    VBUCKET_CONFIG_HANDLE vch;
+    int v;
+
     assert(ptr->kind == MCS_KIND_LIBVBUCKET);
     assert(ptr->data != NULL);
 
-    VBUCKET_CONFIG_HANDLE vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
+    vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
 
-    int v = vbucket_get_vbucket_by_key(vch, key, key_length);
+    v = vbucket_get_vbucket_by_key(vch, key, key_length);
     if (vbucket != NULL) {
         *vbucket = v;
     }
@@ -275,10 +283,12 @@ uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
 
 void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
                                 int vbucket) {
+    VBUCKET_CONFIG_HANDLE vch;
+
     assert(ptr->kind == MCS_KIND_LIBVBUCKET);
     assert(ptr->data != NULL);
 
-    VBUCKET_CONFIG_HANDLE vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
+    vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
 
     vbucket_found_incorrect_master(vch, vbucket, server_index);
 }
@@ -290,12 +300,15 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
                    const char *default_usr,
                    const char *default_pwd,
                    const char *opts) {
+    memcached_st *mst;
+
     assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBMEMCACHED;
 
-    memcached_st *mst = memcached_create(NULL);
+    mst = memcached_create(NULL);
     if (mst != NULL) {
+        memcached_server_st *mservers;
         memcached_behavior_t b = MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED;
         uint64_t             v = 1;
 
@@ -316,8 +329,6 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
         memcached_behavior_set(mst, MEMCACHED_BEHAVIOR_NO_BLOCK, 1);
         memcached_behavior_set(mst, MEMCACHED_BEHAVIOR_TCP_NODELAY, 1);
 
-        memcached_server_st *mservers;
-
         mservers = memcached_servers_parse(config);
         if (mservers != NULL) {
             memcached_server_push(mst, mservers);
@@ -327,12 +338,13 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
             if (ptr->nservers > 0) {
                 ptr->servers = calloc(sizeof(mcs_server_st), ptr->nservers);
                 if (ptr->servers != NULL) {
-                    for (int i = 0; i < ptr->nservers; i++) {
+                    int i;
+                    int j;
+                    for (i = 0; i < ptr->nservers; i++) {
                         ptr->servers[i].fd = -1;
                     }
 
-                    int j = 0;
-                    for (; j < ptr->nservers; j++) {
+                    for (j = 0; j < ptr->nservers; j++) {
                         strncpy(ptr->servers[j].hostname,
                                 memcached_server_name(mservers + j),
                                 sizeof(ptr->servers[j].hostname) - 1);
@@ -427,22 +439,25 @@ mcs_return mcs_server_st_connect(mcs_server_st *ptr, int *errno_out, bool blocki
 
 int mcs_connect(const char *hostname, int portnum,
                 int *errno_out, bool blocking) {
+    int ret = -1;
+    struct addrinfo *ai   = NULL;
+    struct addrinfo *next = NULL;
+    struct addrinfo hints;
+    char port[50];
+    int error;
+
     if (errno_out != NULL) {
         *errno_out = -1;
     }
 
-    int ret = -1;
+    memset(&hints, 0, sizeof(0));
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_UNSPEC;
 
-    struct addrinfo *ai   = NULL;
-    struct addrinfo *next = NULL;
-    struct addrinfo hints = { .ai_flags = AI_PASSIVE,
-                              .ai_socktype = SOCK_STREAM,
-                              .ai_family = AF_UNSPEC };
-
-    char port[50];
     snprintf(port, sizeof(port), "%d", portnum);
 
-    int error = getaddrinfo(hostname, port, &hints, &ai);
+    error = getaddrinfo(hostname, port, &hints, &ai);
     if (error != 0) {
         if (error != EAI_SYSTEM) {
             /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
@@ -636,7 +651,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
 }
 #else
 
-static unsigned long long __get_time_ms(const struct timeval *tv) {
+static uint64_t __get_time_ms(const struct timeval *tv) {
     struct timeval now;
 
     if (tv == NULL) {
@@ -645,13 +660,13 @@ static unsigned long long __get_time_ms(const struct timeval *tv) {
         }
         tv = &now;
     }
-    return (unsigned long long)tv->tv_sec * 1000 + (unsigned long long)tv->tv_usec / 1000;
+    return (uint64_t)tv->tv_sec * 1000 + (uint64_t)tv->tv_usec / 1000;
 }
 
 mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
-    unsigned long long start_ms = 0;
-    unsigned long long timeout_ms = 0;
-    unsigned long long now_ms = 0;
+    uint64_t start_ms = 0;
+    uint64_t timeout_ms = 0;
+    uint64_t now_ms = 0;
     char *data;
     size_t done;
     struct pollfd pfd[1];
@@ -679,12 +694,12 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
                 /* ensure we poll at least once */
                 timeout = 0;
             } else {
-                unsigned long long taken_ms = now_ms - start_ms;
+                uint64_t taken_ms = now_ms - start_ms;
                 if (taken_ms >= timeout_ms) {
                     /* just check (boundary case) */
                     timeout = 0;
                 } else {
-                    unsigned long long left_ms = timeout_ms - taken_ms;
+                    uint64_t left_ms = timeout_ms - taken_ms;
                     timeout = (left_ms > INT_MAX) ? INT_MAX : left_ms;
                 }
             }

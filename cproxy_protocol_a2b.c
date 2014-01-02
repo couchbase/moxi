@@ -192,6 +192,8 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
                         protocol_binary_response_header *header);
 
 void cproxy_init_a2b() {
+    int i = 0;
+
     memset(&req_noop, 0, sizeof(req_noop));
 
     req_noop.message.header.request.magic    = PROTOCOL_BINARY_REQ;
@@ -200,9 +202,11 @@ void cproxy_init_a2b() {
 
     /* Run through the a2b_specs to populate the a2b_spec_map. */
 
-    int i = 0;
     while (true) {
         struct A2BSpec *spec = &a2b_specs[i];
+        int j;
+        int noreply_index;
+
         if (spec->line == NULL) {
             break;
         }
@@ -212,7 +216,7 @@ void cproxy_init_a2b() {
                                     MAX_TOKENS, NULL);
         assert(spec->ntokens > 1);
 
-        int noreply_index = spec->ntokens - 2;
+        noreply_index = spec->ntokens - 2;
         if (spec->tokens[noreply_index].value &&
             strcmp(spec->tokens[noreply_index].value,
                    "[noreply]") == 0) {
@@ -222,7 +226,7 @@ void cproxy_init_a2b() {
         }
 
         spec->num_optional = 0;
-        for (int j = 0; j < spec->ntokens; j++) {
+        for (j = 0; j < spec->ntokens; j++) {
             if (spec->tokens[j].value &&
                 spec->tokens[j].value[0] == '[') {
                 spec->num_optional++;
@@ -250,6 +254,7 @@ int a2b_fill_request(short    cmd,
                      uint8_t **out_key,
                      uint16_t *out_keylen,
                      uint8_t  *out_extlen) {
+    struct A2BSpec *spec;
     assert(header);
     assert(cmd_tokens);
     assert(cmd_ntokens > 1);
@@ -259,10 +264,12 @@ int a2b_fill_request(short    cmd,
     assert(out_keylen);
     assert(out_extlen);
 
-    struct A2BSpec *spec = a2b_spec_map[cmd];
+    spec = a2b_spec_map[cmd];
     if (spec != NULL) {
         if (cmd_ntokens >= (spec->ntokens - spec->num_optional) &&
             cmd_ntokens <= (spec->ntokens)) {
+            int i;
+
             header->request.magic = PROTOCOL_BINARY_REQ;
 
             if (noreply) {
@@ -281,7 +288,7 @@ int a2b_fill_request(short    cmd,
 
             /* Start at 1 to skip the CMD_TOKEN. */
 
-            for (int i = 1; i < cmd_ntokens - 1; i++) {
+            for (i = 1; i < cmd_ntokens - 1; i++) {
                 if (a2b_fill_request_token(spec, i,
                                            cmd_tokens, cmd_ntokens,
                                            header,
@@ -311,6 +318,10 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
                             uint8_t **out_key,
                             uint16_t *out_keylen,
                             uint8_t  *out_extlen) {
+
+    uint64_t delta;
+    char t;
+
     (void)cmd_ntokens;
     assert(header);
     assert(spec);
@@ -321,14 +332,12 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
     assert(cur_token < cmd_ntokens);
     assert(cur_token < spec->ntokens);
 
-    uint64_t delta;
-
     if (settings.verbose > 2) {
         moxi_log_write("a2b_fill_request_token %s\n",
                 spec->tokens[cur_token].value);
     }
 
-    char t = spec->tokens[cur_token].value[1];
+    t = spec->tokens[cur_token].value[1];
     switch (t) {
     case 'k': /* key */
         assert(out_key);
@@ -342,13 +351,13 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
     case 'v': /* value (for incr/decr) */
         delta = 0;
         if (safe_strtoull(cmd_tokens[cur_token].value, &delta)) {
+            protocol_binary_request_incr *req;
             assert(out_extlen);
 
             header->request.extlen   = *out_extlen = 20;
             header->request.datatype = PROTOCOL_BINARY_RAW_BYTES;
 
-            protocol_binary_request_incr *req =
-                (protocol_binary_request_incr *) header;
+            req = (protocol_binary_request_incr *) header;
 
             req->message.body.delta = htonll(delta);
             req->message.body.initial = 0;
@@ -365,13 +374,13 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
 
         if (safe_strtol(cmd_tokens[cur_token].value, &exptime_int)) {
             /* Ubuntu 8.04 breaks when I pass exptime to safe_strtol */
+            protocol_binary_request_flush *req;
             exptime = exptime_int;
 
             header->request.extlen   = *out_extlen = 4;
             header->request.datatype = PROTOCOL_BINARY_RAW_BYTES;
 
-            protocol_binary_request_flush *req =
-                (protocol_binary_request_flush *) header;
+            req = (protocol_binary_request_flush *) header;
 
             req->message.body.expiration = htonl(exptime);
         }
@@ -418,6 +427,11 @@ bool a2b_fill_request_token(struct A2BSpec *spec,
  * a downstream server, via try_read_command()/drive_machine().
  */
 void cproxy_process_a2b_downstream(conn *c) {
+    protocol_binary_response_header *header;
+    int extlen;
+    int keylen;
+    uint32_t bodylen;
+
     assert(c != NULL);
     assert(c->cmd >= 0);
     assert(c->next == NULL);
@@ -429,9 +443,7 @@ void cproxy_process_a2b_downstream(conn *c) {
 
     c->cmd_start = c->rcurr;
 
-    protocol_binary_response_header *header =
-        (protocol_binary_response_header *) &c->binary_header;
-
+    header = (protocol_binary_response_header *) &c->binary_header;
     header->response.status = (uint16_t) ntohs(header->response.status);
 
     assert(header->response.magic == (uint8_t) PROTOCOL_BINARY_RES);
@@ -439,9 +451,9 @@ void cproxy_process_a2b_downstream(conn *c) {
 
     process_bin_noreply(c); /* Map quiet c->cmd values into non-quiet. */
 
-    int      extlen  = header->response.extlen;
-    int      keylen  = header->response.keylen;
-    uint32_t bodylen = header->response.bodylen;
+    extlen = header->response.extlen;
+    keylen = header->response.keylen;
+    bodylen = header->response.bodylen;
 
     assert(bodylen >= (uint32_t) keylen + extlen);
 
@@ -520,6 +532,12 @@ void cproxy_process_a2b_downstream(conn *c) {
 /* We reach here after nread'ing a ext+key or item.
  */
 void cproxy_process_a2b_downstream_nread(conn *c) {
+    downstream *d;
+    protocol_binary_response_header *header;
+    int extlen;
+    int keylen;
+    uint32_t bodylen;
+
     assert(c != NULL);
     assert(c->cmd >= 0);
     assert(c->next == NULL);
@@ -527,15 +545,13 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
     assert(IS_BINARY(c->protocol));
     assert(IS_PROXY(c->protocol));
 
-    downstream *d = c->extra;
+    d = c->extra;
     assert(d);
 
-    protocol_binary_response_header *header =
-        (protocol_binary_response_header *) &c->binary_header;
-
-    int      extlen  = header->response.extlen;
-    int      keylen  = header->response.keylen;
-    uint32_t bodylen = header->response.bodylen;
+    header = (protocol_binary_response_header *) &c->binary_header;
+    extlen = header->response.extlen;
+    keylen = header->response.keylen;
+    bodylen = header->response.bodylen;
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_a2b_downstream_nread %d %d, cmd %x %d %d\n",
@@ -549,6 +565,12 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
          c->cmd == PROTOCOL_BINARY_CMD_GETK ||
          c->cmd == PROTOCOL_BINARY_CMD_STAT ||
          c->cmd == PROTOCOL_BINARY_CMD_GETL)) {
+
+        item *it;
+        char *key;
+        int vlen;
+        int flags = 0;
+
         if (settings.verbose > 2) {
             moxi_log_write("<%d cproxy_process_a2b_downstream_nread %d %d %x get/getk/stat\n",
                     c->sfd, c->ileft, c->isize, c->cmd);
@@ -560,9 +582,8 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
         /* We item_alloc() even if vlen is 0, so that later */
         /* code can assume an item exists. */
 
-        char *key   = binary_get_key(c);
-        int   vlen  = bodylen - (keylen + extlen);
-        int   flags = 0;
+        key = binary_get_key(c);
+        vlen = bodylen - (keylen + extlen);
 
         assert(key);
         assert(vlen >= 0);
@@ -578,16 +599,17 @@ void cproxy_process_a2b_downstream_nread(conn *c) {
             flags = ntohl(response_get->message.body.flags);
         }
 
-        item *it = item_alloc(key, keylen, flags, 0, vlen + 2);
+        it = item_alloc(key, keylen, flags, 0, vlen + 2);
         if (it != NULL) {
+            uint64_t cas = CPROXY_NOT_CAS;
+            conn *uc;
+
             c->item = it;
             c->ritem = ITEM_data(it);
             c->rlbytes = vlen;
             c->substate = bin_read_set_value;
 
-            uint64_t cas = CPROXY_NOT_CAS;
-
-            conn *uc = d->upstream_conn;
+            uc = d->upstream_conn;
             if (uc != NULL &&
                 uc->cmd_start != NULL &&
                 (strncmp(uc->cmd_start, "gets ", 5) == 0 ||
@@ -667,6 +689,15 @@ static void a2b_out_error(conn *uc, uint16_t status) {
  * including header, ext, key, and item data, as appropriate.
  */
 void a2b_process_downstream_response(conn *c) {
+    protocol_binary_response_header *header;
+    uint32_t extlen;
+    uint32_t keylen;
+    uint32_t bodylen;
+    uint16_t status;
+    downstream *d;
+    item *it;
+    conn *uc;
+
     assert(c != NULL);
     assert(c->cmd >= 0);
     assert(c->next == NULL);
@@ -674,13 +705,12 @@ void a2b_process_downstream_response(conn *c) {
     assert(IS_BINARY(c->protocol));
     assert(IS_PROXY(c->protocol));
 
-    protocol_binary_response_header *header =
-        (protocol_binary_response_header *) &c->binary_header;
+    header = (protocol_binary_response_header *) &c->binary_header;
 
-    uint32_t extlen  = header->response.extlen;
-    uint32_t keylen  = header->response.keylen;
-    uint32_t bodylen = header->response.bodylen;
-    uint16_t status  = header->response.status;
+    extlen = header->response.extlen;
+    keylen = header->response.keylen;
+    bodylen = header->response.bodylen;
+    status = header->response.status;
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_a2b_downstream_response, cmd: %x, item: %d, status: %d\n",
@@ -691,12 +721,12 @@ void a2b_process_downstream_response(conn *c) {
     /* including header, ext, key, and possibly item data. */
     /* Now we can get into big switch/case processing. */
 
-    downstream *d = c->extra;
+    d = c->extra;
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
 
-    item *it = c->item;
+    it = c->item;
 
     /* Clear c->item because we either move it to the upstream or */
     /* item_remove() it on error. */
@@ -707,7 +737,7 @@ void a2b_process_downstream_response(conn *c) {
         return;
     }
 
-    conn *uc = d->upstream_conn;
+    uc = d->upstream_conn;
 
     /* Handle not-my-vbucket error response. */
 
@@ -947,20 +977,20 @@ void a2b_process_downstream_response(conn *c) {
         conn_set_state(c, conn_pause);
 
         if (uc != NULL) {
+            protocol_binary_response_incr *response_incr;
             assert(uc->next == NULL);
 
             /* TODO: Any weird alignment/padding issues on different */
             /*       platforms in this cast to worry about here? */
 
-            protocol_binary_response_incr *response_incr =
-                (protocol_binary_response_incr *) c->cmd_start;
+            response_incr = (protocol_binary_response_incr *) c->cmd_start;
 
             switch (status) {
             case 0: {
                 char *s = add_conn_suffix(uc);
                 if (s != NULL) {
                     uint64_t v = mc_swap64(response_incr->message.body.value);
-                    sprintf(s, "%llu", (unsigned long long) v);
+                    sprintf(s, "%"PRIu64"", v);
                     out_string(uc, s);
                 } else {
                     d->ptd->stats.stats.err_oom++;
@@ -1069,9 +1099,13 @@ void a2b_process_downstream_response(conn *c) {
  * upstream ascii conn to its assigned binary downstream.
  */
 bool cproxy_forward_a2b_downstream(downstream *d) {
+    conn *uc;
+    int server_index = -1;
+    int nc;
+
     assert(d != NULL);
 
-    conn *uc = d->upstream_conn;
+    uc = d->upstream_conn;
 
     assert(uc != NULL);
     assert(uc->state == conn_pause);
@@ -1080,8 +1114,6 @@ bool cproxy_forward_a2b_downstream(downstream *d) {
     assert(uc->thread->base != NULL);
     assert(IS_ASCII(uc->protocol));
     assert(IS_PROXY(uc->protocol));
-
-    int server_index = -1;
 
     if (cproxy_is_broadcast_cmd(uc->cmd_curr) == true) {
         cproxy_ascii_broadcast_suffix(d);
@@ -1099,7 +1131,7 @@ bool cproxy_forward_a2b_downstream(downstream *d) {
         }
     }
 
-    int nc = cproxy_connect_downstream(d, uc->thread, server_index);
+    nc = cproxy_connect_downstream(d, uc->thread, server_index);
     if (nc == -1) {
         return true;
     }
@@ -1129,6 +1161,18 @@ bool cproxy_forward_a2b_downstream(downstream *d) {
  */
 bool cproxy_forward_a2b_simple_downstream(downstream *d,
                                           char *command, conn *uc) {
+    int vbucket = -1;
+    bool local;
+    conn *c;
+    uint8_t *out_key = NULL;
+    uint16_t out_keylen = 0;
+    uint8_t out_extlen = 0;
+    int cmd_len = 0;
+    token_t tokens[MAX_TOKENS];
+    size_t ntokens;
+    char *key;
+    int key_len;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -1143,7 +1187,6 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_GETKQ) {
         /* Only use front_cache for 'get', not for 'gets'. */
-
         mcache *front_cache =
             (command[3] == ' ') ? &d->ptd->proxy->front_cache : NULL;
 
@@ -1167,33 +1210,27 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
     /* TODO: Inefficient repeated scan_tokens. */
 
-    int      cmd_len = 0;
-    token_t  tokens[MAX_TOKENS];
-    size_t   ntokens = scan_tokens(command, tokens, MAX_TOKENS, &cmd_len);
-    char    *key     = tokens[KEY_TOKEN].value;
-    int      key_len = tokens[KEY_TOKEN].length;
+    ntokens = scan_tokens(command, tokens, MAX_TOKENS, &cmd_len);
+    key= tokens[KEY_TOKEN].value;
+    key_len = tokens[KEY_TOKEN].length;
 
     if (ntokens <= 1) { /* This was checked long ago, while parsing */
         assert(false);  /* the upstream conn. */
         return false;
     }
 
-    uint8_t *out_key    = NULL;
-    uint16_t out_keylen = 0;
-    uint8_t  out_extlen = 0;
-
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_FLUSH) {
         protocol_binary_request_flush req;
-        memset(&req, 0, sizeof(req));
-        protocol_binary_request_header *preq =
-            (protocol_binary_request_header *) &req;
+        protocol_binary_request_header *preq = (void*)&req;
+        int size;
 
-        int size = a2b_fill_request(uc->cmd_curr,
-                                    tokens, ntokens,
-                                    uc->noreply, preq,
-                                    &out_key,
-                                    &out_keylen,
-                                    &out_extlen);
+        memset(&req, 0, sizeof(req));
+        size = a2b_fill_request(uc->cmd_curr,
+                                tokens, ntokens,
+                                uc->noreply, preq,
+                                &out_key,
+                                &out_keylen,
+                                &out_extlen);
         if (size > 0) {
             assert(out_key == NULL);
             assert(out_keylen == 0);
@@ -1223,16 +1260,16 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_STAT) {
         protocol_binary_request_stats req;
-        memset(&req, 0, sizeof(req));
-        protocol_binary_request_header *preq =
-            (protocol_binary_request_header *) &req;
+        protocol_binary_request_header *preq = (void*)&req;
+        int size;
 
-        int size = a2b_fill_request(uc->cmd_curr,
-                                    tokens, ntokens,
-                                    uc->noreply, preq,
-                                    &out_key,
-                                    &out_keylen,
-                                    &out_extlen);
+        memset(&req, 0, sizeof(req));
+        size = a2b_fill_request(uc->cmd_curr,
+                                tokens, ntokens,
+                                uc->noreply, preq,
+                                &out_key,
+                                &out_keylen,
+                                &out_extlen);
         if (size > 0) {
             assert(out_extlen == 0);
             assert(uc->noreply == false);
@@ -1271,12 +1308,8 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
 
     /* Assuming we're already connected to downstream. */
     /* Handle all other simple commands. */
-
-    int  vbucket = -1;
-    bool local;
-
-    conn *c = cproxy_find_downstream_conn_ex(d, key, key_len,
-                                             &local, &vbucket);
+    c = cproxy_find_downstream_conn_ex(d, key, key_len,
+                                       &local, &vbucket);
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_VERSION) {
         key     = NULL;
@@ -1289,22 +1322,22 @@ bool cproxy_forward_a2b_simple_downstream(downstream *d,
         }
 
         if (cproxy_prep_conn_for_write(c)) {
+            protocol_binary_request_header *header;
+            int size;
+
             assert(c->state == conn_pause);
             assert(c->wbuf);
             assert(c->wsize >= a2b_size_max);
 
-            protocol_binary_request_header *header =
-                (protocol_binary_request_header *) c->wbuf;
-
+            header = (protocol_binary_request_header *) c->wbuf;
             memset(header, 0, a2b_size_max);
-
-            int size = a2b_fill_request(uc->cmd_curr,
-                                        tokens, ntokens,
-                                        uc->noreply,
-                                        header,
-                                        &out_key,
-                                        &out_keylen,
-                                        &out_extlen);
+            size = a2b_fill_request(uc->cmd_curr,
+                                    tokens, ntokens,
+                                    uc->noreply,
+                                    header,
+                                    &out_key,
+                                    &out_keylen,
+                                    &out_extlen);
             if (size > 0) {
                 assert(size <= a2b_size_max);
                 assert(key     == (char *) out_key);
@@ -1464,6 +1497,10 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
                                      uint8_t  extlen,
                                      conn *uc,
                                      char *suffix) {
+    int nwrite = 0;
+    int nconns;
+    int i;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -1479,10 +1516,8 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
 
     req->request.bodylen = htonl(keylen + extlen);
 
-    int nwrite = 0;
-    int nconns = mcs_server_count(&d->mst);
-
-    for (int i = 0; i < nconns; i++) {
+    nconns = mcs_server_count(&d->mst);
+    for (i = 0; i < nconns; i++) {
         conn *c = d->downstream_conns[i];
         if (c != NULL &&
             c != NULL_CONN) {
@@ -1566,6 +1601,11 @@ bool cproxy_broadcast_a2b_downstream(downstream *d,
  */
 bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
                                         item *it, conn *uc) {
+
+    int  vbucket = -1;
+    bool local;
+    conn *c;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -1578,16 +1618,17 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
 
     /* Assuming we're already connected to downstream. */
 
-    int  vbucket = -1;
-    bool local;
-
-    conn *c = cproxy_find_downstream_conn_ex(d, ITEM_key(it), it->nkey,
-                                             &local, &vbucket);
+    c = cproxy_find_downstream_conn_ex(d, ITEM_key(it), it->nkey,
+                                       &local, &vbucket);
     if (c != NULL) {
         if (local) {
             uc->hit_local = true;
         }
         if (cproxy_prep_conn_for_write(c)) {
+            uint8_t  extlen;
+            uint32_t hdrlen;
+            item *it_hdr;
+
             if (settings.verbose > 2) {
                 moxi_log_write("%d: a2b_item_forward, state: %s\n",
                                c->sfd, state_text(c->state));
@@ -1595,13 +1636,11 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
 
             assert(c->state == conn_pause);
 
-            uint8_t  extlen = (cmd == NREAD_APPEND ||
-                               cmd == NREAD_PREPEND) ? 0 : 8;
-            uint32_t hdrlen =
-                sizeof(protocol_binary_request_header) +
+            extlen = (cmd == NREAD_APPEND || cmd == NREAD_PREPEND) ? 0 : 8;
+            hdrlen = sizeof(protocol_binary_request_header) +
                 extlen;
 
-            item *it_hdr = item_alloc("i", 1, 0, 0, hdrlen);
+            it_hdr = item_alloc("i", 1, 0, 0, hdrlen);
             if (it_hdr != NULL) {
                 if (add_conn_item(c, it_hdr)) {
                     protocol_binary_request_header *req =
@@ -1767,6 +1806,10 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
     if ((c->cmd != PROTOCOL_BINARY_CMD_GETK &&
          c->cmd != PROTOCOL_BINARY_CMD_GETL) ||
         c->noreply == false) {
+        int max_retries;
+        int vbucket;
+        int sindex;
+
         /* For non-multi-key GET commands, enqueue a retry after */
         /* informing the vbucket map.  This includes single-key GET's. */
 
@@ -1777,8 +1820,8 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
             return true;
         }
 
-        int vbucket = ntohl(header->response.opaque);
-        int sindex = downstream_conn_index(d, c);
+        vbucket = ntohl(header->response.opaque);
+        sindex = downstream_conn_index(d, c);
 
         if (settings.verbose > 2) {
             moxi_log_write("<%d a2b_not_my_vbucket, "
@@ -1791,7 +1834,7 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
         /* As long as the upstream is still open and we haven't */
         /* retried too many times already. */
 
-        int max_retries = cproxy_max_retries(d);
+        max_retries = cproxy_max_retries(d);
 
         if (uc->cmd_retries < max_retries) {
             uc->cmd_retries++;
@@ -1812,6 +1855,13 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
 
         return false;
     } else {
+        int key_index;
+        char *key;
+        int key_len;
+        char key_buf[KEY_MAX_LENGTH + 10];
+        int vbucket = -1;
+        int sindex;
+
         /* Handle ascii multi-GET commands by awaiting all NOOP's from */
         /* downstream servers, eating the NOOP's, and retrying with */
         /* the same multiget de-duplication map, which might be partially */
@@ -1828,19 +1878,17 @@ bool a2b_not_my_vbucket(conn *uc, conn *c,
         assert(uc->cmd_start != NULL);
         assert(header->response.opaque != 0);
 
-        int   key_index = ntohl(header->response.opaque);
-        char *key       = uc->cmd_start + key_index;
-        int   key_len   = skey_len(key);
+        key_index = ntohl(header->response.opaque);
+        key = uc->cmd_start + key_index;
+        key_len = skey_len(key);
 
         /* The key is not NULL or space terminated. */
 
-        char key_buf[KEY_MAX_LENGTH + 10];
         assert(key_len <= KEY_MAX_LENGTH);
         memcpy(key_buf, key, key_len);
         key_buf[key_len] = '\0';
 
-        int vbucket = -1;
-        int sindex = downstream_conn_index(d, c);
+        sindex = downstream_conn_index(d, c);
 
         mcs_key_hash(&d->mst, key_buf, key_len, &vbucket);
 

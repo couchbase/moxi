@@ -39,22 +39,24 @@ static enum test_return cache_create_test(void)
 const uint64_t constructor_pattern = 0xdeadcafebabebeef;
 
 static int cache_constructor(void *buffer, void *notused1, int notused2) {
-    (void)buffer;
+    uint64_t *ptr = buffer;
+    *ptr = constructor_pattern;
+
     (void)notused1;
     (void)notused2;
 
-    uint64_t *ptr = buffer;
-    *ptr = constructor_pattern;
     return 0;
 }
 
 static enum test_return cache_constructor_test(void)
 {
+    uint64_t *ptr;
+    uint64_t pattern;
     cache_t *cache = cache_create("test", sizeof(uint64_t), sizeof(uint64_t),
                                   cache_constructor, NULL);
     assert(cache != NULL);
-    uint64_t *ptr = cache_alloc(cache);
-    uint64_t pattern = *ptr;
+    ptr = cache_alloc(cache);
+    pattern = *ptr;
     cache_free(cache, ptr);
     cache_destroy(cache);
     return (pattern == constructor_pattern) ? TEST_PASS : TEST_FAIL;
@@ -73,8 +75,10 @@ static enum test_return cache_fail_constructor_test(void)
 
     cache_t *cache = cache_create("test", sizeof(uint64_t), sizeof(uint64_t),
                                   cache_fail_constructor, NULL);
+    uint64_t *ptr;
+
     assert(cache != NULL);
-    uint64_t *ptr = cache_alloc(cache);
+    ptr = cache_alloc(cache);
     if (ptr != NULL) {
         ret = TEST_FAIL;
     }
@@ -93,8 +97,10 @@ static enum test_return cache_destructor_test(void)
 {
     cache_t *cache = cache_create("test", sizeof(uint32_t), sizeof(char*),
                                   NULL, cache_destructor);
+    char *ptr;
+
     assert(cache != NULL);
-    char *ptr = cache_alloc(cache);
+    ptr = cache_alloc(cache);
     cache_free(cache, ptr);
     cache_destroy(cache);
 
@@ -123,15 +129,20 @@ static enum test_return cache_redzone_test(void)
     cache_t *cache = cache_create("test", sizeof(uint32_t), sizeof(char*),
                                   NULL, NULL);
 
+    char *p;
+    char old;
     /* Ignore SIGABORT */
     struct sigaction old_action;
-    struct sigaction action = { .sa_handler = SIG_IGN, .sa_flags = 0};
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = SIG_IGN;
+
     sigemptyset(&action.sa_mask);
     sigaction(SIGABRT, &action, &old_action);
 
     /* check memory debug.. */
-    char *p = cache_alloc(cache);
-    char old = *(p - 1);
+    p = cache_alloc(cache);
+    old = *(p - 1);
     *(p - 1) = 0;
     cache_free(cache, p);
     assert(cache_error == -1);
@@ -259,17 +270,22 @@ static enum test_return test_safe_strtol(void) {
  * @return the pid of the memcached server
  */
 static pid_t start_server(in_port_t *port_out, bool is_daemon) {
+    pid_t pid;
+    FILE *fp;
+    char buffer[80];
     char environment[80];
+    char pid_file[80];
+    char *filename;
+
     snprintf(environment, sizeof(environment),
              "MEMCACHED_PORT_FILENAME=/tmp/ports.%lu", (long)getpid());
-    char *filename= environment + strlen("MEMCACHED_PORT_FILENAME=");
-    char pid_file[80];
+    filename = environment + strlen("MEMCACHED_PORT_FILENAME=");
     snprintf(pid_file, sizeof(pid_file), "/tmp/pid.%lu", (long)getpid());
 
     remove(filename);
     remove(pid_file);
 
-    pid_t pid = fork();
+    pid = fork();
     assert(pid != -1);
 
     if (pid == 0) {
@@ -310,7 +326,7 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
         usleep(10);
     }
 
-    FILE *fp = fopen(filename, "r");
+    fp = fopen(filename, "r");
     if (fp == NULL) {
         fprintf(stderr, "Failed to open the file containing port numbers: %s\n",
                 strerror(errno));
@@ -318,7 +334,6 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
     }
 
     *port_out = (in_port_t)-1;
-    char buffer[80];
     while ((fgets(buffer, sizeof(buffer), fp)) != NULL) {
         if (strncmp(buffer, "TCP INET: ", 10) == 0) {
             int32_t val;
@@ -331,6 +346,7 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
     assert(remove(filename) == 0);
 
     if (is_daemon) {
+        int32_t val;
         /* loop and wait for the pid file.. There is a potential race
          * condition that the server just created the file but isn't
          * finished writing the content, but I'll take the chance....
@@ -348,7 +364,6 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
         assert(fgets(buffer, sizeof(buffer), fp) != NULL);
         fclose(fp);
 
-        int32_t val;
         assert(safe_strtol(buffer, &val));
         pid = (pid_t)val;
     }
@@ -417,9 +432,15 @@ static enum test_return test_vperror(void) {
     int rv = 0;
     int oldstderr = dup(STDERR_FILENO);
     char tmpl[sizeof(TMP_TEMPLATE)+1];
+    int newfile;
+    char buf[80] = { 0 };
+    FILE *efile;
+    char *prv;
+    char expected[80] = { 0 };
+
     strncpy(tmpl, TMP_TEMPLATE, sizeof(TMP_TEMPLATE)+1);
 
-    int newfile = mkstemp(tmpl);
+    newfile = mkstemp(tmpl);
     assert(newfile > 0);
     rv = dup2(newfile, STDERR_FILENO);
     assert(rv == STDERR_FILENO);
@@ -435,16 +456,14 @@ static enum test_return test_vperror(void) {
 
 
     /* Go read the file */
-    char buf[80] = { 0 };
-    FILE *efile = fopen(tmpl, "r");
+    efile = fopen(tmpl, "r");
     assert(efile);
-    char *prv = fgets(buf, sizeof(buf), efile);
+    prv = fgets(buf, sizeof(buf), efile);
     assert(prv);
     fclose(efile);
 
     unlink(tmpl);
 
-    char expected[80] = { 0 };
     snprintf(expected, sizeof(expected),
              "Old McDonald had a farm.  EI EIO: %s\n", strerror(EIO));
 
@@ -498,9 +517,9 @@ int main(void)
     printf("1..%d\n", num_cases);
 
     for (ii = 0; testcases[ii].description != NULL; ++ii) {
+        enum test_return ret = testcases[ii].function();
         fflush(stdout);
         alarm(60);
-        enum test_return ret = testcases[ii].function();
         if (ret == TEST_SKIP) {
             fprintf(stdout, "ok # SKIP %d - %s\n", ii + 1, testcases[ii].description);
         } else if (ret == TEST_PASS) {

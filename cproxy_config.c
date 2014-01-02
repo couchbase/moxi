@@ -93,9 +93,10 @@ proxy_behavior behavior_default_g = {
 /** Length of key that may be zero or space terminated.
  */
 size_t skey_len(const char *key) {
+    char *x;
     assert(key);
 
-    char *x = (char *) key;
+    x = (char *) key;
     while (*x != ' ' && *x != '\0')
         x++;
 
@@ -105,10 +106,13 @@ size_t skey_len(const char *key) {
 /** Hash of key that may be zero or space terminated.
  */
 int skey_hash(const void *v) {
+    const char *key;
+    size_t len;
+
     assert(v);
 
-    const char *key = v;
-    size_t      len = skey_len(key);
+    key = v;
+    len = skey_len(key);
 
     return murmur_hash(key, len);
 }
@@ -117,14 +121,18 @@ int skey_hash(const void *v) {
  *  keys may be zero or space terminated.
  */
 int skey_equal(const void *v1, const void *v2) {
+    const char *k1;
+    const char *k2;
+    size_t n1;
+    size_t n2;
+
     assert(v1);
     assert(v2);
 
-    const char *k1 = v1;
-    const char *k2 = v2;
-
-    size_t n1 = skey_len(k1);
-    size_t n2 = skey_len(k2);
+    k1 = v1;
+    k2 = v2;
+    n1 = skey_len(k1);
+    n2 = skey_len(k2);
 
     return (n1 == n2 && strncmp(k1, k2, n1) == 0);
 }
@@ -184,11 +192,13 @@ char *skipspace(char *s) {
 /** Modifies string by zero'ing out any trailing spaces.
  */
 char *trailspace(char *s) {
+    char *e;
+
     if (s == NULL) {
         return NULL;
     }
 
-    for (char *e = s + strlen(s) - 1; e >= s && isspace(*e); e--) {
+    for (e = s + strlen(s) - 1; e >= s && isspace(*e); e--) {
         *e = '\0';
     }
 
@@ -213,10 +223,11 @@ char *trimstrdup(char *s) {
 /** Returns true if first word in a string equals a given word.
  */
 bool wordeq(char *s, char *word) {
+    char *end = s;
+
     assert(s);
     assert(word);
 
-    char *end = s;
     while (!isspace(*end) && *end != '\0')
         end++;
 
@@ -247,6 +258,10 @@ int cproxy_init(char *cfg_str,
                 char *behavior_str,
                 int nthreads,
                 struct event_base *main_base) {
+    char *env_usr;
+    char *env_pwd;
+    proxy_behavior behavior;
+
     assert(nthreads > 1); /* Main + at least one worker. */
     assert(nthreads == settings.num_threads);
 
@@ -265,9 +280,7 @@ int cproxy_init(char *cfg_str,
         return 0;
     }
 
-    if (behavior_str != NULL &&
-        (behavior_str[0] == '.' ||
-         behavior_str[0] == '/')) {
+    if (behavior_str != NULL && (behavior_str[0] == '.' || behavior_str[0] == '/')) {
         char *buf = readfile(behavior_str);
         if (buf != NULL) {
             int rv = cproxy_init(cfg_str, buf, nthreads, main_base);
@@ -306,7 +319,7 @@ int cproxy_init(char *cfg_str,
 
     behavior_default_g.downstream_protocol = proxy_downstream_binary_prot;
 
-    char *env_usr = getenv("MOXI_SASL_PLAIN_USR");
+    env_usr = getenv("MOXI_SASL_PLAIN_USR");
     if (env_usr != NULL) {
         strncpy(behavior_default_g.usr, env_usr, sizeof(behavior_default_g.usr) - 1);
         behavior_default_g.usr[sizeof(behavior_default_g.usr) - 1] = '\0';
@@ -315,7 +328,7 @@ int cproxy_init(char *cfg_str,
                        strlen(behavior_default_g.usr));
     }
 
-    char *env_pwd = getenv("MOXI_SASL_PLAIN_PWD");
+    env_pwd = getenv("MOXI_SASL_PLAIN_PWD");
     if (env_pwd != NULL) {
         strncpy(behavior_default_g.pwd, env_pwd, sizeof(behavior_default_g.pwd) - 1);
         behavior_default_g.pwd[sizeof(behavior_default_g.pwd) - 1] = '\0';
@@ -324,10 +337,7 @@ int cproxy_init(char *cfg_str,
                        strlen(behavior_default_g.pwd));
     }
 
-    proxy_behavior behavior =
-        cproxy_parse_behavior(behavior_str,
-                              behavior_default_g);
-
+    behavior = cproxy_parse_behavior(behavior_str, behavior_default_g);
     if (behavior.cycle > 0) {
         msec_cycle = behavior.cycle;
     }
@@ -335,7 +345,7 @@ int cproxy_init(char *cfg_str,
     msec_clockevent_base = main_base;
     msec_clock_handler(0, 0, NULL);
 
-    if (true == settings.enable_mcmux_mode) {
+    if (settings.enable_mcmux_mode) {
         return cproxy_init_mcmux_mode(settings.port,
                                       behavior,
                                       nthreads);
@@ -364,14 +374,14 @@ int cproxy_init_mcmux_mode(int proxy_port,
                            proxy_behavior behavior,
                            int nthreads) {
 
+    int behaviors_num = 1; /* Number of servers. */
+    proxy_behavior_pool behavior_pool;
     char *proxy_name = "default";
 
     if (settings.verbose > 1) {
         cproxy_dump_behavior(&behavior, "init_string", 2);
     }
 
-    int behaviors_num = 1; /* Number of servers. */
-    proxy_behavior_pool behavior_pool;
     memset(&behavior_pool, 0, sizeof(proxy_behavior_pool));
 
     behavior_pool.base = behavior;
@@ -380,31 +390,33 @@ int cproxy_init_mcmux_mode(int proxy_port,
             sizeof(proxy_behavior));
 
     if (behavior_pool.arr != NULL) {
-        for (int i = 0; i < behaviors_num; i++) {
+        int i;
+        proxy_main *m;
+        proxy *p;
+
+        for (i = 0; i < behaviors_num; i++) {
             behavior_pool.arr[i] = behavior;
         }
 
-        proxy_main *m = cproxy_gen_proxy_main(behavior, nthreads,
+        m = cproxy_gen_proxy_main(behavior, nthreads,
                 PROXY_CONF_TYPE_STATIC);
         if (m == NULL) {
             moxi_log_write("could not alloc proxy_main\n");
             exit(EXIT_FAILURE);
         }
 
-        proxy *p = cproxy_create(m,
-                proxy_name,
-                proxy_port,
-                "mcmux_config",
-                0, /* config_ver. */
-                &behavior_pool,
-                nthreads);
+        p = cproxy_create(m, proxy_name, proxy_port, "mcmux_config",
+                          0, /* config_ver. */
+                          &behavior_pool, nthreads);
         if (p != NULL) {
+            int n;
+
             pthread_mutex_lock(&m->proxy_main_lock);
             p->next = m->proxy_head;
             m->proxy_head = p;
             pthread_mutex_unlock(&m->proxy_main_lock);
 
-            int n = cproxy_listen(p);
+            n = cproxy_listen(p);
             if (n > 0) {
                 if (settings.verbose > 1) {
                     moxi_log_write("moxi listening on %d with %d conns\n",
@@ -432,6 +444,13 @@ int cproxy_init_mcmux_mode(int proxy_port,
 int cproxy_init_string(char *cfg_str,
                        proxy_behavior behavior,
                        int nthreads) {
+    char *buff;
+    char *next;
+    char *proxy_name = "default";
+    char *proxy_sect;
+    char *proxy_port_str;
+    int   proxy_port;
+
     /* cfg looks like "local_port=host:port,host:port;local_port=host:port"
      * like "11222=memcached1.foo.net:11211"  This means local port 11222
      * will be a proxy to downstream memcached server running at
@@ -442,13 +461,6 @@ int cproxy_init_string(char *cfg_str,
         return 0;
     }
 
-    char *buff;
-    char *next;
-    char *proxy_name = "default";
-    char *proxy_sect;
-    char *proxy_port_str;
-    int   proxy_port;
-
     if (settings.verbose > 1) {
         cproxy_dump_behavior(&behavior, "init_string", 2);
     }
@@ -456,6 +468,10 @@ int cproxy_init_string(char *cfg_str,
     buff = trimstrdup(cfg_str);
     next = buff;
     while (next != NULL) {
+        proxy_behavior_pool behavior_pool;
+        int behaviors_num = 1; /* Number of servers. */
+        char *x;
+
         proxy_sect = strsep(&next, ";");
 
         proxy_port_str = trimstr(strsep(&proxy_sect, "="));
@@ -470,47 +486,49 @@ int cproxy_init_string(char *cfg_str,
         }
         proxy_sect = trimstr(proxy_sect);
 
-        int behaviors_num = 1; /* Number of servers. */
-        for (char *x = proxy_sect; *x != '\0'; x++) {
+        for (x = proxy_sect; *x != '\0'; x++) {
             if (*x == ',') {
                 behaviors_num++;
             }
         }
 
-        proxy_behavior_pool behavior_pool;
         memset(&behavior_pool, 0, sizeof(proxy_behavior_pool));
 
         behavior_pool.base = behavior;
-        behavior_pool.num  = behaviors_num;
-        behavior_pool.arr  = calloc(behaviors_num,
-                                    sizeof(proxy_behavior));
+        behavior_pool.num = behaviors_num;
+        behavior_pool.arr = calloc(behaviors_num, sizeof(proxy_behavior));
 
         if (behavior_pool.arr != NULL) {
-            for (int i = 0; i < behaviors_num; i++) {
+            proxy *p;
+            proxy_main *m;
+            int i;
+
+            for (i = 0; i < behaviors_num; i++) {
                 behavior_pool.arr[i] = behavior;
             }
 
-            proxy_main *m = cproxy_gen_proxy_main(behavior, nthreads,
-                                                  PROXY_CONF_TYPE_STATIC);
+            m = cproxy_gen_proxy_main(behavior, nthreads,
+                                      PROXY_CONF_TYPE_STATIC);
             if (m == NULL) {
                 moxi_log_write("could not alloc proxy_main\n");
                 exit(EXIT_FAILURE);
             }
 
-            proxy *p = cproxy_create(m,
-                                     proxy_name,
-                                     proxy_port,
-                                     proxy_sect,
-                                     0, /* config_ver. */
-                                     &behavior_pool,
-                                     nthreads);
+            p = cproxy_create(m,
+                              proxy_name,
+                              proxy_port,
+                              proxy_sect,
+                              0, /* config_ver. */
+                              &behavior_pool,
+                              nthreads);
             if (p != NULL) {
+                int n;
                 pthread_mutex_lock(&m->proxy_main_lock);
                 p->next = m->proxy_head;
                 m->proxy_head = p;
                 pthread_mutex_unlock(&m->proxy_main_lock);
 
-                int n = cproxy_listen(p);
+                n = cproxy_listen(p);
                 if (n > 0) {
                     if (settings.verbose > 1) {
                         moxi_log_write("moxi listening on %d with %d conns\n",
@@ -567,6 +585,8 @@ proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior, int nthreads,
 proxy_behavior cproxy_parse_behavior(char          *behavior_str,
                                      proxy_behavior behavior_default) {
     /* These are the default proxy behaviors. */
+    char *buff;
+    char *next;
 
     struct proxy_behavior behavior = behavior_default;
 
@@ -577,8 +597,8 @@ proxy_behavior cproxy_parse_behavior(char          *behavior_str,
 
     /* Parse the key-value behavior_str, to override the defaults. */
 
-    char *buff = trimstrdup(behavior_str);
-    char *next = buff;
+    buff = trimstrdup(behavior_str);
+    next = buff;
 
     while (next != NULL) {
         char *key_val = trimstr(strsep(&next, ","));
@@ -781,6 +801,7 @@ proxy_behavior *cproxy_copy_behaviors(int arr_size, proxy_behavior *arr) {
  */
 bool cproxy_equal_behaviors(int x_size, proxy_behavior *x,
                             int y_size, proxy_behavior *y) {
+    int i;
     if (x_size != y_size) {
         return false;
     }
@@ -793,7 +814,7 @@ bool cproxy_equal_behaviors(int x_size, proxy_behavior *x,
         return false;
     }
 
-    for (int i = 0; i < x_size; i++) {
+    for (i = 0; i < x_size; i++) {
         if (cproxy_equal_behavior(&x[i], &y[i]) == false) {
             if (settings.verbose > 1) {
                 moxi_log_write("behaviors not equal (%d)\n", i);
@@ -832,10 +853,10 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
                                           const char *key,
                                           const char *buf),
                              const void *dump_opaque) {
+    char vbuf[8000];
     assert(b);
     assert(dump);
 
-    char vbuf[8000];
 
 #define vdump(key, vfmt, val) {              \
     snprintf(vbuf, sizeof(vbuf), vfmt, val); \
@@ -931,20 +952,16 @@ void msec_set_current_time(void) {
 }
 
 void msec_clock_handler(const int fd, const short which, void *arg) {
-    (void)fd;
-    (void)which;
-    (void)arg;
+    static bool initialized = false;
+    struct timeval t;
 
     if (msec_cycle <= 0) {
         return;
     }
 
     /* Subsecond resolution timer. */
-
-    struct timeval t = { .tv_sec = 0,
-                         .tv_usec = msec_cycle * 1000 };
-
-    static bool initialized = false;
+    t.tv_sec = 0;
+    t.tv_usec = msec_cycle * 1000;
 
     if (initialized) {
         /* only delete the event if it's actually there. */
@@ -958,6 +975,10 @@ void msec_clock_handler(const int fd, const short which, void *arg) {
     evtimer_add(&msec_clockevent, &t);
 
     msec_set_current_time();
+
+    (void)fd;
+    (void)which;
+    (void)arg;
 }
 
 /* --------------------------------------- */

@@ -249,13 +249,14 @@ void mcache_set(mcache *m, void *it,
 
     if (m->map != NULL) {
         /* Evict some items if necessary. */
-
-        for (int i = 0; m->lru_tail != NULL && i < 20; i++) {
+        int i;
+        for (i = 0; m->lru_tail != NULL && i < 20; i++) {
+            void *last_it;
             if ((uint32_t)genhash_size(m->map) < m->max) {
                 break;
             }
 
-            void *last_it = m->lru_tail;
+            last_it = m->lru_tail;
 
             mcache_item_unlink(m, last_it);
 

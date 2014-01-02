@@ -73,24 +73,30 @@ mcache_funcs mcache_key_stats_funcs = {
 #define MERGE_BUF_SIZE 300
 
 bool protocol_stats_merge_line(genhash_t *merger, char *line) {
+    int nline;
+    token_t tokens[MAX_TOKENS];
+    int ntokens;
+    char *name;
+    int name_len;
+
+
     assert(merger != NULL);
     assert(line != NULL);
 
-    int nline = strlen(line); /* Ex: "STATS uptime 123455" */
+    nline = strlen(line); /* Ex: "STATS uptime 123455" */
     if (nline <= 0 ||
         nline >= MERGE_BUF_SIZE) {
         return false;
     }
 
-    token_t tokens[MAX_TOKENS];
-    size_t  ntokens = scan_tokens(line, tokens, MAX_TOKENS, NULL);
+    ntokens = scan_tokens(line, tokens, MAX_TOKENS, NULL);
 
     if (ntokens != 4) { /* 3 + 1 for the terminal token. */
         return false;
     }
 
-    char *name     = tokens[NAME_TOKEN].value;
-    int   name_len = tokens[NAME_TOKEN].length;
+    name = tokens[NAME_TOKEN].value;
+    name_len = tokens[NAME_TOKEN].length;
     if (name == NULL ||
         name_len <= 0 ||
         tokens[VALUE_TOKEN].value == NULL ||
@@ -116,28 +122,35 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
                                    int   name_len,
                                    char *val,
                                    int   val_len) {
+
+    char *key;
+    int key_len;
+
     assert(merger);
     assert(name);
     assert(val);
 
-    char *key = name + name_len - 1;     /* Key part for merge rule lookup. */
+    key = name + name_len - 1;     /* Key part for merge rule lookup. */
     while (key >= name && *key != ':') { /* Scan for last colon. */
         key--;
     }
     if (key < name) {
         key = name;
     }
-    int key_len = name_len - (key - name);
-    if (key_len > 0 &&
-        key_len < MERGE_BUF_SIZE) {
+    key_len = name_len - (key - name);
+    if (key_len > 0 && key_len < MERGE_BUF_SIZE) {
         char buf_name[MERGE_BUF_SIZE];
         char buf_key[MERGE_BUF_SIZE];
         char buf_val[MERGE_BUF_SIZE];
+        char *prev;
+        token_t prev_tokens[MAX_TOKENS];
+        size_t prev_ntokens;
+        bool ok;
 
         strncpy(buf_name, name, name_len);
         buf_name[name_len] = '\0';
 
-        char *prev = (char *) genhash_find(merger, buf_name);
+        prev = (char *) genhash_find(merger, buf_name);
         if (prev == NULL) {
             char *hval = malloc(prefix_len + 1 +
                                 name_len + 1 +
@@ -165,18 +178,13 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
             return true;
         }
 
-        token_t prev_tokens[MAX_TOKENS];
-        size_t  prev_ntokens = scan_tokens(prev, prev_tokens,
-                                           MAX_TOKENS, NULL);
-
+        prev_ntokens = scan_tokens(prev, prev_tokens, MAX_TOKENS, NULL);
         if (prev_ntokens != 4) {
             return true;
         }
 
         strncpy(buf_val, val, val_len);
         buf_val[val_len] = '\0';
-
-        bool ok;
 
         if (strstr(protocol_stats_keys_smallest, buf_key) != NULL) {
             ok = protocol_stats_merge_smallest(prev_tokens[VALUE_TOKEN].value,
@@ -223,7 +231,6 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
 bool protocol_stats_merge_sum(char *v1, int v1len,
                               char *v2, int v2len,
                               char *out, int outlen) {
-    (void)outlen;
     int dot = count_dot_pair(v1, v1len, v2, v2len);
     if (dot > 0) {
         float v1f = strtof(v1, NULL);
@@ -236,18 +243,18 @@ bool protocol_stats_merge_sum(char *v1, int v1len,
 
         if (safe_strtoull(v1, &v1i) &&
             safe_strtoull(v2, &v2i)) {
-            sprintf(out, "%llu", (long long unsigned int) (v1i + v2i));
+            sprintf(out, "%"PRIu64"", (v1i + v2i));
             return true;
         }
     }
 
+    (void)outlen;
     return false;
 }
 
 bool protocol_stats_merge_smallest(char *v1, int v1len,
                                    char *v2, int v2len,
                                    char *out, int outlen) {
-    (void)outlen;
     int dot = count_dot_pair(v1, v1len, v2, v2len);
     if (dot > 0) {
         float v1f = strtof(v1, NULL);
@@ -260,11 +267,12 @@ bool protocol_stats_merge_smallest(char *v1, int v1len,
 
         if (safe_strtoull(v1, &v1i) &&
             safe_strtoull(v2, &v2i)) {
-            sprintf(out, "%llu", (long long unsigned int) (v1i > v2i ? v1i : v2i));
+            sprintf(out, "%"PRIu64"", (v1i > v2i ? v1i : v2i));
             return true;
         }
     }
 
+    (void)outlen;
     return false;
 }
 
@@ -282,15 +290,17 @@ void protocol_stats_foreach_free(const void *key,
 void protocol_stats_foreach_write(const void *key,
                                   const void *value,
                                   void *user_data) {
-    (void)key;
+
     char *line = (char *) value;
-    assert(line != NULL);
-
     conn *uc = (conn *) user_data;
+    int nline;
+    assert(line != NULL);
     assert(uc != NULL);
+    (void)key;
 
-    int nline = strlen(line);
+    nline = strlen(line);
     if (nline > 0) {
+        item *it;
         if (settings.verbose > 2) {
             moxi_log_write("%d: cproxy_stats writing: %s\n", uc->sfd, line);
         }
@@ -303,8 +313,8 @@ void protocol_stats_foreach_write(const void *key,
                 uint16_t key_len  = line_tokens[NAME_TOKEN].length;
                 uint32_t data_len = line_tokens[VALUE_TOKEN].length;
 
-                item *it = item_alloc("s", 1, 0, 0,
-                                      sizeof(protocol_binary_response_stats) + key_len + data_len);
+                it = item_alloc("s", 1, 0, 0,
+                                sizeof(protocol_binary_response_stats) + key_len + data_len);
                 if (it != NULL) {
                     protocol_binary_response_stats *header =
                         (protocol_binary_response_stats *) ITEM_data(it);
@@ -340,7 +350,7 @@ void protocol_stats_foreach_write(const void *key,
             return;
         }
 
-        item *it = item_alloc("s", 1, 0, 0, nline + 2);
+        it = item_alloc("s", 1, 0, 0, nline + 2);
         if (it != NULL) {
             strncpy(ITEM_data(it), line, nline);
             strncpy(ITEM_data(it) + nline, "\r\n", 2);
@@ -364,8 +374,8 @@ int count_dot_pair(char *x, int xlen, char *y, int ylen) {
 
 int count_dot(char *x, int len) { /* Number of '.' chars in a string. */
     int dot = 0;
-
-    for (char *end = x + len; x < end; x++) {
+    char *end;
+    for (end = x + len; x < end; x++) {
         if (*x == '.')
             dot++;
     }
@@ -376,12 +386,15 @@ int count_dot(char *x, int len) { /* Number of '.' chars in a string. */
 /* ---------------------------------------- */
 
 void cproxy_reset_stats_td(proxy_stats_td *pstd) {
+    int j;
+
     assert(pstd);
 
     cproxy_reset_stats(&pstd->stats);
 
-    for (int j = 0; j < STATS_CMD_TYPE_last; j++) {
-        for (int k = 0; k < STATS_CMD_last; k++) {
+    for (j = 0; j < STATS_CMD_TYPE_last; j++) {
+        int k;
+        for (k = 0; k < STATS_CMD_last; k++) {
             cproxy_reset_stats_cmd(&pstd->stats_cmd[j][k]);
         }
     }
@@ -453,12 +466,12 @@ void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
 
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
                           uint64_t msec_time) {
+    key_stats *ks;
     assert(ptd);
     assert(key);
     assert(key_len > 0);
 
-    key_stats *ks = mcache_get(&ptd->key_stats, key, key_len,
-                               msec_time);
+    ks = mcache_get(&ptd->key_stats, key, key_len, msec_time);
     if (ks == NULL) {
         ks = calloc(1, sizeof(key_stats));
         if (ks != NULL) {

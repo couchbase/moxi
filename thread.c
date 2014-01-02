@@ -348,12 +348,14 @@ void dispatch_conn_new_to_thread(int tid, int sfd, enum conn_states init_state,
                                  enum protocol prot,
                                  enum network_transport transport,
                                  conn_funcs *funcs, void *extra) {
+    LIBEVENT_THREAD *thread;
+    CQ_ITEM *cq_item;
+
     assert(tid > 0);
     assert(tid < settings.num_threads);
 
-    LIBEVENT_THREAD *thread = threads + tid;
-
-    CQ_ITEM *cq_item = cqi_new();
+    thread = threads + tid;
+    cq_item = cqi_new();
 
     cq_item->sfd = sfd;
     cq_item->init_state = init_state;
@@ -389,7 +391,8 @@ int is_listen_thread() {
 }
 
 int thread_index(pthread_t thread_id) {
-    for (int i = 0; i < settings.num_threads; i++) {
+    int i;
+    for (i = 0; i < settings.num_threads; i++) {
         if (compare_pthread_t(threads[i].thread_id, thread_id)) {
             return i;
         }

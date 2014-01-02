@@ -30,6 +30,10 @@ void cproxy_init_b2b() {
  * upstream binary conn to its assigned binary downstream.
  */
 bool cproxy_forward_b2b_downstream(downstream *d) {
+    int nc;
+    int server_index;
+    conn *uc;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -40,8 +44,7 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
 
     d->downstream_used_start = 0;
 
-    conn *uc = d->upstream_conn;
-
+    uc = d->upstream_conn;
     if (settings.verbose > 2) {
         moxi_log_write("%d: cproxy_forward_b2b_downstream %x\n",
                 uc->sfd, uc->cmd);
@@ -57,18 +60,19 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
     assert(IS_BINARY(uc->protocol));
     assert(IS_PROXY(uc->protocol));
 
-    int server_index = -1;
+    server_index = -1;
 
-    if (cproxy_is_broadcast_cmd(uc->cmd) == false &&
-        uc->corked == NULL) {
+    if (cproxy_is_broadcast_cmd(uc->cmd) == false && uc->corked == NULL) {
         item *it = uc->item;
+        protocol_binary_request_header *req;
+        char *key;
+        int key_len;
+
         assert(it != NULL);
 
-        protocol_binary_request_header *req =
-            (protocol_binary_request_header *) ITEM_data(it);
-
-        char *key     = ((char *) req) + sizeof(*req) + req->request.extlen;
-        int   key_len = ntohs(req->request.keylen);
+        req = (protocol_binary_request_header *) ITEM_data(it);
+        key = ((char *) req) + sizeof(*req) + req->request.extlen;
+        key_len = ntohs(req->request.keylen);
 
         if (key_len > 0) {
             server_index = cproxy_server_index(d, key, key_len, NULL);
@@ -78,12 +82,15 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
         }
     }
 
-    int nc = cproxy_connect_downstream(d, uc->thread, server_index);
+    nc = cproxy_connect_downstream(d, uc->thread, server_index);
     if (nc == -1) {
         return true;
     }
 
     if (nc > 0) {
+        int i;
+        int nconns;
+
         assert(d->downstream_conns != NULL);
 
         if (d->usec_start == 0 &&
@@ -91,9 +98,8 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
             d->usec_start = usec_now();
         }
 
-        int nconns = mcs_server_count(&d->mst);
-
-        for (int i = 0; i < nconns; i++) {
+        nconns = mcs_server_count(&d->mst);
+        for (i = 0; i < nconns; i++) {
             conn *c = d->downstream_conns[i];
             if (c != NULL &&
                 c != NULL_CONN) {
@@ -137,16 +143,21 @@ bool cproxy_forward_b2b_simple_downstream(downstream *d, conn *uc) {
 }
 
 bool b2b_forward_item(conn *uc, downstream *d, item *it) {
+    int  vbucket = -1;
+    bool local;
+    conn *c;
+    protocol_binary_request_header *req;
+    char *key;
+    int keylen;
+
     assert(uc != NULL);
     assert(uc->next == NULL);
     assert(uc->noreply == false);
     assert(it != NULL);
 
-    protocol_binary_request_header *req =
-        (protocol_binary_request_header *) ITEM_data(it);
-
-    char *key    = ((char *) req) + sizeof(*req) + req->request.extlen;
-    int   keylen = ntohs(req->request.keylen);
+    req = (protocol_binary_request_header *) ITEM_data(it);
+    key = ((char *) req) + sizeof(*req) + req->request.extlen;
+    keylen = ntohs(req->request.keylen);
 
     if (settings.verbose > 2) {
         char buf[300];
@@ -164,11 +175,8 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
         return false; /* We don't know how to hash an empty key. */
     }
 
-    int  vbucket = -1;
-    bool local;
 
-    conn *c = cproxy_find_downstream_conn_ex(d, key, keylen,
-                                             &local, &vbucket);
+    c = cproxy_find_downstream_conn_ex(d, key, keylen, &local, &vbucket);
     if (c != NULL) {
         if (local) {
             uc->hit_local = true;
@@ -193,6 +201,8 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
 
 bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
                               conn *c, int vbucket) {
+    protocol_binary_request_header *req;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(uc != NULL);
@@ -207,9 +217,7 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
                 uc->sfd, uc->cmd, c->sfd, vbucket);
     }
 
-    protocol_binary_request_header *req =
-        (protocol_binary_request_header *) ITEM_data(it);
-
+    req = (protocol_binary_request_header *) ITEM_data(it);
     if (vbucket >= 0) {
         req->request.reserved = htons(vbucket);
     }
@@ -243,6 +251,10 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
 /* Used for broadcast commands, like no-op, flush_all or stats.
  */
 bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
+    int nwrite = 0;
+    int nconns;
+    int i;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -251,10 +263,9 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
     assert(uc->next == NULL);
     assert(uc->noreply == false);
 
-    int nwrite = 0;
-    int nconns = mcs_server_count(&d->mst);
+    nconns = mcs_server_count(&d->mst);
 
-    for (int i = 0; i < nconns; i++) {
+    for (i = 0; i < nconns; i++) {
         conn *c = d->downstream_conns[i];
         if (c != NULL &&
             c != NULL_CONN &&
@@ -270,13 +281,14 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
 
     if (nwrite > 0) {
         /* TODO: Handle binary 'stats reset' sub-command. */
+        item *it;
 
         if (uc->cmd == PROTOCOL_BINARY_CMD_STAT &&
             d->merger == NULL) {
             d->merger = genhash_init(128, skeyhash_ops);
         }
 
-        item *it = item_alloc("h", 1, 0, 0,
+        it = item_alloc("h", 1, 0, 0,
                               sizeof(protocol_binary_response_header));
         if (it != NULL) {
             protocol_binary_response_header *header =
@@ -320,6 +332,13 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
  * a downstream server, via try_read_command()/drive_machine().
  */
 void cproxy_process_b2b_downstream(conn *c) {
+    char *ikey;
+    int ikeylen;
+    downstream *d;
+    int extlen;
+    int keylen;
+    uint32_t bodylen;
+
     assert(c != NULL);
     assert(c->cmd >= 0);
     assert(c->next == NULL);
@@ -328,7 +347,7 @@ void cproxy_process_b2b_downstream(conn *c) {
     assert(IS_PROXY(c->protocol));
     assert(c->substate == bin_no_state);
 
-    downstream *d = c->extra;
+    d = c->extra;
     assert(d);
 
     c->cmd_curr       = -1;
@@ -336,9 +355,9 @@ void cproxy_process_b2b_downstream(conn *c) {
     c->cmd_start_time = msec_current_time;
     c->cmd_retries    = 0;
 
-    int      extlen  = c->binary_header.request.extlen;
-    int      keylen  = c->binary_header.request.keylen;
-    uint32_t bodylen = c->binary_header.request.bodylen;
+    extlen  = c->binary_header.request.extlen;
+    keylen  = c->binary_header.request.keylen;
+    bodylen = c->binary_header.request.bodylen;
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_b2b_downstream %x %d %d %u\n",
@@ -357,8 +376,8 @@ void cproxy_process_b2b_downstream(conn *c) {
     /* necessary.  The item will hold the entire response message */
     /* (the header + body). */
 
-    char *ikey    = "q";
-    int   ikeylen = 1;
+    ikey = "q";
+    ikeylen = 1;
 
     c->item = item_alloc(ikey, ikeylen, 0, 0,
                          sizeof(c->binary_header) + bodylen);
@@ -391,6 +410,16 @@ void cproxy_process_b2b_downstream(conn *c) {
 /* We reach here after nread'ing a header+body into an item.
  */
 void cproxy_process_b2b_downstream_nread(conn *c) {
+    conn *uc;
+    item *it;
+    downstream *d;
+    protocol_binary_response_header *header;
+    int extlen;
+    int keylen;
+    uint32_t bodylen;
+    int status;
+    int opcode;
+
     assert(c != NULL);
     assert(c->cmd >= 0);
     assert(c->next == NULL);
@@ -398,21 +427,19 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     assert(IS_BINARY(c->protocol));
     assert(IS_PROXY(c->protocol));
 
-    protocol_binary_response_header *header =
-        (protocol_binary_response_header *) &c->binary_header;
-
-    int      extlen  = header->response.extlen;
-    int      keylen  = header->response.keylen;
-    uint32_t bodylen = header->response.bodylen;
-    int      status  = ntohs(header->response.status);
-    int      opcode  = header->response.opcode;
+    header = (protocol_binary_response_header *) &c->binary_header;
+    extlen = header->response.extlen;
+    keylen = header->response.keylen;
+    bodylen = header->response.bodylen;
+    status = ntohs(header->response.status);
+    opcode = header->response.opcode;
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_b2b_downstream_nread %x %x %d %d %u %d %x\n",
                 c->sfd, c->cmd, opcode, extlen, keylen, bodylen, c->noreply, status);
     }
 
-    downstream *d = c->extra;
+    d = c->extra;
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -421,8 +448,8 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     /*       in the right order. */
     /* TODO: Need to handle not-my-vbucket error during a quiet cmd. */
 
-    conn *uc = d->upstream_conn;
-    item *it = c->item;
+    uc = d->upstream_conn;
+    it = c->item;
 
     /* Clear c->item because we either move it to the upstream or */
     /* item_remove() it on error. */
@@ -470,6 +497,12 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
 
         if (uc != NULL &&
             status == PROTOCOL_BINARY_RESPONSE_NOT_MY_VBUCKET) {
+
+            int max_retries;
+            protocol_binary_request_header *req;
+            int vbucket;
+            int sindex;
+
             if (settings.verbose > 2) {
                 moxi_log_write("<%d cproxy_process_b2b_downstream_nread not-my-vbucket, "
                         "cmd: %x %d\n",
@@ -478,11 +511,10 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
 
             assert(uc->item != NULL);
 
-            protocol_binary_request_header *req =
-                (protocol_binary_request_header *) ITEM_data((item *) uc->item);
+            req = (protocol_binary_request_header *)ITEM_data((item*)uc->item);
 
-            int vbucket = ntohs(req->request.reserved);
-            int sindex = downstream_conn_index(d, c);
+            vbucket = ntohs(req->request.reserved);
+            sindex = downstream_conn_index(d, c);
 
             if (settings.verbose > 2) {
                 moxi_log_write("<%d cproxy_process_b2b_downstream_nread not-my-vbucket, "
@@ -496,7 +528,7 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
             /* As long as the upstream is still open and we haven't */
             /* retried too many times already. */
 
-            int max_retries = cproxy_max_retries(d);
+            max_retries = cproxy_max_retries(d);
 
             if (uc->cmd_retries < max_retries) {
                 uc->cmd_retries++;

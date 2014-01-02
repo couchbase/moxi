@@ -442,6 +442,10 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
                                      char *command,
                                      conn *uc,
                                      char *suffix) {
+    int nwrite = 0;
+    int nconns;
+    int i;
+
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -453,10 +457,8 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
     assert(uc->next == NULL);
     assert(uc->item == NULL);
 
-    int nwrite = 0;
-    int nconns = mcs_server_count(&d->mst);
-
-    for (int i = 0; i < nconns; i++) {
+    nconns = mcs_server_count(&d->mst);
+    for (i = 0; i < nconns; i++) {
         conn *c = d->downstream_conns[i];
         if (c != NULL &&
             c != NULL_CONN) {
@@ -523,6 +525,7 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
  */
 bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
                                         item *it, conn *uc) {
+    conn *c;
     assert(d != NULL);
     assert(d->ptd != NULL);
     assert(d->ptd->proxy != NULL);
@@ -532,23 +535,29 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
     assert(uc->next == NULL);
 
     /* Assuming we're already connected to downstream. */
-
-
-    conn *c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey, NULL);
+    c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey, NULL);
     if (c != NULL) {
 
         if (cproxy_prep_conn_for_write(c)) {
+            char *verb;
+            char *str_flags;
+            char *str_length;
+            int len_flags;
+            int len_length;
+            char *str_exptime;
+            char *str_cas;
+
             assert(c->state == conn_pause);
 
-            char *verb = nread_text(cmd);
+            verb = nread_text(cmd);
             assert(verb != NULL);
 
-            char *str_flags   = ITEM_suffix(it);
-            char *str_length  = strchr(str_flags + 1, ' ');
-            int   len_flags   = str_length - str_flags;
-            int   len_length  = it->nsuffix - len_flags - 2;
-            char *str_exptime = add_conn_suffix(c);
-            char *str_cas     = (cmd == NREAD_CAS ? add_conn_suffix(c) : NULL);
+            str_flags = ITEM_suffix(it);
+            str_length = strchr(str_flags + 1, ' ');
+            len_flags = str_length - str_flags;
+            len_length = it->nsuffix - len_flags - 2;
+            str_exptime = add_conn_suffix(c);
+            str_cas = (cmd == NREAD_CAS ? add_conn_suffix(c) : NULL);
 
             if (str_flags != NULL &&
                 str_length != NULL &&
