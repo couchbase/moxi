@@ -5014,8 +5014,8 @@ int main (int argc, char **argv) {
                 }
                 exit(EXIT_FAILURE);
             }
-        }
 #endif
+        }
     }
 
 #ifndef MAIN_CHECK
