@@ -77,3 +77,8 @@ moxi_*.tar.gz
 stamp-h1
 stamp-h2
 tags
+/CMakeFiles/
+/CTestTestfile.cmake
+/cmake_install.cmake
+/moxi_htgram_test
+/moxi_sizes
