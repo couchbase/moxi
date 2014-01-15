@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <math.h>
@@ -178,7 +177,7 @@ proxy *cproxy_create(proxy_main *main,
 
         p->next = NULL;
 
-        pthread_mutex_init(&p->proxy_lock, NULL);
+        cb_mutex_initialize(&p->proxy_lock);
 
         mcache_init(&p->front_cache, true, &mcache_item_funcs, true);
         matcher_init(&p->front_cache_matcher, true);
@@ -440,7 +439,7 @@ int cproxy_listen_port(int port,
 
 /* Finds the proxy_td associated with a worker thread.
  */
-proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id) {
+proxy_td *cproxy_find_thread_data(proxy *p, cb_thread_t thread_id) {
     if (p != NULL) {
         int i = thread_index(thread_id);
 
@@ -484,7 +483,7 @@ bool cproxy_init_upstream_conn(conn *c) {
         return false;
     }
 
-    ptd = cproxy_find_thread_data(p, pthread_self());
+    ptd = cproxy_find_thread_data(p, cb_thread_self());
     assert(ptd != NULL);
 
     /* Reassign the client/upstream conn to a different bucket */
@@ -518,7 +517,7 @@ bool cproxy_init_upstream_conn(conn *c) {
 
         if (default_proxy != NULL) {
             proxy_td *default_ptd =
-                cproxy_find_thread_data(default_proxy, pthread_self());
+                cproxy_find_thread_data(default_proxy, cb_thread_self());
             if (default_ptd != NULL) {
                 ptd = default_ptd;
             }
@@ -2031,12 +2030,12 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
             msg = "SERVER_ERROR proxy write to downstream\r\n";
         }
 
-        pthread_mutex_lock(&ptd->proxy->proxy_lock);
+        cb_mutex_enter(&ptd->proxy->proxy_lock);
         if (ptd->proxy->name != NULL &&
             strcmp(ptd->proxy->name, NULL_BUCKET) == 0) {
             msg = "SERVER_ERROR unauthorized, null bucket\r\n";
         }
-        pthread_mutex_unlock(&ptd->proxy->proxy_lock);
+        cb_mutex_exit(&ptd->proxy->proxy_lock);
 
         /* Send an END on get/gets instead of generic SERVER_ERROR. */
 
@@ -2070,12 +2069,12 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
             binary_status = PROTOCOL_BINARY_RESPONSE_EINTERNAL;
         }
 
-        pthread_mutex_lock(&ptd->proxy->proxy_lock);
+        cb_mutex_enter(&ptd->proxy->proxy_lock);
         if (ptd->proxy->name != NULL &&
             strcmp(ptd->proxy->name, NULL_BUCKET) == 0) {
             binary_status = PROTOCOL_BINARY_RESPONSE_AUTH_ERROR;
         }
-        pthread_mutex_unlock(&ptd->proxy->proxy_lock);
+        cb_mutex_exit(&ptd->proxy->proxy_lock);
 
         write_bin_error(uc, binary_status, 0);
 
@@ -3560,7 +3559,7 @@ bool zstored_downstream_waiting_remove(downstream *d) {
     bool found = false;
     int i;
     int n;
-    LIBEVENT_THREAD *thread = thread_by_index(thread_index(pthread_self()));
+    LIBEVENT_THREAD *thread = thread_by_index(thread_index(cb_thread_self()));
     assert(thread != NULL);
 
     n = mcs_server_count(&d->mst);
@@ -3666,18 +3665,18 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
     proxy *found = NULL;
     proxy *p;
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL && found == NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
         if (strcmp(p->behavior_pool.base.usr, usr) == 0 &&
             strcmp(p->behavior_pool.base.pwd, pwd) == 0) {
             found = p;
         }
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     return found;
 }
@@ -3686,19 +3685,19 @@ int cproxy_num_active_proxies(proxy_main *m) {
     int n = 0;
     proxy *p;
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
         if (p->name != NULL &&
             p->config != NULL &&
             p->config[0] != '\0') {
             n++;
         }
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     return n;
 }

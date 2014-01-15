@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <assert.h>
 #include <math.h>
 #include "memcached.h"
@@ -411,10 +410,10 @@ int cproxy_init_mcmux_mode(int proxy_port,
         if (p != NULL) {
             int n;
 
-            pthread_mutex_lock(&m->proxy_main_lock);
+            cb_mutex_enter(&m->proxy_main_lock);
             p->next = m->proxy_head;
             m->proxy_head = p;
-            pthread_mutex_unlock(&m->proxy_main_lock);
+            cb_mutex_exit(&m->proxy_main_lock);
 
             n = cproxy_listen(p);
             if (n > 0) {
@@ -523,10 +522,10 @@ int cproxy_init_string(char *cfg_str,
                               nthreads);
             if (p != NULL) {
                 int n;
-                pthread_mutex_lock(&m->proxy_main_lock);
+                cb_mutex_enter(&m->proxy_main_lock);
                 p->next = m->proxy_head;
                 m->proxy_head = p;
-                pthread_mutex_unlock(&m->proxy_main_lock);
+                cb_mutex_exit(&m->proxy_main_lock);
 
                 n = cproxy_listen(p);
                 if (n > 0) {
@@ -567,7 +566,7 @@ proxy_main *cproxy_gen_proxy_main(proxy_behavior behavior, int nthreads,
         m->nthreads   = nthreads;
         m->conf_type  = conf_type;
 
-        pthread_mutex_init(&m->proxy_main_lock, NULL);
+        cb_mutex_initialize(&m->proxy_main_lock);
 
         m->stat_configs      = 0;
         m->stat_config_fails = 0;

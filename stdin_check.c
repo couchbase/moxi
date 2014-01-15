@@ -2,17 +2,15 @@
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 #include "stdin_check.h"
 #include "log.h"
 
-static void* check_stdin_thread(void* arg)
+static void check_stdin_thread(void* arg)
 {
     int ch;
 
     (void)arg;
-    pthread_detach(pthread_self());
 
     do {
         ch = getc(stdin);
@@ -20,13 +18,11 @@ static void* check_stdin_thread(void* arg)
 
     fprintf(stderr, "%s on stdin.  Exiting\n", (ch == EOF) ? "EOF" : "EOL");
     exit(0);
-    /* NOTREACHED */
-    return NULL;
 }
 
 int stdin_check(void) {
-    pthread_t t;
-    if (pthread_create(&t, NULL, check_stdin_thread, NULL) != 0) {
+    cb_thread_t t;
+    if (cb_create_thread(&t, check_stdin_thread, NULL, 1) != 0) {
         perror("couldn't create stdin checking thread.");
         return -1;
     }

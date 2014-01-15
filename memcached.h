@@ -11,11 +11,10 @@
 
 #include <stdio.h>
 #include <sys/types.h>
-#include <sys/time.h>
 #include <event.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <pthread.h>
+#include <platform/platform.h>
 
 #include "work.h"
 #include "genhash.h"
@@ -240,7 +239,7 @@ struct slab_stats {
  * Stats stored per-thread.
  */
 struct thread_stats {
-    pthread_mutex_t   mutex;
+    cb_mutex_t        mutex;
     uint64_t          get_cmds;
     uint64_t          get_misses;
     uint64_t          delete_misses;
@@ -258,7 +257,7 @@ struct thread_stats {
  * Global stats.
  */
 struct stats {
-    pthread_mutex_t mutex;
+    cb_mutex_t    mutex;
     unsigned int  curr_items;
     unsigned int  total_items;
     uint64_t      curr_bytes;
@@ -356,7 +355,7 @@ struct bin_cmd {
 };
 
 typedef struct {
-    pthread_t thread_id;        /* unique ID of this thread */
+    cb_thread_t thread_id;        /* unique ID of this thread */
     struct event_base *base;    /* libevent handle this thread uses */
     struct event notify_event;  /* listen event for notify pipe */
     int notify_receive_fd;      /* receiving end of notify pipe */
@@ -595,7 +594,7 @@ void write_bin_error(conn *c, protocol_binary_response_status err, int swallow);
  */
 
 void thread_init(int nthreads, struct event_base *main_base);
-int  thread_index(pthread_t thread_id);
+int  thread_index(cb_thread_t thread_id);
 LIBEVENT_THREAD *thread_by_index(int i);
 
 int  dispatch_event_add(int thread, conn *c);
@@ -650,6 +649,7 @@ void server_stats(ADD_STAT add_stats, void *c, const char *prefix);
 void process_stat_settings(ADD_STAT add_stats, void *c, const char *prefix);
 
 enum store_item_type store_item(item *item, int comm, conn *c);
+void initialize_conn_lock(void);
 
 #ifdef HAVE_DROP_PRIVILEGES
 extern void drop_privileges(void);

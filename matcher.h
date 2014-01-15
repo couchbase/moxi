@@ -5,13 +5,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <pthread.h>
+#include <platform/platform.h>
 
 typedef struct {
     /* We have a simple implementation currently that */
     /* only supports simple string prefix matching, O(N^2). */
 
-    pthread_mutex_t *lock;
+    cb_mutex_t *lock;
 
     int patterns_max; /* Size of patterns array, may be 0. */
     int patterns_num; /* Number of active patterns, <= patterns_max. */

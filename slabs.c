@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <pthread.h>
 #include "log.h"
 
 /* powers-of-N allocation structures */
@@ -50,7 +49,7 @@ static size_t mem_avail = 0;
 /**
  * Access to the slab allocator is protected by this lock
  */
-static pthread_mutex_t slabs_lock = PTHREAD_MUTEX_INITIALIZER;
+static cb_mutex_t slabs_lock;
 
 /*
  * Forward Declarations
@@ -92,6 +91,7 @@ unsigned int slabs_clsid(const size_t size) {
  * accordingly.
  */
 void slabs_init(const size_t limit, const double factor, const bool prealloc) {
+    cb_mutex_initialize(&slabs_lock);
     int i = POWER_SMALLEST - 1;
     unsigned int size = sizeof(item) + settings.chunk_size;
 
@@ -459,9 +459,9 @@ int do_slabs_reassign(unsigned char srcid, unsigned char dstid) {
 int slabs_reassign(unsigned char srcid, unsigned char dstid) {
     int ret;
 
-    pthread_mutex_lock(&slabs_lock);
+    cb_mutex_enter(&slabs_lock);
     ret = do_slabs_reassign(srcid, dstid);
-    pthread_mutex_unlock(&slabs_lock);
+    cb_mutex_exit(&slabs_lock);
     return ret;
 }
 #endif
@@ -498,20 +498,20 @@ static void *memory_allocate(size_t size) {
 void *slabs_alloc(size_t size, unsigned int id) {
     void *ret;
 
-    pthread_mutex_lock(&slabs_lock);
+    cb_mutex_enter(&slabs_lock);
     ret = do_slabs_alloc(size, id);
-    pthread_mutex_unlock(&slabs_lock);
+    cb_mutex_exit(&slabs_lock);
     return ret;
 }
 
 void slabs_free(void *ptr, size_t size, unsigned int id) {
-    pthread_mutex_lock(&slabs_lock);
+    cb_mutex_enter(&slabs_lock);
     do_slabs_free(ptr, size, id);
-    pthread_mutex_unlock(&slabs_lock);
+    cb_mutex_exit(&slabs_lock);
 }
 
 void slabs_stats(ADD_STAT add_stats, void *c) {
-    pthread_mutex_lock(&slabs_lock);
+    cb_mutex_enter(&slabs_lock);
     do_slabs_stats(add_stats, c);
-    pthread_mutex_unlock(&slabs_lock);
+    cb_mutex_exit(&slabs_lock);
 }

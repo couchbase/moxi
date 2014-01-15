@@ -18,10 +18,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <pthread.h>
 #include "log.h"
 
-static pthread_cond_t maintenance_cond = PTHREAD_COND_INITIALIZER;
+static cb_cond_t maintenance_cond;
 
 
 typedef  unsigned long  int  ub4;   /* unsigned 4-byte quantities */
@@ -55,6 +54,7 @@ static bool expanding = false;
 static unsigned int expand_bucket = 0;
 
 void assoc_init(void) {
+    cb_cond_initialize(&maintenance_cond);
     primary_hashtable = calloc(hashsize(hashpower), sizeof(void *));
     if (! primary_hashtable) {
         moxi_log_write("Failed to init hashtable.\n");
@@ -122,7 +122,7 @@ static void assoc_expand(void) {
         hashpower++;
         expanding = true;
         expand_bucket = 0;
-        pthread_cond_signal(&maintenance_cond);
+        cb_cond_signal(&maintenance_cond);
     } else {
         primary_hashtable = old_hashtable;
         /* Bad news, but we can keep running. */
@@ -182,7 +182,7 @@ static volatile int do_run_maintenance_thread = 1;
 #define DEFAULT_HASH_BULK_MOVE 1
 int hash_bulk_move = DEFAULT_HASH_BULK_MOVE;
 
-static void *assoc_maintenance_thread(void *arg) {
+static void assoc_maintenance_thread(void *arg) {
     (void)arg;
 
     while (do_run_maintenance_thread) {
@@ -190,7 +190,7 @@ static void *assoc_maintenance_thread(void *arg) {
 
         /* Lock the cache, and bulk move multiple buckets to the new
          * hash table. */
-        pthread_mutex_lock(&cache_lock);
+        cb_mutex_enter(&cache_lock);
 
         for (ii = 0; ii < hash_bulk_move && expanding; ++ii) {
             item *it, *next;
@@ -217,15 +217,14 @@ static void *assoc_maintenance_thread(void *arg) {
 
         if (!expanding) {
             /* We are done expanding.. just wait for next invocation */
-            pthread_cond_wait(&maintenance_cond, &cache_lock);
+            cb_cond_wait(&maintenance_cond, &cache_lock);
         }
 
-        pthread_mutex_unlock(&cache_lock);
+        cb_mutex_exit(&cache_lock);
     }
-    return NULL;
 }
 
-static pthread_t maintenance_tid;
+static cb_thread_t maintenance_tid;
 
 int start_assoc_maintenance_thread() {
     int ret;
@@ -236,8 +235,8 @@ int start_assoc_maintenance_thread() {
             hash_bulk_move = DEFAULT_HASH_BULK_MOVE;
         }
     }
-    if ((ret = pthread_create(&maintenance_tid, NULL,
-                              assoc_maintenance_thread, NULL)) != 0) {
+    if ((ret = cb_create_thread(&maintenance_tid,
+                                 assoc_maintenance_thread, NULL, 0)) != 0) {
         moxi_log_write("Can't create thread: %s\n", strerror(ret));
         return -1;
     }
@@ -245,13 +244,13 @@ int start_assoc_maintenance_thread() {
 }
 
 void stop_assoc_maintenance_thread() {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_run_maintenance_thread = 0;
-    pthread_cond_signal(&maintenance_cond);
-    pthread_mutex_unlock(&cache_lock);
+    cb_cond_signal(&maintenance_cond);
+    cb_mutex_exit(&cache_lock);
 
     /* Wait for the maintenance thread to stop */
-    pthread_join(maintenance_tid, NULL);
+    cb_join_thread(maintenance_tid);
 }
 
 

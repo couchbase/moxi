@@ -12,8 +12,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
-#include <sys/time.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -136,7 +134,7 @@ int log_error_close(moxi_log *mlog) {
     return 0;
 }
 
-static inline
+static
 void mappend_log(char *logbuf, int *logbuf_used, const char *str) {
     int str_len = strlen(str);
     int used = *logbuf_used;
@@ -151,7 +149,7 @@ void mappend_log(char *logbuf, int *logbuf_used, const char *str) {
     assert(*logbuf_used < MAX_LOGBUF_LEN);
 }
 
-static inline
+static
 void mappend_log_int(char *logbuf, int *logbuf_used, int num) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%d", num);
@@ -227,7 +225,7 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
             written = write(mlog->fd, logbuf, logbuf_used);
             break;
         case ERRORLOG_STDERR:
-            written = write(STDERR_FILENO, logbuf, logbuf_used);
+            written = write(fileno(stderr), logbuf, logbuf_used);
             break;
 #ifdef HAVE_SYSLOG_H
         case ERRORLOG_SYSLOG:

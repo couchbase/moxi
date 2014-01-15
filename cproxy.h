@@ -62,7 +62,7 @@ extern mcache_funcs mcache_key_stats_funcs;
 typedef struct {
     mcache_funcs *funcs;
 
-    pthread_mutex_t *lock; /* NULL-able, for non-multithreaded. */
+    cb_mutex_t *lock; /* NULL-able, for non-multithreaded. */
 
     bool key_alloc;        /* True if mcache must alloc key memory. */
 
@@ -191,7 +191,7 @@ struct proxy_main {
     /* Any thread that accesses the proxy list must */
     /* first acquire the proxy_main_lock. */
 
-    pthread_mutex_t proxy_main_lock;
+    cb_mutex_t proxy_main_lock;
 
     /* Start of proxy list.  Covered by proxy_main_lock. */
     /* Only the main listener thread may modify the proxy list. */
@@ -234,7 +234,7 @@ struct proxy {
     /* Any thread that accesses the mutable fields should */
     /* first acquire the proxy_lock. */
 
-    pthread_mutex_t proxy_lock;
+    cb_mutex_t proxy_lock;
 
     /* Number of listening conn's acting as a proxy, */
     /* where (((proxy *) conn->extra) == this). */
@@ -511,7 +511,7 @@ int cproxy_listen_port(int port,
                        void       *conn_extra,
                        conn_funcs *conn_funcs);
 
-proxy_td *cproxy_find_thread_data(proxy *p, pthread_t thread_id);
+proxy_td *cproxy_find_thread_data(proxy *p, cb_thread_t thread_id);
 bool      cproxy_init_upstream_conn(conn *c);
 bool      cproxy_init_downstream_conn(conn *c);
 void      cproxy_on_close_upstream_conn(conn *c);

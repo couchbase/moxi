@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <pthread.h>
 #include "log.h"
 
 #define ITEMS_PER_ALLOC 64
@@ -36,22 +35,22 @@ typedef struct conn_queue CQ;
 struct conn_queue {
     CQ_ITEM *head;
     CQ_ITEM *tail;
-    pthread_mutex_t lock;
-    pthread_cond_t  cond;
+    cb_mutex_t lock;
+    cb_cond_t  cond;
 };
 
 /* Lock for cache operations (item_*, assoc_*) */
-pthread_mutex_t cache_lock;
+cb_mutex_t cache_lock;
 
 /* Connection lock around accepting new connections */
-pthread_mutex_t conn_lock = PTHREAD_MUTEX_INITIALIZER;
+cb_mutex_t conn_lock;
 
 /* Lock for global stats */
-static pthread_mutex_t stats_lock;
+static cb_mutex_t stats_lock;
 
 /* Free list of CQ_ITEM structs */
 static CQ_ITEM *cqi_freelist;
-static pthread_mutex_t cqi_freelist_lock;
+static cb_mutex_t cqi_freelist_lock;
 
 /*
  * Each libevent instance has a wakeup pipe, which other threads
@@ -63,8 +62,8 @@ static LIBEVENT_THREAD *threads;
  * Number of threads that have finished setting themselves up.
  */
 static int init_count = 0;
-static pthread_mutex_t init_lock;
-static pthread_cond_t init_cond;
+static cb_mutex_t init_lock;
+static cb_cond_t init_cond;
 
 
 static void thread_libevent_process(int fd, short which, void *arg);
@@ -73,8 +72,8 @@ static void thread_libevent_process(int fd, short which, void *arg);
  * Initializes a connection queue.
  */
 static void cq_init(CQ *cq) {
-    pthread_mutex_init(&cq->lock, NULL);
-    pthread_cond_init(&cq->cond, NULL);
+    cb_mutex_initialize(&cq->lock);
+    cb_cond_initialize(&cq->cond);
     cq->head = NULL;
     cq->tail = NULL;
 }
@@ -87,14 +86,14 @@ static void cq_init(CQ *cq) {
 static CQ_ITEM *cq_pop(CQ *cq) {
     CQ_ITEM *cq_item;
 
-    pthread_mutex_lock(&cq->lock);
+    cb_mutex_enter(&cq->lock);
     cq_item = cq->head;
     if (NULL != cq_item) {
         cq->head = cq_item->next;
         if (NULL == cq->head)
             cq->tail = NULL;
     }
-    pthread_mutex_unlock(&cq->lock);
+    cb_mutex_exit(&cq->lock);
 
     return cq_item;
 }
@@ -105,14 +104,14 @@ static CQ_ITEM *cq_pop(CQ *cq) {
 static void cq_push(CQ *cq, CQ_ITEM *cq_item) {
     cq_item->next = NULL;
 
-    pthread_mutex_lock(&cq->lock);
+    cb_mutex_enter(&cq->lock);
     if (NULL == cq->tail)
         cq->head = cq_item;
     else
         cq->tail->next = cq_item;
     cq->tail = cq_item;
-    pthread_cond_signal(&cq->cond);
-    pthread_mutex_unlock(&cq->lock);
+    cb_cond_signal(&cq->cond);
+    cb_mutex_exit(&cq->lock);
 }
 
 /*
@@ -120,12 +119,12 @@ static void cq_push(CQ *cq, CQ_ITEM *cq_item) {
  */
 static CQ_ITEM *cqi_new(void) {
     CQ_ITEM *cq_item = NULL;
-    pthread_mutex_lock(&cqi_freelist_lock);
+    cb_mutex_enter(&cqi_freelist_lock);
     if (cqi_freelist) {
         cq_item = cqi_freelist;
         cqi_freelist = cq_item->next;
     }
-    pthread_mutex_unlock(&cqi_freelist_lock);
+    cb_mutex_exit(&cqi_freelist_lock);
 
     if (NULL == cq_item) {
         int i;
@@ -143,10 +142,10 @@ static CQ_ITEM *cqi_new(void) {
         for (i = 2; i < ITEMS_PER_ALLOC; i++)
             cq_item[i - 1].next = &cq_item[i];
 
-        pthread_mutex_lock(&cqi_freelist_lock);
+        cb_mutex_enter(&cqi_freelist_lock);
         cq_item[ITEMS_PER_ALLOC - 1].next = cqi_freelist;
         cqi_freelist = &cq_item[1];
-        pthread_mutex_unlock(&cqi_freelist_lock);
+        cb_mutex_exit(&cqi_freelist_lock);
     }
 
     return cq_item;
@@ -157,37 +156,39 @@ static CQ_ITEM *cqi_new(void) {
  * Frees a connection queue item (adds it to the freelist.)
  */
 static void cqi_free(CQ_ITEM *cq_item) {
-    pthread_mutex_lock(&cqi_freelist_lock);
+    cb_mutex_enter(&cqi_freelist_lock);
     cq_item->next = cqi_freelist;
     cqi_freelist = cq_item;
-    pthread_mutex_unlock(&cqi_freelist_lock);
+    cb_mutex_exit(&cqi_freelist_lock);
 }
 
 
 /*
  * Creates a worker thread.
  */
-static void create_worker(void *(*func)(void *), void *arg) {
-    pthread_t       thread;
-    pthread_attr_t  attr;
-    int             ret;
+static void create_worker(void (*func)(void *), void *arg) {
+    cb_thread_t thread;
+    int ret;
 
-    pthread_attr_init(&attr);
-
-    if ((ret = pthread_create(&thread, &attr, func, arg)) != 0) {
+    if ((ret = cb_create_thread(&thread, func, arg, 0)) != 0) {
         moxi_log_write("Can't create thread: %s\n",
                 strerror(ret));
         exit(1);
     }
 }
 
+void initialize_conn_lock(void)
+{
+    cb_mutex_initialize(&conn_lock);
+}
+
 /*
  * Sets whether or not we accept new connections.
  */
 void accept_new_conns(const bool do_accept) {
-    pthread_mutex_lock(&conn_lock);
+    cb_mutex_enter(&conn_lock);
     do_accept_new_conns(do_accept);
-    pthread_mutex_unlock(&conn_lock);
+    cb_mutex_exit(&conn_lock);
 }
 /****************************** LIBEVENT THREADS *****************************/
 
@@ -229,11 +230,7 @@ static void setup_thread(LIBEVENT_THREAD *me) {
     }
     work_queue_init(me->work_queue, me->base);
 
-    if (pthread_mutex_init(&me->stats.mutex, NULL) != 0) {
-        perror("Failed to initialize mutex");
-        exit(EXIT_FAILURE);
-    }
-
+    cb_mutex_initialize(&me->stats.mutex);
     me->suffix_cache = cache_create("suffix", SUFFIX_SIZE, sizeof(char*),
                                     NULL, NULL);
     if (me->suffix_cache == NULL) {
@@ -252,25 +249,24 @@ static void setup_thread(LIBEVENT_THREAD *me) {
 /*
  * Worker thread: main event loop
  */
-static void *worker_libevent(void *arg) {
+static void worker_libevent(void *arg) {
     LIBEVENT_THREAD *me = arg;
 
     /* Any per-thread setup can happen here; thread_init() will block until
      * all threads have finished initializing.
      */
-    me->thread_id = pthread_self();
+    me->thread_id = cb_thread_self();
 #ifndef WIN32
     if (settings.verbose > 1)
         moxi_log_write("worker_libevent thread_id %ld\n", (long)me->thread_id);
 #endif
 
-    pthread_mutex_lock(&init_lock);
+    cb_mutex_enter(&init_lock);
     init_count++;
-    pthread_cond_signal(&init_cond);
-    pthread_mutex_unlock(&init_lock);
+    cb_cond_signal(&init_cond);
+    cb_mutex_exit(&init_lock);
 
     event_base_loop(me->base, 0);
-    return NULL;
 }
 
 
@@ -374,26 +370,17 @@ void dispatch_conn_new_to_thread(int tid, int sfd, enum conn_states init_state,
     }
 }
 
-static bool compare_pthread_t(pthread_t a, pthread_t b) {
-#ifdef WIN32
-    return a.p == b.p && a.x == b.x;
-#else
-    return a == b;
-#endif
-}
-
-
 /*
  * Returns true if this is the thread that listens for new TCP connections.
  */
-int is_listen_thread() {
-    return compare_pthread_t(pthread_self(), threads[0].thread_id);
+int is_listen_thread(void) {
+    return cb_thread_self() == threads[0].thread_id;
 }
 
-int thread_index(pthread_t thread_id) {
+int thread_index(cb_thread_t thread_id) {
     int i;
     for (i = 0; i < settings.num_threads; i++) {
-        if (compare_pthread_t(threads[i].thread_id, thread_id)) {
+        if (threads[i].thread_id == thread_id) {
             return i;
         }
     }
@@ -415,9 +402,9 @@ item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbyt
     return do_item_alloc(key, nkey, flags, exptime, nbytes);
 #else
     item *it;
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     it = do_item_alloc(key, nkey, flags, exptime, nbytes);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return it;
 #endif
 }
@@ -428,9 +415,9 @@ item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbyt
  */
 item *item_get(const char *key, const size_t nkey) {
     item *it;
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     it = do_item_get(key, nkey);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return it;
 }
 
@@ -440,9 +427,9 @@ item *item_get(const char *key, const size_t nkey) {
 int item_link(item *cq_item) {
     int ret;
 
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     ret = do_item_link(cq_item);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return ret;
 }
 
@@ -455,9 +442,9 @@ void item_remove(item *cq_item) {
     /* Skip past the lock, since we're using malloc. */
     do_item_remove(cq_item);
 #else
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_remove(cq_item);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 #endif
 }
 
@@ -474,18 +461,18 @@ int item_replace(item *old_it, item *new_it) {
  * Unlinks an item from the LRU and hashtable.
  */
 void item_unlink(item *cq_item) {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_unlink(cq_item);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 /*
  * Moves an item to the back of the LRU queue.
  */
 void item_update(item *cq_item) {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_update(cq_item);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 /*
@@ -495,9 +482,9 @@ enum delta_result_type add_delta(conn *c, item *cq_item, int incr,
                                  const int64_t delta, char *buf) {
     enum delta_result_type ret;
 
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     ret = do_add_delta(c, cq_item, incr, delta, buf);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return ret;
 }
 
@@ -507,9 +494,9 @@ enum delta_result_type add_delta(conn *c, item *cq_item, int incr,
 enum store_item_type store_item(item *cq_item, int comm, conn* c) {
     enum store_item_type ret;
 
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     ret = do_store_item(cq_item, comm, c);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return ret;
 }
 
@@ -517,9 +504,9 @@ enum store_item_type store_item(item *cq_item, int comm, conn* c) {
  * Flushes expired items after a flush_all call
  */
 void item_flush_expired() {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_flush_expired();
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 /*
@@ -528,9 +515,9 @@ void item_flush_expired() {
 char *item_cachedump(unsigned int clsid, unsigned int limit, unsigned int *bytes) {
     char *ret;
 
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     ret = do_item_cachedump(clsid, limit, bytes);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
     return ret;
 }
 
@@ -538,34 +525,34 @@ char *item_cachedump(unsigned int clsid, unsigned int limit, unsigned int *bytes
  * Dumps statistics about slab classes
  */
 void  item_stats(ADD_STAT add_stats, void *c) {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_stats(add_stats, c);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 /*
  * Dumps a list of objects of each size in 32-byte increments
  */
 void  item_stats_sizes(ADD_STAT add_stats, void *c) {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     do_item_stats_sizes(add_stats, c);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 /******************************* GLOBAL STATS ******************************/
 
 void STATS_LOCK() {
-    pthread_mutex_lock(&stats_lock);
+    cb_mutex_enter(&stats_lock);
 }
 
 void STATS_UNLOCK() {
-    pthread_mutex_unlock(&stats_lock);
+    cb_mutex_exit(&stats_lock);
 }
 
 void threadlocal_stats_reset(void) {
     int ii, sid;
     for (ii = 0; ii < settings.num_threads; ++ii) {
-        pthread_mutex_lock(&threads[ii].stats.mutex);
+        cb_mutex_enter(&threads[ii].stats.mutex);
 
         threads[ii].stats.get_cmds = 0;
         threads[ii].stats.get_misses = 0;
@@ -588,7 +575,7 @@ void threadlocal_stats_reset(void) {
             threads[ii].stats.slab_stats[sid].cas_badval = 0;
         }
 
-        pthread_mutex_unlock(&threads[ii].stats.mutex);
+        cb_mutex_exit(&threads[ii].stats.mutex);
     }
 }
 
@@ -610,7 +597,7 @@ void threadlocal_stats_aggregate(struct thread_stats *thread_stats) {
            sizeof(struct slab_stats) * MAX_NUMBER_OF_SLAB_CLASSES);
 
     for (ii = 0; ii < settings.num_threads; ++ii) {
-        pthread_mutex_lock(&threads[ii].stats.mutex);
+        cb_mutex_enter(&threads[ii].stats.mutex);
 
         thread_stats->get_cmds += threads[ii].stats.get_cmds;
         thread_stats->get_misses += threads[ii].stats.get_misses;
@@ -640,7 +627,7 @@ void threadlocal_stats_aggregate(struct thread_stats *thread_stats) {
                 threads[ii].stats.slab_stats[sid].cas_badval;
         }
 
-        pthread_mutex_unlock(&threads[ii].stats.mutex);
+        cb_mutex_exit(&threads[ii].stats.mutex);
     }
 }
 
@@ -682,13 +669,13 @@ void thread_init(int nthreads, struct event_base *main_base) {
         exit(1);
 #endif
 
-    pthread_mutex_init(&cache_lock, NULL);
-    pthread_mutex_init(&stats_lock, NULL);
+    cb_mutex_initialize(&cache_lock);
+    cb_mutex_initialize(&stats_lock);
 
-    pthread_mutex_init(&init_lock, NULL);
-    pthread_cond_init(&init_cond, NULL);
+    cb_mutex_initialize(&init_lock);
+    cb_cond_initialize(&init_cond);
 
-    pthread_mutex_init(&cqi_freelist_lock, NULL);
+    cb_mutex_initialize(&cqi_freelist_lock);
     cqi_freelist = NULL;
 
     threads = calloc(nthreads, sizeof(LIBEVENT_THREAD));
@@ -698,7 +685,7 @@ void thread_init(int nthreads, struct event_base *main_base) {
     }
 
     threads[0].base = main_base;
-    threads[0].thread_id = pthread_self();
+    threads[0].thread_id = cb_thread_self();
 
     for (i = 0; i < nthreads; i++) {
         int fds[2];
@@ -733,11 +720,11 @@ void thread_init(int nthreads, struct event_base *main_base) {
     }
 
     /* Wait for all the threads to set themselves up before returning. */
-    pthread_mutex_lock(&init_lock);
+    cb_mutex_enter(&init_lock);
     init_count++; /* main thread */
     while (init_count < nthreads) {
-        pthread_cond_wait(&init_cond, &init_lock);
+        cb_cond_wait(&init_cond, &init_lock);
     }
-    pthread_mutex_unlock(&init_lock);
+    cb_mutex_exit(&init_lock);
 }
 

@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include "memcached.h"
 #include "cproxy.h"
@@ -1025,17 +1024,17 @@ void cproxy_on_config(void *data0, void *data1) {
 
     m->stat_configs++;
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
         if (max_config_ver < p->config_ver) {
             max_config_ver = p->config_ver;
         }
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     new_config_ver = max_config_ver + 1;
 
@@ -1100,14 +1099,14 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
     empty_pool.num  = 0;
     empty_pool.arr  = NULL;
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL; p = p->next) {
         bool  down = false;
         int   port = 0;
         char *name = NULL;
 
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         if (p->config_ver != new_config_ver) {
             down = true;
@@ -1119,9 +1118,9 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
             name = strdup(p->name);
         }
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
 
-        pthread_mutex_unlock(&m->proxy_main_lock);
+        cb_mutex_exit(&m->proxy_main_lock);
 
         /* Note, we don't want to own the proxy_main_lock here */
         /* because cproxy_on_config_pool() may scatter/gather */
@@ -1142,10 +1141,10 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
             free(name);
         }
 
-        pthread_mutex_lock(&m->proxy_main_lock);
+        cb_mutex_enter(&m->proxy_main_lock);
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 }
 
 /**
@@ -1168,11 +1167,11 @@ void cproxy_on_config_pool(proxy_main *m,
     /* and create one if needed. */
 
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     p = m->proxy_head;
     while (p != NULL && !found) {
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         assert(p->port > 0);
         assert(p->name != NULL);
@@ -1180,7 +1179,7 @@ void cproxy_on_config_pool(proxy_main *m,
         found = ((p->port == port) &&
                  (strcmp(p->name, name) == 0));
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
 
         if (found) {
             break;
@@ -1189,7 +1188,7 @@ void cproxy_on_config_pool(proxy_main *m,
         p = p->next;
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     if (p == NULL) {
         p = cproxy_create(m, name, port,
@@ -1200,12 +1199,12 @@ void cproxy_on_config_pool(proxy_main *m,
         if (p != NULL) {
             int n;
 
-            pthread_mutex_lock(&m->proxy_main_lock);
+            cb_mutex_enter(&m->proxy_main_lock);
 
             p->next = m->proxy_head;
             m->proxy_head = p;
 
-            pthread_mutex_unlock(&m->proxy_main_lock);
+            cb_mutex_exit(&m->proxy_main_lock);
 
             n = cproxy_listen(p);
             if (n > 0) {
@@ -1238,7 +1237,7 @@ void cproxy_on_config_pool(proxy_main *m,
                     p->port);
         }
 
-        pthread_mutex_lock(&m->proxy_main_lock);
+        cb_mutex_enter(&m->proxy_main_lock);
 
         /* Turn off the front_cache while we're reconfiguring. */
 
@@ -1248,7 +1247,7 @@ void cproxy_on_config_pool(proxy_main *m,
 
         matcher_stop(&p->optimize_set_matcher);
 
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         if (settings.verbose > 2) {
             if (p->config && config &&
@@ -1290,7 +1289,7 @@ void cproxy_on_config_pool(proxy_main *m,
 
         p->config_ver = config_ver;
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
 
         if (settings.verbose > 2) {
             moxi_log_write("conp changed %s, shutdown %s\n",
@@ -1339,7 +1338,7 @@ void cproxy_on_config_pool(proxy_main *m,
             }
         }
 
-        pthread_mutex_unlock(&m->proxy_main_lock);
+        cb_mutex_exit(&m->proxy_main_lock);
 
         if (settings.verbose > 2) {
             moxi_log_write("conp changed %s, %d\n",
@@ -1367,7 +1366,7 @@ static void update_ptd_config(void *data0, void *data1) {
 
     assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
-    pthread_mutex_lock(&p->proxy_lock);
+    cb_mutex_enter(&p->proxy_lock);
 
     port = p->port;
     prev = ptd->config_ver;
@@ -1390,7 +1389,7 @@ static void update_ptd_config(void *data0, void *data1) {
             changed;
     }
 
-    pthread_mutex_unlock(&p->proxy_lock);
+    cb_mutex_exit(&p->proxy_lock);
 
     /* Restart the key_stats, if necessary. */
 

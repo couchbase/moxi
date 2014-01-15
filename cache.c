@@ -25,14 +25,13 @@ cache_t* cache_create(const char *name, size_t bufsize, size_t align,
     cache_t* ret = calloc(1, sizeof(cache_t));
     char* nm = strdup(name);
     void** ptr = calloc(initial_pool_size, bufsize);
-    if (ret == NULL || nm == NULL || ptr == NULL ||
-        pthread_mutex_init(&ret->mutex, NULL) == -1) {
+    if (ret == NULL || nm == NULL || ptr == NULL) {
         free(ret);
         free(nm);
         free(ptr);
         return NULL;
     }
-
+    cb_mutex_initialize(&ret->mutex);
     ret->name = nm;
     ret->ptr = ptr;
     ret->freetotal = initial_pool_size;
@@ -67,13 +66,13 @@ void cache_destroy(cache_t *cache) {
     }
     free(cache->name);
     free(cache->ptr);
-    pthread_mutex_destroy(&cache->mutex);
+    cb_mutex_destroy(&cache->mutex);
 }
 
 void* cache_alloc(cache_t *cache) {
     void *ret;
     void *object;
-    pthread_mutex_lock(&cache->mutex);
+    cb_mutex_enter(&cache->mutex);
     if (cache->freecurr > 0) {
         ret = cache->ptr[--cache->freecurr];
         object = get_object(ret);
@@ -89,7 +88,7 @@ void* cache_alloc(cache_t *cache) {
             }
         }
     }
-    pthread_mutex_unlock(&cache->mutex);
+    cb_mutex_exit(&cache->mutex);
 
 #ifndef NDEBUG
     if (object != NULL) {
@@ -110,7 +109,7 @@ void cache_free(cache_t *cache, void *ptr) {
     uint64_t *pre;
 #endif
 
-    pthread_mutex_lock(&cache->mutex);
+    cb_mutex_enter(&cache->mutex);
 
 #ifndef NDEBUG
     /* validate redzone... */
@@ -118,7 +117,7 @@ void cache_free(cache_t *cache, void *ptr) {
                &redzone_pattern, sizeof(redzone_pattern)) != 0) {
         raise(SIGABRT);
         cache_error = 1;
-        pthread_mutex_unlock(&cache->mutex);
+        cb_mutex_exit(&cache->mutex);
         return;
     }
     pre = ptr;
@@ -126,7 +125,7 @@ void cache_free(cache_t *cache, void *ptr) {
     if (*pre != redzone_pattern) {
         raise(SIGABRT);
         cache_error = -1;
-        pthread_mutex_unlock(&cache->mutex);
+        cb_mutex_exit(&cache->mutex);
         return;
     }
     ptr = pre;
@@ -149,6 +148,6 @@ void cache_free(cache_t *cache, void *ptr) {
 
         }
     }
-    pthread_mutex_unlock(&cache->mutex);
+    cb_mutex_exit(&cache->mutex);
 }
 #endif

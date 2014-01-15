@@ -4,10 +4,10 @@
 #define WORK_H
 
 #include <sys/types.h>
-#include <sys/time.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <event.h>
+#include <platform/platform.h>
 
 typedef struct work_item   work_item;
 typedef struct work_queue  work_queue;
@@ -34,7 +34,7 @@ struct work_queue {
     struct event_base *event_base;
     struct event       event;
 
-    pthread_mutex_t work_lock;
+    cb_mutex_t work_lock;
 };
 
 struct work_collect {
@@ -42,8 +42,8 @@ struct work_collect {
 
     void *data;
 
-    pthread_mutex_t collect_lock;
-    pthread_cond_t  collect_cond; /* Signaled when count drops to 0. */
+    cb_mutex_t collect_lock;
+    cb_cond_t  collect_cond; /* Signaled when count drops to 0. */
 };
 
 bool work_queue_init(work_queue *m, struct event_base *base);

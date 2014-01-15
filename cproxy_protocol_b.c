@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include "memcached.h"
 #include "cproxy.h"
@@ -413,7 +412,7 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
             p = cproxy_find_proxy_by_auth(ptd->proxy->main,
                                                  username, password);
             if (p != NULL) {
-                proxy_td *ptd_target = cproxy_find_thread_data(p, pthread_self());
+                proxy_td *ptd_target = cproxy_find_thread_data(p, cb_thread_self());
                 if (ptd_target != NULL) {
                     c->extra = ptd_target;
 

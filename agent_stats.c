@@ -5,7 +5,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include <math.h>
 #include <limits.h>
@@ -515,7 +514,7 @@ static void proxy_stats_dump_behavior(ADD_STAT add_stats,
 
 static void proxy_stats_dump_frontcache(ADD_STAT add_stats, conn *c,
                                         const char *prefix, proxy *p) {
-    pthread_mutex_lock(p->front_cache.lock);
+    cb_mutex_enter(p->front_cache.lock);
 
     if (p->front_cache.map != NULL) {
         APPEND_PREFIX_STAT("size", "%u", genhash_size(p->front_cache.map));
@@ -544,7 +543,7 @@ static void proxy_stats_dump_frontcache(ADD_STAT add_stats, conn *c,
     APPEND_PREFIX_STAT("tot_evictions",
            "%"PRIu64, (uint64_t) p->front_cache.tot_evictions);
 
-    pthread_mutex_unlock(p->front_cache.lock);
+    cb_mutex_exit(p->front_cache.lock);
 }
 
 static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
@@ -835,7 +834,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
     pm = ptd->proxy->main;
 
-    if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
+    if (cb_mutex_try_enter(&pm->proxy_main_lock) != 0) {
         /* Do not dump proxy stats
          * if dynamic reconfiguration is currently executing by other thread.
          */
@@ -844,7 +843,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
     for (p = pm->proxy_head; p != NULL; p = p->next) {
         bool go = true;
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         if (p->name != NULL &&
             strcmp(p->name, NULL_BUCKET) != 0 &&
@@ -907,7 +906,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
             go = false;
         }
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
 
         if (go == false) {
             continue;
@@ -923,14 +922,14 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
             proxy_stats_td *pstd = calloc(1, sizeof(proxy_stats_td));
             if (pstd != NULL) {
                 int i;
-                pthread_mutex_lock(&p->proxy_lock);
+                cb_mutex_enter(&p->proxy_lock);
                 for (i = 1; i < pm->nthreads; i++) {
                     proxy_td *thread_ptd = &p->thread_data[i];
                     if (thread_ptd != NULL) {
                         add_proxy_stats_td(pstd, &thread_ptd->stats);
                     }
                 }
-                pthread_mutex_unlock(&p->proxy_lock);
+                cb_mutex_exit(&p->proxy_lock);
 
                 snprintf(prefix, sizeof(prefix), "%u:%s:pstd_stats:",
                          p->port, p->name);
@@ -954,14 +953,14 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
 
                 memset(&state, 0, sizeof(state));
 
-                pthread_mutex_lock(&p->proxy_lock);
+                cb_mutex_enter(&p->proxy_lock);
                 for (i = 1; i < pm->nthreads; i++) {
                      proxy_td *thread_ptd = &p->thread_data[i];
                      if (ptd != NULL) {
                          add_raw_key_stats(key_stats_map, &thread_ptd->key_stats);
                      }
                 }
-                pthread_mutex_unlock(&p->proxy_lock);
+                cb_mutex_exit(&p->proxy_lock);
 
                 snprintf(prefix, sizeof(prefix), "%u:%s:key_stats:",
                          p->port, p->name);
@@ -975,7 +974,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
         }
     }
 
-    pthread_mutex_unlock(&pm->proxy_main_lock);
+    cb_mutex_exit(&pm->proxy_main_lock);
 }
 
 /* Must be invoked on the main listener thread.
@@ -1009,7 +1008,7 @@ static void main_stats_collect(void *data0, void *data1) {
     ase = *msci;
     ase.prefix = "";
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL; p = p->next) {
         nproxy++;
@@ -1024,7 +1023,7 @@ static void main_stats_collect(void *data0, void *data1) {
         snprintf(bufv, sizeof(bufv), fmtv, val); \
         emit_s(key, bufv);
 
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         emit_f("port",          "%u", p->port);
         emit_s("name",                p->name);
@@ -1055,12 +1054,12 @@ static void main_stats_collect(void *data0, void *data1) {
                    "%"PRIu64, (uint64_t) p->listening_failed);
         }
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
 
         /* Emit front_cache stats. */
 
         if (msci->do_stats) {
-            pthread_mutex_lock(p->front_cache.lock);
+            cb_mutex_enter(p->front_cache.lock);
 
             if (p->front_cache.map != NULL) {
                 emit_f("front_cache_size", "%u", genhash_size(p->front_cache.map));
@@ -1102,11 +1101,11 @@ static void main_stats_collect(void *data0, void *data1) {
                    "%"PRIu64,
                    (uint64_t) p->front_cache.tot_evictions);
 
-            pthread_mutex_unlock(p->front_cache.lock);
+            cb_mutex_exit(p->front_cache.lock);
         }
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     /* Starting at 1 because 0 is the main listen thread. */
 
@@ -1120,7 +1119,7 @@ static void main_stats_collect(void *data0, void *data1) {
             assert(t);
             assert(t->work_queue);
 
-            pthread_mutex_lock(&m->proxy_main_lock);
+            cb_mutex_enter(&m->proxy_main_lock);
 
             for (p = m->proxy_head; p != NULL; p = p->next) {
                 proxy_td *ptd = &p->thread_data[i];
@@ -1130,7 +1129,7 @@ static void main_stats_collect(void *data0, void *data1) {
                 }
             }
 
-            pthread_mutex_unlock(&m->proxy_main_lock);
+            cb_mutex_exit(&m->proxy_main_lock);
         }
     }
 
@@ -1138,7 +1137,7 @@ static void main_stats_collect(void *data0, void *data1) {
         struct main_stats_proxy_info *infos =
             calloc(nproxy, sizeof(struct main_stats_proxy_info));
 
-        pthread_mutex_lock(&m->proxy_main_lock);
+        cb_mutex_enter(&m->proxy_main_lock);
 
         p = m->proxy_head;
         for (i = 0; i < nproxy; i++, p = p->next) {
@@ -1146,13 +1145,13 @@ static void main_stats_collect(void *data0, void *data1) {
                 break;
             }
 
-            pthread_mutex_lock(&p->proxy_lock);
+            cb_mutex_enter(&p->proxy_lock);
             infos[i].name = p->name != NULL ? strdup(p->name) : NULL;
             infos[i].port = p->port;
-            pthread_mutex_unlock(&p->proxy_lock);
+            cb_mutex_exit(&p->proxy_lock);
         }
 
-        pthread_mutex_unlock(&m->proxy_main_lock);
+        cb_mutex_exit(&m->proxy_main_lock);
 
         msci->proxies = infos;
         msci->nproxy = nproxy;
@@ -1194,7 +1193,7 @@ static void work_stats_collect(void *data0, void *data1) {
     map_pstd = pair->map_pstd;
     assert(map_pstd != NULL);
 
-    pthread_mutex_lock(&p->proxy_lock);
+    cb_mutex_enter(&p->proxy_lock);
 
     if (p->name != NULL) {
         int   key_len = strlen(p->name) + 50;
@@ -1205,7 +1204,7 @@ static void work_stats_collect(void *data0, void *data1) {
 
             snprintf(key_buf, key_len, "%d:%s", p->port, p->name);
 
-            pthread_mutex_unlock(&p->proxy_lock);
+            cb_mutex_exit(&p->proxy_lock);
             locked = false;
 
             pstd = genhash_find(map_pstd, key_buf);
@@ -1249,7 +1248,7 @@ static void work_stats_collect(void *data0, void *data1) {
     }
 
     if (locked) {
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
     }
 
     work_collect_one(c);
@@ -1457,11 +1456,11 @@ static void emit_proxy_stats_cmd(conflate_form_result *result,
                                  proxy_stats_cmd stats_cmd[][STATS_CMD_last]) {
     size_t prefix_len = strlen(prefix);
     const size_t bufsize = 200;
-    char buf_key[bufsize + prefix_len];
+    char *buf_key = malloc(bufsize + prefix_len);
     char buf_val[100];
     int j;
     char *buf = buf_key+prefix_len;
-
+    assert(buf_key != NULL);
     memcpy(buf_key, prefix, prefix_len);
 
 
@@ -1499,6 +1498,7 @@ static void emit_proxy_stats_cmd(conflate_form_result *result,
     }
 
 #undef more_cmd_stat
+    free(buf_key);
 }
 
 void map_pstd_foreach_emit(const void *k,
@@ -1750,7 +1750,7 @@ static void main_stats_reset(void *data0, void *data1) {
     m->stat_proxy_existings = 0;
     m->stat_proxy_shutdowns = 0;
 
-    pthread_mutex_lock(&m->proxy_main_lock);
+    cb_mutex_enter(&m->proxy_main_lock);
 
     for (p = m->proxy_head; p != NULL; p = p->next) {
         nproxy++;
@@ -1763,7 +1763,7 @@ static void main_stats_reset(void *data0, void *data1) {
         mcache_reset_stats(&p->front_cache);
     }
 
-    pthread_mutex_unlock(&m->proxy_main_lock);
+    cb_mutex_exit(&m->proxy_main_lock);
 
     if (nproxy > 0) {
         work_collect *ca = calloc(m->nthreads, sizeof(work_collect));
@@ -1781,7 +1781,7 @@ static void main_stats_reset(void *data0, void *data1) {
                 assert(t);
                 assert(t->work_queue);
 
-                pthread_mutex_lock(&m->proxy_main_lock);
+                cb_mutex_enter(&m->proxy_main_lock);
 
                 for (p = m->proxy_head; p != NULL; p = p->next) {
                     proxy_td *ptd = &p->thread_data[i];
@@ -1791,7 +1791,7 @@ static void main_stats_reset(void *data0, void *data1) {
                     }
                 }
 
-                pthread_mutex_unlock(&m->proxy_main_lock);
+                cb_mutex_exit(&m->proxy_main_lock);
             }
 
             /* Wait for all resets to finish. */
@@ -1894,7 +1894,7 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
 
     pm = ptd->proxy->main;
 
-    if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
+    if (cb_mutex_try_enter(&pm->proxy_main_lock) != 0) {
         return;
     }
 
@@ -1905,7 +1905,7 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
             struct htgram_dump_callback_data cbdata;
             int i;
 
-            pthread_mutex_lock(&p->proxy_lock);
+            cb_mutex_enter(&p->proxy_lock);
             for (i = 1; i < pm->nthreads; i++) {
                 proxy_td *thread_ptd = &p->thread_data[i];
                 if (thread_ptd != NULL &&
@@ -1914,7 +1914,7 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
                     htgram_add(hconnect, thread_ptd->stats.downstream_connect_time_htgram);
                 }
             }
-            pthread_mutex_unlock(&p->proxy_lock);
+            cb_mutex_exit(&p->proxy_lock);
 
             cbdata.add_stats = add_stats;
             cbdata.prefix    = prefix;
@@ -1936,7 +1936,7 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
         }
     }
 
-    pthread_mutex_unlock(&pm->proxy_main_lock);
+    cb_mutex_exit(&pm->proxy_main_lock);
 }
 
 void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
@@ -1956,12 +1956,12 @@ void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
 
     pm = ptd->proxy->main;
 
-    if (pthread_mutex_trylock(&pm->proxy_main_lock) != 0) {
+    if (cb_mutex_try_enter(&pm->proxy_main_lock) != 0) {
         return;
     }
 
     for (p = pm->proxy_head; p != NULL; p = p->next) {
-        pthread_mutex_lock(&p->proxy_lock);
+        cb_mutex_enter(&p->proxy_lock);
 
         if (p->name != NULL &&
             p->config != NULL) {
@@ -1970,8 +1970,8 @@ void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
             add_stats(prefix, strlen(prefix), p->config, strlen(p->config), c);
         }
 
-        pthread_mutex_unlock(&p->proxy_lock);
+        cb_mutex_exit(&p->proxy_lock);
     }
 
-    pthread_mutex_unlock(&pm->proxy_main_lock);
+    cb_mutex_exit(&pm->proxy_main_lock);
 }

@@ -43,9 +43,9 @@ void item_init(void) {
 }
 
 void item_stats_reset(void) {
-    pthread_mutex_lock(&cache_lock);
+    cb_mutex_enter(&cache_lock);
     memset(itemstats, 0, sizeof(itemstats_t) * LARGEST_ID);
-    pthread_mutex_unlock(&cache_lock);
+    cb_mutex_exit(&cache_lock);
 }
 
 

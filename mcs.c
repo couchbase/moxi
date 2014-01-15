@@ -459,6 +459,7 @@ int mcs_connect(const char *hostname, int portnum,
 
     error = getaddrinfo(hostname, port, &hints, &ai);
     if (error != 0) {
+#if 0
         if (error != EAI_SYSTEM) {
             /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
             /*                                 "getaddrinfo(): %s\n", gai_strerror(error)); */
@@ -466,7 +467,7 @@ int mcs_connect(const char *hostname, int portnum,
             /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
             /*                                 "getaddrinfo(): %s\n", strerror(error)); */
         }
-
+#endif
         return -1;
     }
 
@@ -585,14 +586,11 @@ mcs_return mcs_set_sock_opt(int sock) {
     WATCHPOINT_ASSERT(error == 0);
   }
   */
-
-    int flags = fcntl(sock, F_GETFL, 0);
-    if (flags < 0 ||
-        fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+    if (evutil_make_socket_nonblocking(sock) == -1) {
         return MCS_FAILURE;
     }
 
-    flags = 1;
+    int flags = 1;
 
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
                &flags, (socklen_t) sizeof(flags));

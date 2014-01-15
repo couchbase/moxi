@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include <math.h>
 #include "memcached.h"
@@ -54,9 +53,9 @@ void mcache_init(mcache *m, bool multithreaded,
     m->oldest_live = 0;
 
     if (multithreaded) {
-        m->lock = malloc(sizeof(pthread_mutex_t));
+        m->lock = malloc(sizeof(cb_mutex_t));
         if (m->lock != NULL) {
-            pthread_mutex_init(m->lock, NULL);
+            cb_mutex_initialize(m->lock);
         }
     } else {
         m->lock = NULL;
@@ -69,7 +68,7 @@ void mcache_reset_stats(mcache *m) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     m->tot_get_hits    = 0;
@@ -84,7 +83,7 @@ void mcache_reset_stats(mcache *m) {
     m->tot_evictions   = 0;
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -92,7 +91,7 @@ void mcache_start(mcache *m, uint32_t max) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     assert(m->funcs);
@@ -115,7 +114,7 @@ void mcache_start(mcache *m, uint32_t max) {
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -123,13 +122,13 @@ bool mcache_started(mcache *m) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     bool rv = m->map != NULL;
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     return rv;
@@ -139,7 +138,7 @@ void mcache_stop(mcache *m) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     genhash_t *x = m->map;
@@ -151,7 +150,7 @@ void mcache_stop(mcache *m) {
     m->oldest_live = 0;
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     /* Destroying hash table outside the lock. */
@@ -173,7 +172,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
     assert(m->funcs);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->map != NULL) {
@@ -193,7 +192,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
                 m->tot_get_bytes += m->funcs->item_len(it);
 
                 if (m->lock) {
-                    pthread_mutex_unlock(m->lock);
+                    cb_mutex_exit(m->lock);
                 }
 
                 if (settings.verbose > 1) {
@@ -222,7 +221,7 @@ void *mcache_get(mcache *m, char *key, int key_len,
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     return NULL;
@@ -244,7 +243,7 @@ void mcache_set(mcache *m, void *it,
     /* TODO: Our lock areas are possibly too wide. */
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->map != NULL) {
@@ -336,7 +335,7 @@ void mcache_set(mcache *m, void *it,
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -353,7 +352,7 @@ void mcache_delete(mcache *m, char *key, int key_len) {
     }
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->map != NULL) {
@@ -372,7 +371,7 @@ void mcache_delete(mcache *m, char *key, int key_len) {
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -382,7 +381,7 @@ void mcache_flush_all(mcache *m, uint32_t msec_exp) {
     }
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->map != NULL) {
@@ -395,7 +394,7 @@ void mcache_flush_all(mcache *m, uint32_t msec_exp) {
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 

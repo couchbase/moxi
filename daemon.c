@@ -34,6 +34,8 @@
 # pragma ident "$NetBSD: daemon.c,v 1.9 2003/08/07 16:42:46 agc Exp $"
 #endif
 
+#ifndef WIN32
+
 #include "config.h"
 #include <fcntl.h>
 #include <stdio.h>
@@ -88,3 +90,4 @@ int daemonize(int nochdir, int noclose)
     }
     return (0);
 }
+#endif

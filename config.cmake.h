@@ -2,10 +2,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H 1
 
+#cmakedefine HAVE_UMEM_H ${HAVE_UMEM_H}
+#cmakedefine HAVE_SYSEXITS_H ${HAVE_SYSEXITS_H}
+
+#include <platform/platform.h>
+
 #ifdef WIN32
-#include <winsock2.h>
+//#include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
+//#include <windows.h>
 
 #define PATH_MAX 1024
 
@@ -14,8 +19,8 @@
 #define SOCKETPAIR_AF AF_INET
 #define get_socket_error() WSAGetLastError()
 
-typedef int in_port_t;
 typedef HANDLE pid_t;
+typedef char* caddr_t;
 
 #define snprintf _snprintf
 #define strtoull(a, b, c) _strtoui64(a, b, c)
@@ -26,17 +31,6 @@ typedef HANDLE pid_t;
 #define putenv(a) _putenv(a)
 #endif
 
-#if !defined(__cplusplus) && !defined(PRIu64)
-#define PRIu64 "I64u"
-#endif
-
-#if !defined(__cplusplus) && !defined(PRI64)
-#define PRI64 "I64d"
-#endif
-
-#if !defined(__cplusplus) && !defined(PRIu32)
-#define PRIu32 "u"
-#endif
 
 #else
 
@@ -53,7 +47,7 @@ typedef long long int64_t;
 #define get_socket_error() errno
 
 /* some POSIX systems need the following definition
- * to get mlockall flags out of sys/mman.h.  */
+* to get mlockall flags out of sys/mman.h.  */
 #ifndef _P1003_1B_VISIBLE
 #define _P1003_1B_VISIBLE
 #endif
@@ -106,15 +100,16 @@ typedef long long int64_t;
 #include <stdlib.h>
 #include <inttypes.h>
 #include <sys/types.h>
-#include <sysexits.h>
 
-#ifndef __cplusplus
-#ifndef bool
-#define bool char
-#define false 0
-#define true 1
+#ifdef HAVE_SYSEXITS_H
+#include <sysexits.h>
+#else
+#define EX_USAGE EXIT_FAILURE
+#define EX_OSERR EXIT_FAILURE
 #endif
 
+#ifndef __cplusplus
+#include <stdbool.h>
 #endif
 
 #ifndef IOV_MAX
@@ -125,8 +120,6 @@ typedef long long int64_t;
 #define PACKAGE "moxi"
 #define VERSION "${MOXI_VERSION}"
 #define CONFLATE_DB_PATH "${CONFLATE_DB_PATH}"
-
-#cmakedefine HAVE_UMEM_H ${HAVE_UMEM_H}
 
 #include "config_static.h"
 #endif

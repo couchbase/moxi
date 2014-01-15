@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include <math.h>
 #include "memcached.h"

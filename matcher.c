@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/time.h>
 #include <assert.h>
 #include "matcher.h"
 
@@ -16,9 +15,9 @@ void matcher_init(matcher *m, bool multithreaded) {
     memset(m, 0, sizeof(matcher));
 
     if (multithreaded) {
-        m->lock = malloc(sizeof(pthread_mutex_t));
+        m->lock = malloc(sizeof(cb_mutex_t));
         if (m->lock != NULL) {
-            pthread_mutex_init(m->lock, NULL);
+            cb_mutex_initialize(m->lock);
         }
     } else {
         m->lock = NULL;
@@ -29,7 +28,7 @@ void matcher_start(matcher *m, char *spec) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     /* The spec currently is a string of '|' separated prefixes. */
@@ -49,7 +48,7 @@ void matcher_start(matcher *m, char *spec) {
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -59,13 +58,13 @@ bool matcher_started(matcher *m) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     rv = m->patterns != NULL && m->patterns_num > 0;
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     return rv;
@@ -75,7 +74,7 @@ void matcher_stop(matcher *m) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->patterns != NULL) {
@@ -100,7 +99,7 @@ void matcher_stop(matcher *m) {
     m->misses = 0;
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 }
 
@@ -108,7 +107,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     assert(m->patterns_num <= m->patterns_max);
@@ -138,7 +137,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
             }
 
             if (m->lock)
-                pthread_mutex_unlock(m->lock);
+                cb_mutex_exit(m->lock);
 
             return copy;
         }
@@ -146,7 +145,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
 
  fail:
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     matcher_stop(copy);
@@ -203,7 +202,7 @@ bool matcher_check(matcher *m, char *str, int str_len,
     assert(m);
 
     if (m->lock) {
-        pthread_mutex_lock(m->lock);
+        cb_mutex_enter(m->lock);
     }
 
     if (m->patterns != NULL && m->patterns_num > 0) {
@@ -233,9 +232,8 @@ bool matcher_check(matcher *m, char *str, int str_len,
     }
 
     if (m->lock) {
-        pthread_mutex_unlock(m->lock);
+        cb_mutex_exit(m->lock);
     }
 
     return found;
 }
-

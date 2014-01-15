@@ -12,7 +12,12 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libconflate/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libmemcached)
 
+IF (WIN32)
+   INCLUDE_DIRECTORIES(AFTER ${CMAKE_CURRENT_SOURCE_DIR}/../platform/include/win32)
+ENDIF (WIN32)
+
 CHECK_INCLUDE_FILES("umem.h" HAVE_UMEM_H)
+CHECK_INCLUDE_FILES("sysexits.h" HAVE_SYSEXITS_H)
 
 SET(CONFLATE_DB_PATH ${CMAKE_INSTALL_PREFIX}/var/lib/moxi)
 

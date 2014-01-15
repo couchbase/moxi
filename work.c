@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <assert.h>
 #include <unistd.h>
 #include <event.h>
@@ -30,7 +29,7 @@ bool work_queue_init(work_queue *m, struct event_base *event_base) {
 
     memset(m, 0, sizeof(work_queue));
 
-    pthread_mutex_init(&m->work_lock, NULL);
+    cb_mutex_initialize(&m->work_lock);
 
     m->work_head = NULL;
     m->work_tail = NULL;
@@ -115,7 +114,7 @@ bool work_send(work_queue *m,
         w->data1 = data1;
         w->next  = NULL;
 
-        pthread_mutex_lock(&m->work_lock);
+        cb_mutex_enter(&m->work_lock);
 
         if (m->work_tail != NULL)
             m->work_tail->next = w;
@@ -123,13 +122,13 @@ bool work_send(work_queue *m,
         if (m->work_head == NULL)
             m->work_head = w;
 
-        if (write(m->send_fd, "", 1) == 1) {
+        if (send(m->send_fd, "", 1, 0) == 1) {
             m->num_items++;
             m->tot_sends++;
 
 #ifdef WORK_DEBUG
             moxi_log_write("work_send %x %x %x %d %d %d %llu %llu\n",
-                    (int) pthread_self(),
+                    (int) cb_thread_self(),
                     (int) m,
                     (int) m->event_base,
                     m->send_fd, m->recv_fd,
@@ -141,7 +140,7 @@ bool work_send(work_queue *m,
             rv = true;
         }
 
-        pthread_mutex_unlock(&m->work_lock);
+        cb_mutex_exit(&m->work_lock);
     }
 
     return rv;
@@ -167,9 +166,9 @@ void work_recv(int fd, short which, void *arg) {
     /* The lock area includes the read() for safety, */
     /* as the pipe acts like a cond variable. */
 
-    pthread_mutex_lock(&m->work_lock);
+    cb_mutex_enter(&m->work_lock);
 
-    int readrv = read(fd, buf, 1);
+    int readrv = recv(fd, buf, 1, 0);
     assert(readrv == 1);
     if (readrv != 1) {
 #ifdef WORK_DEBUG
@@ -195,7 +194,7 @@ void work_recv(int fd, short which, void *arg) {
             fd);
 #endif
 
-    pthread_mutex_unlock(&m->work_lock);
+    cb_mutex_exit(&m->work_lock);
 
     uint64_t num_items = 0;
 
@@ -208,12 +207,12 @@ void work_recv(int fd, short which, void *arg) {
     }
 
     if (num_items > 0) {
-        pthread_mutex_lock(&m->work_lock);
+        cb_mutex_enter(&m->work_lock);
 
         m->tot_recvs += num_items;
         m->num_items -= num_items;
 
-        pthread_mutex_unlock(&m->work_lock);
+        cb_mutex_exit(&m->work_lock);
     }
 }
 
@@ -237,51 +236,41 @@ int work_collect_init(work_collect *c, int count, void *data) {
 
     c->count = count;
     c->data  = data;
-
-    int rv;
-
-    rv = pthread_mutex_init(&c->collect_lock, NULL);
-    if (rv != 0) {
-        return rv;
-    }
-
-    rv = pthread_cond_init(&c->collect_cond, NULL);
-    if (rv != 0) {
-        return rv;
-    }
+    cb_mutex_initialize(&c->collect_lock);
+    cb_cond_initialize(&c->collect_cond);
 
     return 0;
 }
 
 int work_collect_wait(work_collect *c) {
     int rv = 0;
-    pthread_mutex_lock(&c->collect_lock);
+    cb_mutex_enter(&c->collect_lock);
     while (c->count != 0 && rv == 0) { /* Can't test for > 0, due to -1 on init race. */
-        rv = pthread_cond_wait(&c->collect_cond, &c->collect_lock);
+        cb_cond_wait(&c->collect_cond, &c->collect_lock);
     }
-    pthread_mutex_unlock(&c->collect_lock);
+    cb_mutex_exit(&c->collect_lock);
     return rv;
 }
 
 int work_collect_count(work_collect *c, int count) {
     int rv = 0;
-    pthread_mutex_lock(&c->collect_lock);
+    cb_mutex_enter(&c->collect_lock);
     c->count = count;
     if (c->count <= 0) {
-        rv = pthread_cond_signal(&c->collect_cond);
+        cb_cond_signal(&c->collect_cond);
     }
-    pthread_mutex_unlock(&c->collect_lock);
+    cb_mutex_exit(&c->collect_lock);
     return rv;
 }
 
 int work_collect_one(work_collect *c) {
     int rv = 0;
-    pthread_mutex_lock(&c->collect_lock);
+    cb_mutex_enter(&c->collect_lock);
     assert(c->count >= 1);
     c->count--;
     if (c->count <= 0) {
-        rv = pthread_cond_signal(&c->collect_cond);
+        cb_cond_signal(&c->collect_cond);
     }
-    pthread_mutex_unlock(&c->collect_lock);
+    cb_mutex_exit(&c->collect_lock);
     return rv;
 }

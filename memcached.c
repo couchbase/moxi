@@ -19,15 +19,6 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-/* some POSIX systems need the following definition
- * to get mlockall flags out of sys/mman.h.  */
-#ifndef _P1003_1B_VISIBLE
-#define _P1003_1B_VISIBLE
-#endif
-/* need this to get IOV_MAX on some platforms. */
-#ifndef __need_IOV_MAX
-#define __need_IOV_MAX
-#endif
 #include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -37,18 +28,13 @@
 #include <assert.h>
 #include <limits.h>
 #include <stddef.h>
+#include <getopt.h>
 
 #include "cproxy.h"
 #include "agent.h"
 #include "stdin_check.h"
 #include "log.h"
 
-/* FreeBSD 4.x doesn't have IOV_MAX exposed. */
-#ifndef IOV_MAX
-#if defined(__FreeBSD__) || defined(__APPLE__)
-# define IOV_MAX 1024
-#endif
-#endif
 
 /*
  * forward declarations
@@ -245,15 +231,15 @@ int add_msghdr(conn *c) {
  */
 
 static conn **freeconns;
-static int freetotal;
-static int freecurr;
+static size_t freetotal;
+static size_t freecurr;
 /* Lock for connection freelist */
-static pthread_mutex_t conn_lock = PTHREAD_MUTEX_INITIALIZER;
-
+static cb_mutex_t conn_lock;
 
 static void conn_init(void) {
     freetotal = 200;
     freecurr = 0;
+    cb_mutex_initialize(&conn_lock);
     if ((freeconns = calloc(freetotal, sizeof(conn *))) == NULL) {
         moxi_log_write("Failed to allocate connection structures\n");
     }
@@ -266,13 +252,13 @@ static void conn_init(void) {
 conn *conn_from_freelist() {
     conn *c;
 
-    pthread_mutex_lock(&conn_lock);
+    cb_mutex_enter(&conn_lock);
     if (freecurr > 0) {
         c = freeconns[--freecurr];
     } else {
         c = NULL;
     }
-    pthread_mutex_unlock(&conn_lock);
+    cb_mutex_exit(&conn_lock);
 
     return c;
 }
@@ -282,7 +268,7 @@ conn *conn_from_freelist() {
  */
 bool conn_add_to_freelist(conn *c) {
     bool ret = true;
-    pthread_mutex_lock(&conn_lock);
+    cb_mutex_enter(&conn_lock);
     if (freecurr < freetotal) {
         freeconns[freecurr++] = c;
         ret = false;
@@ -297,7 +283,7 @@ bool conn_add_to_freelist(conn *c) {
             ret = false;
         }
     }
-    pthread_mutex_unlock(&conn_lock);
+    cb_mutex_exit(&conn_lock);
     return ret;
 }
 
@@ -848,9 +834,9 @@ void complete_nread_ascii(conn *c) {
     int comm = c->cmd;
     enum store_item_type ret;
 
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++;
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 
     if (strncmp(ITEM_data(it) + it->nbytes - 2, "\r\n", 2) != 0) {
         out_string(c, "CLIENT_ERROR bad data chunk");
@@ -1159,13 +1145,13 @@ static void complete_incr_bin(conn *c) {
         write_bin_error(c, PROTOCOL_BINARY_RESPONSE_KEY_EEXISTS, 0);
     } else {
 
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         if (c->cmd == PROTOCOL_BINARY_CMD_INCREMENT) {
             c->thread->stats.incr_misses++;
         } else {
             c->thread->stats.decr_misses++;
         }
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         write_bin_error(c, PROTOCOL_BINARY_RESPONSE_KEY_ENOENT, 0);
     }
@@ -1178,9 +1164,9 @@ static void complete_update_bin(conn *c) {
 
     item *it = c->item;
 
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++;
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 
     /* We don't actually receive the trailing two characters in the bin
      * protocol, so we're going to just set them here */
@@ -1263,10 +1249,10 @@ static void process_bin_get(conn *c) {
         uint16_t keylen = 0;
         uint32_t bodylen = sizeof(rsp->message.body) + (it->nbytes - 2);
 
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.get_cmds++;
         c->thread->stats.slab_stats[it->slabs_clsid].get_hits++;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         MEMCACHED_COMMAND_GET(c->sfd, ITEM_key(it), it->nkey,
                               it->nbytes, ITEM_get_cas(it));
@@ -1294,10 +1280,10 @@ static void process_bin_get(conn *c) {
         /* Remember this command so we can garbage collect it later */
         c->item = it;
     } else {
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.get_cmds++;
         c->thread->stats.get_misses++;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         MEMCACHED_COMMAND_GET(c->sfd, key, nkey, -1, 0);
 
@@ -1887,9 +1873,9 @@ static void process_bin_flush(conn *c) {
     }
     item_flush_expired();
 
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.flush_cmds++;
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 
     write_bin_response(c, NULL, 0, 0, 0);
 }
@@ -2015,24 +2001,24 @@ enum store_item_type do_store_item(item *it, int comm, conn *c) {
         if(old_it == NULL) {
             /* LRU expired */
             stored = NOT_FOUND;
-            pthread_mutex_lock(&c->thread->stats.mutex);
+            cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.cas_misses++;
-            pthread_mutex_unlock(&c->thread->stats.mutex);
+            cb_mutex_exit(&c->thread->stats.mutex);
         }
         else if (ITEM_get_cas(it) == ITEM_get_cas(old_it)) {
             /* cas validates */
             /* it and old_it may belong to different classes. */
             /* I'm updating the stats for the one that's getting pushed out */
-            pthread_mutex_lock(&c->thread->stats.mutex);
+            cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.slab_stats[old_it->slabs_clsid].cas_hits++;
-            pthread_mutex_unlock(&c->thread->stats.mutex);
+            cb_mutex_exit(&c->thread->stats.mutex);
 
             item_replace(old_it, it);
             stored = STORED;
         } else {
-            pthread_mutex_lock(&c->thread->stats.mutex);
+            cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.slab_stats[old_it->slabs_clsid].cas_badval++;
-            pthread_mutex_unlock(&c->thread->stats.mutex);
+            cb_mutex_exit(&c->thread->stats.mutex);
 
             if(settings.verbose > 1) {
                 moxi_log_write("CAS:  failure: expected %llu, got %llu\n",
@@ -2265,7 +2251,7 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
     free(val_free);
 }
 
-inline static void process_stats_detail(conn *c, const char *command) {
+static void process_stats_detail(conn *c, const char *command) {
     assert(c != NULL);
 
     if (strcmp(command, "on") == 0) {
@@ -2447,7 +2433,7 @@ static void process_stat(conn *c, token_t *tokens, const size_t ntokens) {
 }
 
 /* ntokens is overwritten here... shrug.. */
-static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens, bool return_cas) {
+static void process_get_command(conn *c, token_t *tokens, size_t ntokens, bool return_cas) {
     char *key;
     size_t nkey;
     int i = 0, sid = 0;
@@ -2468,13 +2454,13 @@ static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens,
             nkey = key_token->length;
 
             if(nkey > KEY_MAX_LENGTH) {
-                pthread_mutex_lock(&c->thread->stats.mutex);
+                cb_mutex_enter(&c->thread->stats.mutex);
                 c->thread->stats.get_cmds   += stats_get_cmds;
                 c->thread->stats.get_misses += stats_get_misses;
                 for(sid = 0; sid < MAX_NUMBER_OF_SLAB_CLASSES; sid++) {
                     c->thread->stats.slab_stats[sid].get_hits += stats_get_hits[sid];
                 }
-                pthread_mutex_unlock(&c->thread->stats.mutex);
+                cb_mutex_exit(&c->thread->stats.mutex);
                 out_string(c, "CLIENT_ERROR bad command line format");
                 return;
             }
@@ -2523,13 +2509,13 @@ static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens,
 
                   suffix = cache_alloc(c->thread->suffix_cache);
                   if (suffix == NULL) {
-                    pthread_mutex_lock(&c->thread->stats.mutex);
+                    cb_mutex_enter(&c->thread->stats.mutex);
                     c->thread->stats.get_cmds   += stats_get_cmds;
                     c->thread->stats.get_misses += stats_get_misses;
                     for(sid = 0; sid < MAX_NUMBER_OF_SLAB_CLASSES; sid++) {
                         c->thread->stats.slab_stats[sid].get_hits += stats_get_hits[sid];
                     }
-                    pthread_mutex_unlock(&c->thread->stats.mutex);
+                    cb_mutex_exit(&c->thread->stats.mutex);
                     out_string(c, "SERVER_ERROR out of memory making CAS suffix");
                     item_remove(it);
                     return;
@@ -2615,13 +2601,13 @@ static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens,
         c->msgcurr = 0;
     }
 
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.get_cmds   += stats_get_cmds;
     c->thread->stats.get_misses += stats_get_misses;
     for(sid = 0; sid < MAX_NUMBER_OF_SLAB_CLASSES; sid++) {
         c->thread->stats.slab_stats[sid].get_hits += stats_get_hits[sid];
     }
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 
     return;
 }
@@ -2734,13 +2720,13 @@ static void process_arithmetic_command(conn *c, token_t *tokens, const size_t nt
 
     it = item_get(key, nkey);
     if (!it) {
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         if (incr) {
             c->thread->stats.incr_misses++;
         } else {
             c->thread->stats.decr_misses++;
         }
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         out_string(c, "NOT_FOUND");
         return;
@@ -2795,13 +2781,13 @@ enum delta_result_type do_add_delta(conn *c, item *it, const bool incr,
         MEMCACHED_COMMAND_DECR(c->sfd, ITEM_key(it), it->nkey, value);
     }
 
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     if (incr) {
         c->thread->stats.slab_stats[it->slabs_clsid].incr_hits++;
     } else {
         c->thread->stats.slab_stats[it->slabs_clsid].decr_hits++;
     }
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 
     snprintf(buf, INCR_MAX_STORAGE_LEN, "%llu", (unsigned long long)value);
     res = strlen(buf);
@@ -2852,17 +2838,17 @@ static void process_delete_command(conn *c, token_t *tokens, const size_t ntoken
     if (it) {
         MEMCACHED_COMMAND_DELETE(c->sfd, ITEM_key(it), it->nkey);
 
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.slab_stats[it->slabs_clsid].delete_hits++;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         item_unlink(it);
         item_remove(it);      /* release our reference */
         out_string(c, "DELETED");
     } else {
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.delete_misses++;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         out_string(c, "NOT_FOUND");
     }
@@ -2961,9 +2947,9 @@ void process_command(conn *c, char *command) {
 
         set_noreply_maybe(c, tokens, ntokens);
 
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.flush_cmds++;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         if(ntokens == (c->noreply ? 3 : 2)) {
             settings.oldest_live = current_time - 1;
@@ -3213,9 +3199,9 @@ static enum try_read_result try_read_udp(conn *c) {
     if (res > 8) {
         unsigned char *buf = (unsigned char *)c->rbuf;
 
-        pthread_mutex_lock(&c->thread->stats.mutex);
+        cb_mutex_enter(&c->thread->stats.mutex);
         c->thread->stats.bytes_read += res;
-        pthread_mutex_unlock(&c->thread->stats.mutex);
+        cb_mutex_exit(&c->thread->stats.mutex);
 
         add_bytes_read(c, res);
 
@@ -3277,9 +3263,9 @@ static enum try_read_result try_read_network(conn *c) {
         assert(avail > 0);
         res = read(c->sfd, c->rbuf + c->rbytes, avail);
         if (res > 0) {
-            pthread_mutex_lock(&c->thread->stats.mutex);
+            cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.bytes_read += res;
-            pthread_mutex_unlock(&c->thread->stats.mutex);
+            cb_mutex_exit(&c->thread->stats.mutex);
 
             add_bytes_read(c, res);
 
@@ -3385,9 +3371,9 @@ static enum transmit_result transmit(conn *c) {
 
         res = sendmsg(c->sfd, m, 0);
         if (res > 0) {
-            pthread_mutex_lock(&c->thread->stats.mutex);
+            cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.bytes_written += res;
-            pthread_mutex_unlock(&c->thread->stats.mutex);
+            cb_mutex_exit(&c->thread->stats.mutex);
 
             /* We've written some of the data. Remove the completed
                iovec entries from the list of pending writes. */
@@ -3463,8 +3449,7 @@ void drive_machine(conn *c) {
                 }
                 break;
             }
-            if ((flags = fcntl(sfd, F_GETFL, 0)) < 0 ||
-                fcntl(sfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+            if (evutil_make_socket_nonblocking(sfd) == -1) {
                 perror("setting O_NONBLOCK");
                 close(sfd);
                 break;
@@ -3536,9 +3521,9 @@ void drive_machine(conn *c) {
             if (IS_DOWNSTREAM(c->protocol) || nreqs >= 0) {
                 reset_cmd_handler(c);
             } else {
-                pthread_mutex_lock(&c->thread->stats.mutex);
+                cb_mutex_enter(&c->thread->stats.mutex);
                 c->thread->stats.conn_yields++;
-                pthread_mutex_unlock(&c->thread->stats.mutex);
+                cb_mutex_exit(&c->thread->stats.mutex);
                 if (c->rbytes > 0) {
                     /* We have already read in data into the input buffer,
                        so libevent will most likely not signal read events
@@ -3636,9 +3621,9 @@ void drive_machine(conn *c) {
             /*  now try reading from the socket */
             res = read(c->sfd, c->rbuf, c->rsize > c->sbytes ? c->sbytes : c->rsize);
             if (res > 0) {
-                pthread_mutex_lock(&c->thread->stats.mutex);
+                cb_mutex_enter(&c->thread->stats.mutex);
                 c->thread->stats.bytes_read += res;
-                pthread_mutex_unlock(&c->thread->stats.mutex);
+                cb_mutex_exit(&c->thread->stats.mutex);
                 add_bytes_read(c, res);
                 c->sbytes -= res;
                 break;
@@ -3761,9 +3746,9 @@ void drive_machine(conn *c) {
 
 void add_bytes_read(conn *c, int bytes_read) {
     assert(c != NULL);
-    pthread_mutex_lock(&c->thread->stats.mutex);
+    cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.bytes_read += bytes_read;
-    pthread_mutex_unlock(&c->thread->stats.mutex);
+    cb_mutex_exit(&c->thread->stats.mutex);
 }
 
 void event_handler(const int fd, const short which, void *arg) {
@@ -3792,14 +3777,12 @@ void event_handler(const int fd, const short which, void *arg) {
 
 static int new_socket(struct addrinfo *ai) {
     int sfd;
-    int flags;
 
     if ((sfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
         return -1;
     }
 
-    if ((flags = fcntl(sfd, F_GETFL, 0)) < 0 ||
-        fcntl(sfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    if (evutil_make_socket_nonblocking(sfd) == -1) {
         perror("setting O_NONBLOCK");
         close(sfd);
         return -1;
@@ -3871,10 +3854,24 @@ int server_socket(int port, enum network_transport transport,
     snprintf(port_buf, sizeof(port_buf), "%d", port);
     error= getaddrinfo(settings.inter, port_buf, &hints, &ai);
     if (error != 0) {
+#ifdef WIN32
+        char* win_msg = NULL;
+        DWORD err = WSAGetLastError();
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                       FORMAT_MESSAGE_FROM_SYSTEM |
+                       FORMAT_MESSAGE_IGNORE_INSERTS,
+                       NULL, err,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       (LPTSTR)&win_msg,
+                       0, NULL);
+        moxi_log_write("getaddrinfo(): %s\n", win_msg);
+        LocalFree(win_msg);
+#else
         if (error != EAI_SYSTEM)
           moxi_log_write("getaddrinfo(): %s\n", gai_strerror(error));
         else
           perror("getaddrinfo()");
+#endif
         return 1;
     }
 
@@ -3984,15 +3981,13 @@ int server_socket(int port, enum network_transport transport,
 
 static int new_socket_unix(void) {
     int sfd;
-    int flags;
 
     if ((sfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket()");
         return -1;
     }
 
-    if ((flags = fcntl(sfd, F_GETFL, 0)) < 0 ||
-        fcntl(sfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    if (evutil_make_socket_nonblocking(sfd) == -1) {
         perror("setting O_NONBLOCK");
         close(sfd);
         return -1;
@@ -4405,17 +4400,18 @@ static void remove_pidfile(const char *pid_file) {
 
 static void sig_handler(const int sig) {
     switch (sig) {
-
+#ifndef WIN32
         case SIGHUP :
             log_error_cycle(ml);
             break;
+#endif
         default :
             printf("SIGINT handled.\n");
             exit(EXIT_SUCCESS);
     }
 }
 
-#ifndef HAVE_SIGIGNORE
+#if !defined(WIN32) && !defined(HAVE_SIGIGNORE)
 static int sigignore(int sig) {
     struct sigaction sa = { .sa_handler = SIG_IGN, .sa_flags = 0 };
 
@@ -4551,8 +4547,8 @@ int main (int argc, char **argv) {
     /* handle SIGINT */
     signal(SIGINT, sig_handler);
 
-    initialize_sockets();
-
+    cb_initialize_sockets();
+    initialize_conn_lock();
 
     /* init settings */
     settings_init();
@@ -4764,6 +4760,7 @@ int main (int argc, char **argv) {
         moxi_log_write("moxi log, mode=%d, file=%s\n", ml->log_mode, ml->log_file);
     }
 
+#ifndef WIN32
     if (ml->log_mode == ERRORLOG_FILE) {
         /*
          * install the signal handler for SIGHUP to handle
@@ -4771,6 +4768,7 @@ int main (int argc, char **argv) {
          */
          signal(SIGHUP, sig_handler);
     }
+#endif
 #endif
 
     if (cproxy_cfg
@@ -4852,6 +4850,7 @@ int main (int argc, char **argv) {
 #endif
 #endif
 
+#ifndef WIN32
     /* daemonize if requested */
     /* if we want to ensure our ability to dump core, don't chdir to / */
     if (do_daemonize) {
@@ -4863,6 +4862,7 @@ int main (int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
     }
+#endif
 
     /* lock paged memory if needed */
     if (lock_memory) {
@@ -4907,8 +4907,11 @@ int main (int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+#ifndef WIN32
     if (do_daemonize)
         save_pid(getpid(), pid_file);
+#endif
+
     /* initialise clock event */
     clock_handler(0, 0, 0);
 
