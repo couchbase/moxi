@@ -24,6 +24,25 @@
 #define INFTIM -1
 #endif
 
+#ifdef WIN32
+static int is_blocking(DWORD dw) {
+    return (dw == WSAEWOULDBLOCK);
+}
+
+static int is_in_progress(DWORD dw) {
+    return (dw == WSAEINPROGRESS);
+}
+#else
+static int is_blocking(int dw) {
+    return (dw == EAGAIN || dw == EWOULDBLOCK);
+}
+
+static int is_in_progress(int dw) {
+    return (dw == EINPROGRESS);
+}
+#endif
+
+
 /* The lvb stands for libvbucket. */
 
 mcs_st  *lvb_create(mcs_st *ptr, const char *config,
@@ -410,14 +429,14 @@ void mcs_server_st_quit(mcs_server_st *ptr, uint8_t io_death) {
 
     /* TODO: Should send QUIT cmd. */
 
-    if (ptr->fd != -1) {
-        close(ptr->fd);
+    if (ptr->fd != INVALID_SOCKET) {
+        closesocket(ptr->fd);
     }
-    ptr->fd = -1;
+    ptr->fd = INVALID_SOCKET;
 }
 
 mcs_return mcs_server_st_connect(mcs_server_st *ptr, int *errno_out, bool blocking) {
-    if (ptr->fd != -1) {
+    if (ptr->fd != INVALID_SOCKET) {
         if (errno_out != NULL) {
             *errno_out = 0;
         }
@@ -430,16 +449,16 @@ mcs_return mcs_server_st_connect(mcs_server_st *ptr, int *errno_out, bool blocki
     }
 
     ptr->fd = mcs_connect(ptr->hostname, ptr->port, errno_out, blocking);
-    if (ptr->fd != -1) {
+    if (ptr->fd != INVALID_SOCKET) {
         return MCS_SUCCESS;
     }
 
     return MCS_FAILURE;
 }
 
-int mcs_connect(const char *hostname, int portnum,
+SOCKET mcs_connect(const char *hostname, int portnum,
                 int *errno_out, bool blocking) {
-    int ret = -1;
+    SOCKET ret = INVALID_SOCKET;
     struct addrinfo *ai   = NULL;
     struct addrinfo *next = NULL;
     struct addrinfo hints;
@@ -468,12 +487,12 @@ int mcs_connect(const char *hostname, int portnum,
             /*                                 "getaddrinfo(): %s\n", strerror(error)); */
         }
 #endif
-        return -1;
+        return INVALID_SOCKET;
     }
 
     for (next = ai; next; next = next->ai_next) {
-        int sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if (sock == -1) {
+        SOCKET sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (sock == INVALID_SOCKET) {
             /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
             /*                                 "Failed to create socket: %s\n", */
             /*                                 strerror(errno)); */
@@ -484,23 +503,22 @@ int mcs_connect(const char *hostname, int portnum,
         /* now so even the connect() becomes non-blocking. */
 
         if (!blocking && (mcs_set_sock_opt(sock) != MCS_SUCCESS)) {
-            close(sock);
+            closesocket(sock);
             continue;
         }
 
-        if (connect(sock, ai->ai_addr, ai->ai_addrlen) == -1) {
-            int errno_last;
+        if (connect(sock, ai->ai_addr, (socklen_t)ai->ai_addrlen) == SOCKET_ERROR) {
 #ifdef WIN32
-            errno_last = WSAGetLastError();
+            DWORD errno_last = WSAGetLastError();
 #else
-            errno_last = errno;
+            int errno_last = errno;
 #endif
             if (errno_out != NULL) {
                 *errno_out = errno_last;
             }
 
-            if (!blocking && (errno_last == EINPROGRESS ||
-                              errno_last == EWOULDBLOCK)) {
+            if (!blocking && (is_in_progress(errno_last) ||
+                              is_blocking(errno_last))) {
                 ret = sock;
                 break;
             }
@@ -508,7 +526,7 @@ int mcs_connect(const char *hostname, int portnum,
             /* settings.extensions.logger->log(EXTENSION_LOG_WARNING, NULL, */
             /*                                 "Failed to connect socket: %s\n", */
             /*                                 strerror(errno)); */
-            close(sock);
+            closesocket(sock);
             continue;
         }
 
@@ -517,7 +535,7 @@ int mcs_connect(const char *hostname, int portnum,
             break;
         }
 
-        close(sock);
+        closesocket(sock);
     }
 
     freeaddrinfo(ai);
@@ -525,7 +543,7 @@ int mcs_connect(const char *hostname, int portnum,
     return ret;
 }
 
-mcs_return mcs_set_sock_opt(int sock) {
+mcs_return mcs_set_sock_opt(SOCKET sock) {
     /* jsh: todo
        TODO: from zstored set_socket_options()...
 
@@ -593,19 +611,19 @@ mcs_return mcs_set_sock_opt(int sock) {
     int flags = 1;
 
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-               &flags, (socklen_t) sizeof(flags));
+               (void*)&flags, (socklen_t)sizeof(flags));
 
     return MCS_SUCCESS;
 }
 
-ssize_t mcs_io_write(int fd, const void *buffer, size_t length) {
+ssize_t mcs_io_write(SOCKET fd, const void *buffer, size_t length) {
     assert(fd != -1);
 
-    return write(fd, buffer, length);
+    return send(fd, buffer, (int)length, 0);
 }
 
 #ifdef WIN32
-mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
+mcs_return mcs_io_read(SOCKET fd, void *dta, size_t size, struct timeval *timeout_in) {
     struct timeval my_timeout; /* Linux select() modifies its timeout param. */
     struct timeval *timeout = NULL;
 
@@ -620,24 +638,24 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
     size_t done = 0;
 
     while (done < size) {
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(fd, &readfds);
+        fd_set readfds[FD_SETSIZE];
+        FD_ZERO(readfds);
+        FD_SET(fd, readfds);
 
-        fd_set errfds;
-        FD_ZERO(&errfds);
-        FD_SET(fd, &errfds);
+        fd_set errfds[FD_SETSIZE];
+        FD_ZERO(errfds);
+        FD_SET(fd, errfds);
 
-        int s = select(fd + 1, &readfds, NULL, &errfds, timeout);
+        int s = select(FD_SETSIZE, readfds, NULL, errfds, timeout);
         if (s == 0) {
             return MCS_TIMEOUT;
         }
 
-        if (s != 1 || FD_ISSET(fd, &errfds) || !FD_ISSET(fd, &readfds)) {
+        if (s != 1 || FD_ISSET(fd, errfds) || !FD_ISSET(fd, readfds)) {
             return MCS_FAILURE;
         }
 
-        ssize_t n = read(fd, data + done, 1);
+        ssize_t n = recv(fd, data + done, 1, 0);
         if (n == -1 || n == 0) {
             return MCS_FAILURE;
         }
@@ -661,7 +679,7 @@ static uint64_t __get_time_ms(const struct timeval *tv) {
     return (uint64_t)tv->tv_sec * 1000 + (uint64_t)tv->tv_usec / 1000;
 }
 
-mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_in) {
+mcs_return mcs_io_read(SOCKET fd, void *dta, size_t size, struct timeval *timeout_in) {
     uint64_t start_ms = 0;
     uint64_t timeout_ms = 0;
     uint64_t now_ms = 0;
@@ -724,7 +742,7 @@ mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout_i
 }
 #endif
 
-void mcs_io_reset(int fd) {
+void mcs_io_reset(SOCKET fd) {
     (void) fd;
 
     /* TODO: memcached_io_reset(ptr); */
@@ -738,7 +756,7 @@ int mcs_server_st_port(mcs_server_st *ptr) {
     return ptr->port;
 }
 
-int mcs_server_st_fd(mcs_server_st *ptr) {
+SOCKET mcs_server_st_fd(mcs_server_st *ptr) {
     return ptr->fd;
 }
 

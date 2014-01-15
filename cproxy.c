@@ -24,10 +24,10 @@ downstream *downstream_list_waiting_remove(downstream *head,
                                            downstream **tail,
                                            downstream *d);
 
-void downstream_timeout(const int fd,
+static void downstream_timeout(evutil_socket_t fd,
                         const short which,
                         void *arg);
-void wait_queue_timeout(const int fd,
+static void wait_queue_timeout(evutil_socket_t fd,
                         const short which,
                         void *arg);
 
@@ -1554,7 +1554,7 @@ conn *cproxy_connect_downstream_conn(downstream *d,
                                      proxy_behavior *behavior) {
     uint64_t start = 0;
     int err = -1;
-    int fd;
+    SOCKET fd;
 
     assert(d);
     assert(d->ptd);
@@ -2322,9 +2322,9 @@ bool cproxy_start_wait_queue_timeout(proxy_td *ptd, conn *uc) {
     return true;
 }
 
-void wait_queue_timeout(const int fd,
-                        const short which,
-                        void *arg) {
+static void wait_queue_timeout(evutil_socket_t fd,
+                               const short which,
+                               void *arg) {
     proxy_td *ptd = arg;
     assert(ptd != NULL);
     (void)fd;
@@ -2726,7 +2726,7 @@ bool is_compatible_request(conn *existing, conn *candidate) {
     return false;
 }
 
-void downstream_timeout(const int fd,
+void downstream_timeout(evutil_socket_t fd,
                         const short which,
                         void *arg) {
     downstream *d = arg;
@@ -2863,7 +2863,7 @@ bool cproxy_start_downstream_timeout_ex(downstream *d, conn *c,
 
 int cproxy_auth_downstream(mcs_server_st *server,
                            proxy_behavior *behavior,
-                           int fd) {
+                           SOCKET fd) {
     protocol_binary_request_header req;
     protocol_binary_response_header res;
     struct timeval *timeout = NULL;
@@ -2877,7 +2877,7 @@ int cproxy_auth_downstream(mcs_server_st *server,
 
     assert(server);
     assert(behavior);
-    assert(fd != -1);
+    assert(fd != INVALID_SOCKET);
 
 
     if (!IS_BINARY(behavior->downstream_protocol)) {
@@ -3012,7 +3012,7 @@ int cproxy_auth_downstream(mcs_server_st *server,
 
 int cproxy_bucket_downstream(mcs_server_st *server,
                              proxy_behavior *behavior,
-                             int fd) {
+                             SOCKET fd) {
     protocol_binary_request_header req;
     protocol_binary_response_header res;
     struct timeval *timeout = NULL;
@@ -3022,7 +3022,7 @@ int cproxy_bucket_downstream(mcs_server_st *server,
     assert(server);
     assert(behavior);
     assert(IS_PROXY(behavior->downstream_protocol));
-    assert(fd != -1);
+    assert(fd != INVALID_SOCKET);
 
     if (!IS_BINARY(behavior->downstream_protocol)) {
         return 0;

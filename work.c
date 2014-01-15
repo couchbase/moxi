@@ -12,6 +12,35 @@
 
 #undef WORK_DEBUG
 
+
+static bool create_notification_pipe(work_queue *me) {
+    int j;
+    SOCKET notify[2];
+    if (evutil_socketpair(SOCKETPAIR_AF, SOCK_STREAM, 0,
+        (void*)notify) == SOCKET_ERROR) {
+        moxi_log_write("Failed to create notification pipe");
+        return false;
+    }
+
+    for (j = 0; j < 2; ++j) {
+        int flags = 1;
+        setsockopt(notify[j], IPPROTO_TCP,
+                   TCP_NODELAY, (void *)&flags, sizeof(flags));
+        setsockopt(notify[j], SOL_SOCKET,
+                   SO_REUSEADDR, (void *)&flags, sizeof(flags));
+
+        if (evutil_make_socket_nonblocking(notify[j]) == -1) {
+            moxi_log_write("Failed to enable non-blocking");
+            return false;
+        }
+    }
+
+    me->recv_fd = notify[0];
+    me->send_fd = notify[1];
+
+    return true;
+}
+
 /** A work queue is a mechanism to allow thread-to-thread
  *  communication in a libevent-based, multithreaded system.
  *
@@ -41,26 +70,9 @@ bool work_queue_init(work_queue *m, struct event_base *event_base) {
     m->event_base = event_base;
     assert(m->event_base != NULL);
 
-    int fds[2] = {0};
-#ifdef WIN32
-    struct sockaddr_in serv_addr;
-    int sockfd;
-
-    if ((sockfd = createLocalListSock(&serv_addr)) < 0 ||
-        createLocalSocketPair(sockfd,fds,&serv_addr) == -1)
-    {
-        fprintf(stderr, "Can't create notify pipe: %s", strerror(errno));
+    if (!create_notification_pipe(m)) {
         return false;
     }
-#else
-    if (pipe(fds)) {
-        perror("Can't create notify pipe");
-        return false;
-    }
-#endif
-
-    m->recv_fd = fds[0];
-    m->send_fd = fds[1];
 
     event_set(&m->event, m->recv_fd,
               EV_READ | EV_PERSIST, work_recv, m);
@@ -149,7 +161,7 @@ bool work_send(work_queue *m,
 /** Called by libevent, on the receiving thread, when
  *  there is work for the receiving thread to handle.
  */
-void work_recv(int fd, short which, void *arg) {
+void work_recv(evutil_socket_t fd, short which, void *arg) {
     assert(which & EV_READ);
 
     work_queue *m = arg;

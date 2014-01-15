@@ -3,6 +3,8 @@
 #ifndef WORK_H
 #define WORK_H
 
+#include "config.h"
+
 #include <sys/types.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -21,8 +23,8 @@ struct work_item {
 };
 
 struct work_queue {
-    int send_fd; /* Pipe to notify thread. */
-    int recv_fd;
+    SOCKET send_fd; /* Pipe to notify thread. */
+    SOCKET recv_fd;
 
     work_item *work_head;
     work_item *work_tail;
@@ -52,7 +54,7 @@ bool work_send(work_queue *m,
                void (*func)(void *data0, void *data1),
                void *data0, void *data1);
 
-void work_recv(int fd, short which, void *arg);
+void work_recv(evutil_socket_t fd, short which, void *arg);
 
 int work_collect_init(work_collect *c, int count, void *data);
 int work_collect_wait(work_collect *c);

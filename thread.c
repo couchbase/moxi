@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 #include "log.h"
 
@@ -19,7 +18,7 @@ extern struct hash_ops skeyhash_ops;
 /* An item in the connection queue. */
 typedef struct conn_queue_item CQ_ITEM;
 struct conn_queue_item {
-    int               sfd;
+    SOCKET            sfd;
     enum conn_states  init_state;
     int               event_flags;
     int               read_buffer_size;
@@ -66,7 +65,7 @@ static cb_mutex_t init_lock;
 static cb_cond_t init_cond;
 
 
-static void thread_libevent_process(int fd, short which, void *arg);
+static void thread_libevent_process(evutil_socket_t fd, short which, void *arg);
 
 /*
  * Initializes a connection queue.
@@ -274,16 +273,18 @@ static void worker_libevent(void *arg) {
  * Processes an incoming "handle a new connection" item. This is called when
  * input arrives on the libevent wakeup pipe.
  */
-static void thread_libevent_process(int fd, short which, void *arg) {
+static void thread_libevent_process(evutil_socket_t fd, short which, void *arg) {
     LIBEVENT_THREAD *me = arg;
     CQ_ITEM *cq_item;
     char buf[1];
 
     (void)which;
 
-    if (read(fd, buf, 1) != 1)
-        if (settings.verbose > 0)
+    if (recv(fd, buf, 1, 0) != 1) {
+        if (settings.verbose > 0) {
             moxi_log_write("Can't read from libevent pipe\n");
+        }
+    }
 
     cq_item = cq_pop(me->new_conn_queue);
 
@@ -302,7 +303,7 @@ static void thread_libevent_process(int fd, short which, void *arg) {
                     moxi_log_write("Can't listen for events on fd %d\n",
                         cq_item->sfd);
                 }
-                close(cq_item->sfd);
+                closesocket(cq_item->sfd);
             }
         } else {
             c->protocol = cq_item->protocol;
@@ -320,7 +321,7 @@ static int last_thread = 0;
  * from the main thread, either during initialization (for UDP) or because
  * of an incoming connection.
  */
-void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
+void dispatch_conn_new(SOCKET sfd, enum conn_states init_state, int event_flags,
                        int read_buffer_size,
                        enum protocol prot,
                        enum network_transport transport,
@@ -339,7 +340,7 @@ void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
                                 funcs, extra);
 }
 
-void dispatch_conn_new_to_thread(int tid, int sfd, enum conn_states init_state,
+void dispatch_conn_new_to_thread(int tid, SOCKET sfd, enum conn_states init_state,
                                  int event_flags, int read_buffer_size,
                                  enum protocol prot,
                                  enum network_transport transport,
@@ -365,7 +366,7 @@ void dispatch_conn_new_to_thread(int tid, int sfd, enum conn_states init_state,
     cq_push(thread->new_conn_queue, cq_item);
 
     MEMCACHED_CONN_DISPATCH(sfd, thread->thread_id);
-    if (write(thread->notify_send_fd, "", 1) != 1) {
+    if (send(thread->notify_send_fd, "", 1, 0) != 1) {
         perror("Writing to thread notify pipe");
     }
 }
@@ -653,6 +654,34 @@ void slab_stats_aggregate(struct thread_stats *thread_stats, struct slab_stats *
     }
 }
 
+static bool create_notification_pipe(LIBEVENT_THREAD *me) {
+    int j;
+    SOCKET notify[2];
+    if (evutil_socketpair(SOCKETPAIR_AF, SOCK_STREAM, 0,
+        (void*)notify) == SOCKET_ERROR) {
+        moxi_log_write("Failed to create notification pipe");
+        return false;
+    }
+
+    for (j = 0; j < 2; ++j) {
+        int flags = 1;
+        setsockopt(notify[j], IPPROTO_TCP,
+                   TCP_NODELAY, (void *)&flags, sizeof(flags));
+        setsockopt(notify[j], SOL_SOCKET,
+                   SO_REUSEADDR, (void *)&flags, sizeof(flags));
+
+        if (evutil_make_socket_nonblocking(notify[j]) == -1) {
+            moxi_log_write("Failed to enable non-blocking");
+            return false;
+        }
+    }
+
+    me->notify_receive_fd = notify[0];
+    me->notify_send_fd = notify[1];
+
+    return true;
+}
+
 /*
  * Initializes the thread subsystem, creating various worker threads.
  *
@@ -660,14 +689,7 @@ void slab_stats_aggregate(struct thread_stats *thread_stats, struct slab_stats *
  * main_base Event base for main thread
  */
 void thread_init(int nthreads, struct event_base *main_base) {
-    int         i;
-#ifdef WIN32
-    struct sockaddr_in serv_addr;
-    int sockfd;
-
-    if ((sockfd = createLocalListSock(&serv_addr)) < 0)
-        exit(1);
-#endif
+    int i;
 
     cb_mutex_initialize(&cache_lock);
     cb_mutex_initialize(&stats_lock);
@@ -688,30 +710,11 @@ void thread_init(int nthreads, struct event_base *main_base) {
     threads[0].thread_id = cb_thread_self();
 
     for (i = 0; i < nthreads; i++) {
-        int fds[2];
-
-#ifdef WIN32
-        if (createLocalSocketPair(sockfd,fds,&serv_addr) == -1) {
-            fprintf(stderr, "Can't create notify pipe: %s", strerror(errno));
+        if (!create_notification_pipe(&threads[i])) {
             exit(1);
         }
-#else
-        if (pipe(fds)) {
-            perror("Can't create notify pipe");
-            exit(1);
-        }
-#endif
-
-        threads[i].notify_receive_fd = fds[0];
-        threads[i].notify_send_fd = fds[1];
 
         setup_thread(&threads[i]);
-#ifdef WIN32
-        if (i == (nthreads - 1)) {
-            shutdown(sockfd, 2);
-        }
-#endif
-
     }
 
     /* Create threads after we've done all the libevent setup. */

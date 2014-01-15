@@ -24,7 +24,7 @@ struct event_base *msec_clockevent_base = NULL;
 
 char cproxy_hostname[300] = {0}; /* Immutable after init. */
 
-void msec_clock_handler(const int fd, const short which, void *arg);
+static void msec_clock_handler(evutil_socket_t fd, short which, void *arg);
 void msec_set_current_time(void);
 
 int cproxy_init_string(char *cfg_str,
@@ -950,7 +950,7 @@ void msec_set_current_time(void) {
         (timer.tv_sec - process_started) * 1000 + (timer.tv_usec / 1000);
 }
 
-void msec_clock_handler(const int fd, const short which, void *arg) {
+static void msec_clock_handler(evutil_socket_t fd, short which, void *arg) {
     static bool initialized = false;
     struct timeval t;
 

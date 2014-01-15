@@ -35,11 +35,41 @@
 #include "stdin_check.h"
 #include "log.h"
 
+#ifdef WIN32
+static int is_blocking(DWORD dw) {
+    return (dw == WSAEWOULDBLOCK);
+}
+static int is_emfile(DWORD dw) {
+    return (dw == WSAEMFILE);
+}
+static int is_closed_conn(DWORD dw) {
+    return (dw == WSAENOTCONN || WSAECONNRESET);
+}
+static int is_addrinuse(DWORD dw) {
+    return (dw == WSAEADDRINUSE);
+}
+#else
+static int is_blocking(int dw) {
+    return (dw == EAGAIN || dw == EWOULDBLOCK);
+}
+
+static int is_emfile(int dw) {
+    return (dw == EMFILE);
+}
+
+static int is_closed_conn(int dw) {
+    return  (dw == ENOTCONN || dw != ECONNRESET);
+}
+
+static int is_addrinuse(int dw) {
+    return (dw == EADDRINUSE);
+}
+#endif
 
 /*
  * forward declarations
  */
-static int new_socket(struct addrinfo *ai);
+static SOCKET new_socket(struct addrinfo *ai);
 
 enum try_read_result {
     READ_DATA_RECEIVED,
@@ -58,7 +88,7 @@ static void stats_init(void);
 static void settings_init(void);
 
 /* event handling, network IO */
-static void event_handler(const int fd, const short which, void *arg);
+static void event_handler(evutil_socket_t fd, short which, void *arg);
 static void conn_close(conn *c);
 static void conn_init(void);
 static void write_and_free(conn *c, char *buf, int bytes);
@@ -317,7 +347,7 @@ static const char *prot_text(enum protocol prot) {
     return rv;
 }
 
-conn *conn_new(const int sfd, enum conn_states init_state,
+conn *conn_new(const SOCKET sfd, enum conn_states init_state,
                const int event_flags,
                const int read_buffer_size,
                enum network_transport transport,
@@ -542,7 +572,7 @@ static void conn_close(conn *c) {
         moxi_log_write("<%d connection closed.\n", c->sfd);
 
     MEMCACHED_CONN_RELEASE(c->sfd);
-    close(c->sfd);
+    closesocket(c->sfd);
     accept_new_conns(true);
     conn_cleanup(c);
 
@@ -3235,6 +3265,11 @@ static enum try_read_result try_read_udp(conn *c) {
 static enum try_read_result try_read_network(conn *c) {
     enum try_read_result gotdata = READ_NO_DATA_RECEIVED;
     int res;
+#ifdef WIN32
+    DWORD error;
+#else
+    int error;
+#endif
 
     assert(c != NULL);
 
@@ -3261,7 +3296,12 @@ static enum try_read_result try_read_network(conn *c) {
 
         int avail = c->rsize - c->rbytes;
         assert(avail > 0);
-        res = read(c->sfd, c->rbuf + c->rbytes, avail);
+        res = recv(c->sfd, c->rbuf + c->rbytes, avail, 0);
+#ifdef WIN32
+        error = WSAGetLastError();
+#else
+        error = errno;
+#endif
         if (res > 0) {
             cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.bytes_read += res;
@@ -3281,7 +3321,7 @@ static enum try_read_result try_read_network(conn *c) {
             return READ_ERROR;
         }
         if (res == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (is_blocking(errno)) {
                 break;
             }
             return READ_ERROR;
@@ -3368,8 +3408,18 @@ static enum transmit_result transmit(conn *c) {
     if (c->msgcurr < c->msgused) {
         ssize_t res;
         struct msghdr *m = &c->msglist[c->msgcurr];
+#ifdef WIN32
+        DWORD error;
+#else
+        int error;
+#endif
 
         res = sendmsg(c->sfd, m, 0);
+#ifdef WIN32
+        error = WSAGetLastError();
+#else
+        error = errno;
+#endif
         if (res > 0) {
             cb_mutex_enter(&c->thread->stats.mutex);
             c->thread->stats.bytes_written += res;
@@ -3391,7 +3441,8 @@ static enum transmit_result transmit(conn *c) {
             }
             return TRANSMIT_INCOMPLETE;
         }
-        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+
+        if (res == -1 && is_blocking(error)) {
             if (!update_event(c, EV_WRITE | EV_PERSIST)) {
                 if (settings.verbose > 0)
                     moxi_log_write("Couldn't update event\n");
@@ -3417,11 +3468,17 @@ static enum transmit_result transmit(conn *c) {
 
 void drive_machine(conn *c) {
     bool stop = false;
-    int sfd, flags = 1;
+    SOCKET sfd;
+    int flags = 1;
     socklen_t addrlen;
     struct sockaddr_storage addr;
     int nreqs = settings.reqs_per_event;
     int res;
+#ifdef WIN32
+    DWORD error;
+#else
+    int error;
+#endif
 
     assert(c != NULL);
 
@@ -3434,11 +3491,16 @@ void drive_machine(conn *c) {
         switch(c->state) {
         case conn_listening:
             addrlen = sizeof(addr);
-            if ((sfd = accept(c->sfd, (struct sockaddr *)&addr, &addrlen)) == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if ((sfd = accept(c->sfd, (struct sockaddr *)&addr, &addrlen)) == INVALID_SOCKET) {
+#ifdef WIN32
+                error = WSAGetLastError();
+#else
+                error = errno;
+#endif
+                if (is_blocking(error)) {
                     /* these are transient, so don't log anything */
                     stop = true;
-                } else if (errno == EMFILE) {
+                } else if (is_emfile(error)) {
                     if (settings.verbose > 0)
                         moxi_log_write("Too many open connections\n");
                     accept_new_conns(false);
@@ -3451,7 +3513,7 @@ void drive_machine(conn *c) {
             }
             if (evutil_make_socket_nonblocking(sfd) == -1) {
                 perror("setting O_NONBLOCK");
-                close(sfd);
+                closesocket(sfd);
                 break;
             }
 
@@ -3565,7 +3627,13 @@ void drive_machine(conn *c) {
             }
 
             /*  now try reading from the socket */
-            res = read(c->sfd, c->ritem, c->rlbytes);
+            res = recv(c->sfd, c->ritem, c->rlbytes, 0);
+#ifdef WIN32
+            error = WSAGetLastError();
+#else
+            error = errno;
+#endif
+
             if (res > 0) {
                 add_bytes_read(c, res);
 
@@ -3580,7 +3648,7 @@ void drive_machine(conn *c) {
                 conn_set_state(c, conn_closing);
                 break;
             }
-            if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            if (res == -1 && is_blocking(error)) {
                 if (!update_event(c, EV_READ | EV_PERSIST)) {
                     if (settings.verbose > 0)
                         moxi_log_write( "Couldn't update event\n");
@@ -3619,7 +3687,13 @@ void drive_machine(conn *c) {
             }
 
             /*  now try reading from the socket */
-            res = read(c->sfd, c->rbuf, c->rsize > c->sbytes ? c->sbytes : c->rsize);
+            res = recv(c->sfd, c->rbuf, c->rsize > c->sbytes ? c->sbytes : c->rsize, 0);
+#ifdef WIN32
+            error = WSAGetLastError();
+#else
+            error = errno;
+#endif
+
             if (res > 0) {
                 cb_mutex_enter(&c->thread->stats.mutex);
                 c->thread->stats.bytes_read += res;
@@ -3632,7 +3706,7 @@ void drive_machine(conn *c) {
                 conn_set_state(c, conn_closing);
                 break;
             }
-            if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            if (res == -1 && is_blocking(error)) {
                 if (!update_event(c, EV_READ | EV_PERSIST)) {
                     if (settings.verbose > 0)
                         moxi_log_write("Couldn't update event\n");
@@ -3751,7 +3825,7 @@ void add_bytes_read(conn *c, int bytes_read) {
     cb_mutex_exit(&c->thread->stats.mutex);
 }
 
-void event_handler(const int fd, const short which, void *arg) {
+static void event_handler(evutil_socket_t fd, short which, void *arg) {
     conn *c;
 
     c = (conn *)arg;
@@ -3775,17 +3849,17 @@ void event_handler(const int fd, const short which, void *arg) {
     return;
 }
 
-static int new_socket(struct addrinfo *ai) {
-    int sfd;
+static SOCKET new_socket(struct addrinfo *ai) {
+    SOCKET sfd;
 
-    if ((sfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
-        return -1;
+    if ((sfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == INVALID_SOCKET) {
+        return INVALID_SOCKET;
     }
 
     if (evutil_make_socket_nonblocking(sfd) == -1) {
         perror("setting O_NONBLOCK");
-        close(sfd);
-        return -1;
+        closesocket(sfd);
+        return INVALID_SOCKET;
     }
     return sfd;
 }
@@ -3794,7 +3868,7 @@ static int new_socket(struct addrinfo *ai) {
 /*
  * Sets a socket's send buffer size to the maximum allowed by the system.
  */
-static void maximize_sndbuf(const int sfd) {
+static void maximize_sndbuf(const SOCKET sfd) {
     socklen_t intsize = sizeof(int);
     int last_good = 0;
     int min, max, avg;
@@ -3835,7 +3909,7 @@ static void maximize_sndbuf(const int sfd) {
  */
 int server_socket(int port, enum network_transport transport,
                   FILE *portnumber_file) {
-    int sfd;
+    SOCKET sfd;
     struct linger ling = {0, 0};
     struct addrinfo *ai;
     struct addrinfo *next;
@@ -3877,7 +3951,7 @@ int server_socket(int port, enum network_transport transport,
 
     for (next= ai; next; next= next->ai_next) {
         conn *listen_conn_add;
-        if ((sfd = new_socket(next)) == -1) {
+        if ((sfd = new_socket(next)) == INVALID_SOCKET) {
             /* getaddrinfo can return "junk" addresses,
              * we make sure at least one works before erroring.
              */
@@ -3889,7 +3963,7 @@ int server_socket(int port, enum network_transport transport,
             error = setsockopt(sfd, IPPROTO_IPV6, IPV6_V6ONLY, (char *) &flags, sizeof(flags));
             if (error != 0) {
                 perror("setsockopt");
-                close(sfd);
+                closesocket(sfd);
                 continue;
             }
         }
@@ -3912,20 +3986,25 @@ int server_socket(int port, enum network_transport transport,
                 perror("setsockopt");
         }
 
-        if (bind(sfd, next->ai_addr, next->ai_addrlen) == -1) {
-            if (errno != EADDRINUSE) {
+        if (bind(sfd, next->ai_addr, next->ai_addrlen) == SOCKET_ERROR) {
+#ifdef WIN32
+            DWORD error = WSAGetLastError();
+#else
+            int error = errno;
+#endif
+            if (!is_addrinuse(error)) {
                 perror("bind()");
-                close(sfd);
+                closesocket(sfd);
                 freeaddrinfo(ai);
                 return 1;
             }
-            close(sfd);
+            closesocket(sfd);
             continue;
         } else {
             success++;
-            if (!IS_UDP(transport) && listen(sfd, settings.backlog) == -1) {
+            if (!IS_UDP(transport) && listen(sfd, settings.backlog) == SOCKET_ERROR) {
                 perror("listen()");
-                close(sfd);
+                closesocket(sfd);
                 freeaddrinfo(ai);
                 return 1;
             }
@@ -3979,19 +4058,20 @@ int server_socket(int port, enum network_transport transport,
     return success == 0;
 }
 
-static int new_socket_unix(void) {
-    int sfd;
+static SOCKET new_socket_unix(void) {
+    SOCKET sfd;
 
-    if ((sfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    if ((sfd = socket(AF_UNIX, SOCK_STREAM, 0)) == INVALID_SOCKET) {
         perror("socket()");
-        return -1;
+        return INVALID_SOCKET;
     }
 
     if (evutil_make_socket_nonblocking(sfd) == -1) {
         perror("setting O_NONBLOCK");
-        close(sfd);
-        return -1;
+        closesocket(sfd);
+        return INVALID_SOCKET;
     }
+
     return sfd;
 }
 
@@ -4034,16 +4114,16 @@ int server_socket_unix(const char *path, int access_mask) {
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
     assert(strcmp(addr.sun_path, path) == 0);
     old_umask = umask( ~(access_mask&0777));
-    if (bind(sfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(sfd, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
         perror("bind()");
-        close(sfd);
+        closesocket(sfd);
         umask(old_umask);
         return 1;
     }
     umask(old_umask);
-    if (listen(sfd, settings.backlog) == -1) {
+    if (listen(sfd, settings.backlog) == SOCKET_ERROR) {
         perror("listen()");
-        close(sfd);
+        closesocket(sfd);
         return 1;
     }
     if (!(listen_conn = conn_new(sfd, conn_listening,
@@ -4077,7 +4157,7 @@ static void set_current_time(void) {
     current_time = (rel_time_t) (timer.tv_sec - process_started);
 }
 
-static void clock_handler(const int fd, const short which, void *arg) {
+static void clock_handler(evutil_socket_t fd, const short which, void *arg) {
     struct timeval t = {.tv_sec = 1, .tv_usec = 0};
     static bool initialized = false;
 

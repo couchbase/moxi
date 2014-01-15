@@ -7,15 +7,6 @@
 #include "config.h"
 #endif
 
-#ifdef WIN32
-#ifndef EINPROGRESS
-#define EINPROGRESS WSAEINPROGRESS
-#endif
-#ifndef EISCONN
-#define EISCONN WSAEISCONN
-#endif
-#endif
-
 /* The mcs API's are a level of indirection from direct libmemcached */
 /* and libvbucket API usage. */
 
@@ -39,7 +30,7 @@ typedef enum {
 typedef struct {
     char hostname[MCS_HOSTNAME_SIZE];
     int port;
-    int fd;
+    SOCKET fd;
     char *usr;
     char *pwd;
     char ident_a[MCS_IDENT_SIZE]; /* A string suitable as a hash key, ascii protocol. */
@@ -75,21 +66,21 @@ mcs_return mcs_server_st_connect(mcs_server_st *ptr,
                                  int *errno_out,
                                  bool blocking);
 
-ssize_t mcs_io_write(int fd, const void *buffer, size_t length);
-mcs_return mcs_io_read(int fd, void *dta, size_t size, struct timeval *timeout);
-void mcs_io_reset(int fd);
+ssize_t mcs_io_write(SOCKET fd, const void *buffer, size_t length);
+mcs_return mcs_io_read(SOCKET fd, void *dta, size_t size, struct timeval *timeout);
+void mcs_io_reset(SOCKET fd);
 
 const char *mcs_server_st_hostname(mcs_server_st *ptr);
 int mcs_server_st_port(mcs_server_st *ptr);
-int mcs_server_st_fd(mcs_server_st *ptr);
+SOCKET mcs_server_st_fd(mcs_server_st *ptr);
 const char *mcs_server_st_usr(mcs_server_st *ptr);
 const char *mcs_server_st_pwd(mcs_server_st *ptr);
 char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii);
 
-mcs_return mcs_set_sock_opt(int sock);
+mcs_return mcs_set_sock_opt(SOCKET sock);
 
-int mcs_connect(const char *hostname, int portnum,
-                int *errno_out, bool blocking);
+SOCKET mcs_connect(const char *hostname, int portnum,
+                   int *errno_out, bool blocking);
 
 /* ---------------------------------------- */
 

@@ -548,9 +548,9 @@ proxy *cproxy_find_proxy_by_auth(proxy_main *m,
                                  const char *pwd);
 
 int cproxy_auth_downstream(mcs_server_st *server,
-                           proxy_behavior *behavior, int fd);
+                           proxy_behavior *behavior, SOCKET fd);
 int cproxy_bucket_downstream(mcs_server_st *server,
-                             proxy_behavior *behavior, int fd);
+                             proxy_behavior *behavior, SOCKET fd);
 
 void  cproxy_pause_upstream_for_downstream(proxy_td *ptd, conn *upstream);
 conn *cproxy_find_downstream_conn(downstream *d, char *key, int key_length,
@@ -573,7 +573,7 @@ void upstream_retry(void *data0, void *data1);
 
 int downstream_conn_index(downstream *d, conn *c);
 
-void cproxy_dump_header(int prefix, char *bb);
+void cproxy_dump_header(SOCKET prefix, char *bb);
 
 int cproxy_max_retries(downstream *d);
 
