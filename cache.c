@@ -137,7 +137,7 @@ void cache_free(cache_t *cache, void *ptr) {
         size_t newtotal = cache->freetotal * 2;
         void **new_free = realloc(cache->ptr, sizeof(char *) * newtotal);
         if (new_free) {
-            cache->freetotal = newtotal;
+            cache->freetotal = (int)newtotal;
             cache->ptr = new_free;
             cache->ptr[cache->freecurr++] = ptr;
         } else {

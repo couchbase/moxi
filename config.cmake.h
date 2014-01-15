@@ -12,6 +12,9 @@
 #include <ws2tcpip.h>
 //#include <windows.h>
 
+extern char *strsep(char **stringp, const char *pattern);
+
+
 #define PATH_MAX 1024
 
 /* @todo investigate this one.. */

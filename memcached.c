@@ -91,7 +91,7 @@ static void settings_init(void);
 static void event_handler(evutil_socket_t fd, short which, void *arg);
 static void conn_close(conn *c);
 static void conn_init(void);
-static void write_and_free(conn *c, char *buf, int bytes);
+static void write_and_free(conn *c, char *buf, size_t bytes);
 
 /* time handling */
 static rel_time_t realtime(const time_t exptime);
@@ -836,11 +836,11 @@ void out_string(conn *c, const char *str) {
     if (settings.verbose > 1)
         moxi_log_write(">%d %s\n", c->sfd, str);
 
-    len = strlen(str);
+    len = (int)strlen(str);
     if ((len + 2) > c->wsize) {
         /* ought to be always enough. just fail for simplicity */
         str = "SERVER_ERROR output line too long";
-        len = strlen(str);
+        len = (int)strlen(str);
     }
 
     memcpy(c->wbuf, str, len);
@@ -1042,9 +1042,9 @@ void write_bin_error(conn *c, protocol_binary_response_status err, int swallow) 
     }
 
     len = strlen(errstr);
-    add_bin_header(c, err, 0, 0, len);
+    add_bin_header(c, err, 0, 0, (uint32_t)len);
     if (len > 0) {
-        add_iov(c, errstr, len);
+        add_iov(c, errstr, (uint32_t)len);
     }
     conn_set_state(c, conn_mwrite);
     if(swallow > 0) {
@@ -1289,8 +1289,8 @@ static void process_bin_get(conn *c) {
 
         if (c->cmd == PROTOCOL_BINARY_CMD_GETK ||
             c->cmd == PROTOCOL_BINARY_CMD_GETL) {
-            bodylen += nkey;
-            keylen = nkey;
+            bodylen += (uint32_t)nkey;
+            keylen = (uint16_t)nkey;
         }
         add_bin_header(c, 0, sizeof(rsp->message.body), keylen, bodylen);
         rsp->message.header.response.cas = mc_swap64(ITEM_get_cas(it));
@@ -1301,7 +1301,7 @@ static void process_bin_get(conn *c) {
 
         if (c->cmd == PROTOCOL_BINARY_CMD_GETK ||
             c->cmd == PROTOCOL_BINARY_CMD_GETL) {
-            add_iov(c, ITEM_key(it), nkey);
+            add_iov(c, ITEM_key(it), (uint32_t)nkey);
         }
 
         /* Add the data minus the CRLF */
@@ -1324,9 +1324,9 @@ static void process_bin_get(conn *c) {
                 c->cmd == PROTOCOL_BINARY_CMD_GETL) {
                 char *ofs = c->wbuf + sizeof(protocol_binary_response_header);
                 add_bin_header(c, PROTOCOL_BINARY_RESPONSE_KEY_ENOENT,
-                        0, nkey, nkey);
+                        0, (uint16_t)nkey, (uint32_t)nkey);
                 memcpy(ofs, key, nkey);
-                add_iov(c, ofs, nkey);
+                add_iov(c, ofs, (int)nkey);
                 conn_set_state(c, conn_mwrite);
             } else {
                 write_bin_error(c, PROTOCOL_BINARY_RESPONSE_KEY_ENOENT, 0);
@@ -1375,8 +1375,8 @@ static void append_ascii_stats(const char *key, const uint16_t klen,
                                conn *c) {
     char *pos = c->stats.buffer + c->stats.offset;
     uint32_t nbytes = 0;
-    int remaining = c->stats.size - c->stats.offset;
-    int room = remaining - 1;
+    size_t remaining = c->stats.size - c->stats.offset;
+    size_t room = remaining - 1;
 
     if (klen == 0 && vlen == 0) {
         nbytes = snprintf(pos, room, "END\r\n");
@@ -1501,7 +1501,7 @@ static void process_bin_stat(conn *c) {
                 write_bin_error(c, PROTOCOL_BINARY_RESPONSE_ENOMEM, 0);
                 return ;
             } else {
-                append_stats("detailed", strlen("detailed"), dump_buf, len, c);
+                append_stats("detailed", (uint16_t)strlen("detailed"), dump_buf, len, c);
                 free(dump_buf);
             }
         } else if (strncmp(subcmd_pos, " on", 3) == 0) {
@@ -1513,7 +1513,7 @@ static void process_bin_stat(conn *c) {
             return;
         }
     } else {
-        if (get_stats(subcommand, nkey, &append_stats, c)) {
+        if (get_stats(subcommand, (int)nkey, &append_stats, c)) {
             if (c->stats.buffer == NULL) {
                 write_bin_error(c, PROTOCOL_BINARY_RESPONSE_ENOMEM, 0);
             } else {
@@ -1645,7 +1645,7 @@ void dispatch_bin_command(conn *c) {
     switch (c->cmd) {
         case PROTOCOL_BINARY_CMD_VERSION:
             if (extlen == 0 && keylen == 0 && bodylen == 0) {
-                write_bin_response(c, VERSION, 0, 0, strlen(VERSION));
+                write_bin_response(c, VERSION, 0, 0, (int)strlen(VERSION));
             } else {
                 protocol_error = 1;
             }
@@ -2190,11 +2190,11 @@ size_t tokenize_command(char *command, token_t *tokens, const size_t max_tokens)
 }
 
 /* set up a connection to write a buffer then free it, used for stats */
-static void write_and_free(conn *c, char *buf, int bytes) {
+static void write_and_free(conn *c, char *buf, size_t bytes) {
     if (buf) {
         c->write_and_free = buf;
         c->wcurr = buf;
-        c->wbytes = bytes;
+        c->wbytes = (int)bytes;
         conn_set_state(c, conn_write);
         c->write_and_go = conn_new_cmd;
     } else {
@@ -2203,7 +2203,7 @@ static void write_and_free(conn *c, char *buf, int bytes) {
 }
 
 void set_noreply_maybe(conn *c, token_t *tokens, size_t ntokens) {
-    int noreply_index = ntokens - 2;
+    int noreply_index = (int)ntokens - 2;
 
     assert(noreply_index >= 0);
 
@@ -2235,7 +2235,7 @@ void append_stat(const char *name, ADD_STAT add_stats, void *c,
     vlen = vsnprintf(val_str, sizeof(val_str) - 1, fmt, ap);
     va_end(ap);
 
-    add_stats(name, strlen(name), val_str, vlen, c);
+    add_stats(name, (uint16_t)strlen(name), val_str, vlen, c);
 }
 
 void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats, void *c,
@@ -2271,11 +2271,11 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
     }
 
     if (prefix == NULL) {
-        add_stats(name, strlen(name), val, vlen, c);
+        add_stats(name, (uint16_t)strlen(name), val, vlen, c);
     } else {
         char key_str[STAT_KEY_LEN];
         strcpy(key_str, prefix); strcat(key_str, name);
-        add_stats(key_str, strlen(key_str), val, vlen, c);
+        add_stats(key_str, (uint16_t)strlen(key_str), val, vlen, c);
     }
 
     free(val_free);
@@ -2304,7 +2304,9 @@ static void process_stats_detail(conn *c, const char *command) {
 
 /* return server specific stats only */
 void server_stats(ADD_STAT add_stats, void *c, const char *prefix) {
+#ifndef _MSC_VER
     pid_t pid = getpid();
+#endif
     rel_time_t now = current_time;
 
     struct thread_stats thread_stats;
@@ -2318,8 +2320,9 @@ void server_stats(ADD_STAT add_stats, void *c, const char *prefix) {
 #endif /* !WIN32 */
 
     STATS_LOCK();
-
+#ifndef _MSC_VER
     APPEND_PREFIX_STAT("pid", "%lu", (long)pid);
+#endif
     APPEND_PREFIX_STAT("uptime", "%u", now);
     APPEND_PREFIX_STAT("time", "%ld", now + (long)process_started);
     APPEND_PREFIX_STAT("version", "%s", VERSION);
@@ -2438,7 +2441,7 @@ static void process_stat(conn *c, token_t *tokens, const size_t ntokens) {
     } else {
         /* getting here means that the subcommand is either engine specific or
            is invalid. query the engine and see. */
-        if (get_stats(subcommand, strlen(subcommand), &append_stats, c)) {
+        if (get_stats(subcommand, (int)strlen(subcommand), &append_stats, c)) {
             if (c->stats.buffer == NULL) {
                 out_string(c, "SERVER_ERROR out of memory writing stats");
             } else {
@@ -2820,7 +2823,7 @@ enum delta_result_type do_add_delta(conn *c, item *it, const bool incr,
     cb_mutex_exit(&c->thread->stats.mutex);
 
     snprintf(buf, INCR_MAX_STORAGE_LEN, "%llu", (unsigned long long)value);
-    res = strlen(buf);
+    res = (int)strlen(buf);
     if (res + 2 > it->nbytes) { /* need to realloc */
         item *new_it;
         new_it = do_item_alloc(ITEM_key(it), it->nkey, atoi(ITEM_suffix(it) + 1), it->exptime, res + 2 );
@@ -3206,7 +3209,7 @@ int try_read_command(conn *c) {
 
         c->funcs->conn_process_ascii_command(c, c->rcurr);
 
-        c->rbytes -= (cont - c->rcurr);
+        c->rbytes -= (int)(cont - c->rcurr);
         c->rcurr = cont;
 
         assert(c->rcurr <= (c->rbuf + c->rsize));
@@ -3428,7 +3431,7 @@ static enum transmit_result transmit(conn *c) {
             /* We've written some of the data. Remove the completed
                iovec entries from the list of pending writes. */
             while (m->msg_iovlen > 0 && res >= (ssize_t)(m->msg_iov->iov_len)) {
-                res -= m->msg_iov->iov_len;
+                res -= (ssize_t)m->msg_iov->iov_len;
                 m->msg_iovlen--;
                 m->msg_iov++;
             }
@@ -3875,7 +3878,7 @@ static void maximize_sndbuf(const SOCKET sfd) {
     int old_size;
 
     /* Start with the default size. */
-    if (getsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &old_size, &intsize) != 0) {
+    if (getsockopt(sfd, SOL_SOCKET, SO_SNDBUF, (void*)&old_size, &intsize) != 0) {
         if (settings.verbose > 0)
             perror("getsockopt(SO_SNDBUF)");
         return;
@@ -4472,7 +4475,7 @@ static void remove_pidfile(const char *pid_file) {
   if (pid_file == NULL)
       return;
 
-  if (unlink(pid_file) != 0) {
+  if (remove(pid_file) != 0) {
       moxi_log_write("Could not remove the pid file %s.\n", pid_file);
   }
 
@@ -4610,7 +4613,9 @@ int main (int argc, char **argv) {
     char *cproxy_cfg = NULL;
     char *cproxy_behavior = NULL;
 #ifndef MAIN_CHECK
+#ifndef _MSC_VER
     struct passwd *pw;
+#endif
     char *log_file = NULL;
     int log_mode = DEFAULT_ERRORLOG;
     int log_level = 0;

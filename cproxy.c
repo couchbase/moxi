@@ -337,7 +337,7 @@ int cproxy_listen(proxy *p) {
         }
     }
 
-    return p->listening;
+    return (int)p->listening;
 }
 
 int cproxy_listen_port(int port,
@@ -1135,7 +1135,7 @@ bool cproxy_release_downstream(downstream *d, bool force) {
 
             suffix_len = d->upstream_suffix_len;
             if (suffix_len == 0) {
-                suffix_len = strlen(d->upstream_suffix);
+                suffix_len = (int)strlen(d->upstream_suffix);
             }
 
             if (add_iov(d->upstream_conn,
@@ -2053,7 +2053,7 @@ void upstream_error_msg(conn *uc, char *ascii_msg,
             moxi_log_write("%d: upstream_error: %s\n", uc->sfd, msg);
         }
 
-        if (add_iov(uc, msg, strlen(msg)) == 0 &&
+        if (add_iov(uc, msg, (int)strlen(msg)) == 0 &&
             update_event(uc, EV_WRITE | EV_PERSIST)) {
             conn_set_state(uc, conn_mwrite);
         } else {
@@ -2551,7 +2551,7 @@ size_t scan_tokens(char *command, token_t *tokens,
             }
             if (*e == '\0') {
                 if (command_len != NULL) {
-                    *command_len = (e - command);
+                    *command_len = (int)(e - command);
                 }
                 break; /* string end */
             }
@@ -2889,8 +2889,8 @@ int cproxy_auth_downstream(mcs_server_st *server,
     pwd = mcs_server_st_pwd(server) != NULL ?
         mcs_server_st_pwd(server) : behavior->pwd;
 
-    usr_len = strlen(usr);
-    pwd_len = strlen(pwd);
+    usr_len = (int)strlen(usr);
+    pwd_len = (int)strlen(pwd);
 
     if (usr_len <= 0) {
         return 0;
@@ -3028,7 +3028,7 @@ int cproxy_bucket_downstream(mcs_server_st *server,
         return 0;
     }
 
-    bucket_len = strlen(behavior->bucket);
+    bucket_len = (int)strlen(behavior->bucket);
     if (bucket_len <= 0) {
         return 0; /* When no bucket. */
     }
@@ -3432,7 +3432,7 @@ conn *zstored_acquire_downstream_conn(downstream *d,
         if (behavior->connect_max_errors > 0 &&
             behavior->connect_max_errors < conns->error_count) {
             rel_time_t msecs_since_error =
-                msec_current_time - conns->error_time;
+                (rel_time_t)(msec_current_time - conns->error_time);
 
             if (settings.verbose > 2) {
                 moxi_log_write("zacquire_dc, %s, %d, %"PRIu64", (%d)\n",

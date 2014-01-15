@@ -479,7 +479,7 @@ void item_update(item *cq_item) {
 /*
  * Does arithmetic on a numeric item value.
  */
-enum delta_result_type add_delta(conn *c, item *cq_item, int incr,
+enum delta_result_type add_delta(conn *c, item *cq_item, const int incr,
                                  const int64_t delta, char *buf) {
     enum delta_result_type ret;
 
@@ -513,7 +513,7 @@ void item_flush_expired() {
 /*
  * Dumps part of the cache
  */
-char *item_cachedump(unsigned int clsid, unsigned int limit, unsigned int *bytes) {
+char *item_cachedump(const unsigned int clsid, const unsigned int limit, unsigned int *bytes) {
     char *ret;
 
     cb_mutex_enter(&cache_lock);

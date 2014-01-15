@@ -565,7 +565,7 @@ const char *state_text(enum conn_states state);
 extern int daemonize(int nochdir, int noclose);
 #endif
 
-int server_socket(const int port,
+int server_socket(int port,
                   enum network_transport transport,
                   FILE *portnum_file);
 
