@@ -40,7 +40,7 @@ ADD_EXECUTABLE(moxi
                cproxy_protocol_a2b.c cproxy_protocol_b.c
                cproxy_protocol_b2b.c cproxy_multiget.c cproxy_stats.c
                cproxy_front.c matcher.c murmur_hash.c mcs.c
-               stdin_check.c log.c cJSON.c htgram.c agent_config.c
+               stdin_check.c log.c htgram.c agent_config.c
                agent_ping.c agent_stats.c daemon.c cache.c strsep.c)
 
 TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS})
