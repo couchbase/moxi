@@ -39,6 +39,9 @@
 //#define initialize_sockets()
 //#endif
 
+#if !defined(_EVENT_NUMERIC_VERSION) || _EVENT_NUMERIC_VERSION < 0x02000000
+typedef int evutil_socket_t;
+#endif
 
 #ifndef DEFAULT_ERRORLOG
 #define DEFAULT_ERRORLOG ERRORLOG_STDERR
