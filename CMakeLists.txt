@@ -12,6 +12,11 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libconflate/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libmemcached)
 
+IF ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+   SET(UMEM_LIBRARY -lumem)
+   SET(PRVILEGES_SOURCES solaris_priv.c)
+ENDIF ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+
 IF (WIN32)
    INCLUDE_DIRECTORIES(AFTER ${CMAKE_CURRENT_SOURCE_DIR}/../platform/include/win32)
 ENDIF (WIN32)
@@ -41,9 +46,10 @@ ADD_EXECUTABLE(moxi
                cproxy_protocol_b2b.c cproxy_multiget.c cproxy_stats.c
                cproxy_front.c matcher.c murmur_hash.c mcs.c
                stdin_check.c log.c htgram.c agent_config.c
-               agent_ping.c agent_stats.c daemon.c cache.c strsep.c)
+               agent_ping.c agent_stats.c daemon.c cache.c strsep.c
+               ${PRVILEGES_SOURCES})
 
-TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS})
+TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS} ${UMEM_LIBRARY})
 
 INSTALL(TARGETS moxi
         RUNTIME DESTINATION bin)
