@@ -35,6 +35,10 @@
 #include "stdin_check.h"
 #include "log.h"
 
+int IS_UDP(enum network_transport protocol) {
+    return protocol == udp_transport;
+}
+
 #ifdef WIN32
 static int is_blocking(DWORD dw) {
     return (dw == WSAEWOULDBLOCK);

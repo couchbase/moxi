@@ -189,7 +189,7 @@ enum network_transport {
     udp_transport
 };
 
-#define IS_UDP(x) (x == udp_transport)
+int IS_UDP(enum network_transport protocol);
 #define IS_ASCII(x) (x == ascii_prot || \
                      x == proxy_upstream_ascii_prot || \
                      x == proxy_downstream_ascii_prot)
