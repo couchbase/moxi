@@ -3472,7 +3472,6 @@ static enum transmit_result transmit(conn *c) {
 void drive_machine(conn *c) {
     bool stop = false;
     SOCKET sfd;
-    int flags = 1;
     socklen_t addrlen;
     struct sockaddr_storage addr;
     int nreqs = settings.reqs_per_event;

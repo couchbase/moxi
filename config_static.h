@@ -18,26 +18,7 @@
 #define CONFIG_STATIC_H 1
 
 /* The intention of this file is to avoid cluttering the code with #ifdefs */
-
-//#ifdef WIN32
-/* HAVE_CONFIG_H is causing problems with pthreads.h on in32 */
-//#undef HAVE_CONFIG_H
-
-//#define _WIN32_WINNT    0x0501
-//#include <winsock2.h>
-//#include <ws2tcpip.h>
-
-//struct iovec {
-//    size_t iov_len;
-//    void* iov_base;
-//};
-
-//#include "win32/win32.h"
-
-
-//#else
-//#define initialize_sockets()
-//#endif
+#include <event.h>
 
 #if !defined(_EVENT_NUMERIC_VERSION) || _EVENT_NUMERIC_VERSION < 0x02000000
 typedef int evutil_socket_t;

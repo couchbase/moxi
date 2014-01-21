@@ -8,12 +8,9 @@
 #include <platform/platform.h>
 
 #ifdef WIN32
-//#include <winsock2.h>
 #include <ws2tcpip.h>
-//#include <windows.h>
 
 extern char *strsep(char **stringp, const char *pattern);
-
 
 #define PATH_MAX 1024
 
@@ -69,6 +66,12 @@ typedef long long int64_t;
 #endif
 
 #define HAVE_SIGIGNORE 1
+#define HAVE_SIGPIPE 1
+#define HAVE_SYS_UN_H 1
+#cmakedefine HAVE_GETPWNAM ${HAVE_GETPWNAM}
+#cmakedefine HAVE_GETRLIMIT ${HAVE_GETRLIMIT}
+#cmakedefine HAVE_MLOCKALL ${HAVE_MLOCKALL}
+#cmakedefine HAVE_GETPAGESIZES ${HAVE_GETPAGESIZES}
 
 
 #include <sys/wait.h>
