@@ -3665,7 +3665,7 @@ void drive_machine(conn *c) {
                 break;
             }
             /* otherwise we have a real error, on which we close the connection */
-            if (settings.verbose > 0) {
+            if (!is_closed_conn(error) && settings.verbose > 0) {
                 moxi_log_write("Failed to read, and not due to blocking:\n"
                         "errno: %d %s \n"
                         "rcurr=%lx ritem=%lx rbuf=%lx rlbytes=%d rsize=%d\n",
@@ -3723,8 +3723,9 @@ void drive_machine(conn *c) {
                 break;
             }
             /* otherwise we have a real error, on which we close the connection */
-            if (settings.verbose > 0)
+            if (!is_closed_conn(error) && settings.verbose > 0) {
                 moxi_log_write("Failed to read, and not due to blocking\n");
+            }
             conn_set_state(c, conn_closing);
             break;
 
