@@ -6,11 +6,12 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
                            ${LIBEVENT_INCLUDE_DIR}
                            ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
-                           ${CMAKE_CURRENT_SOURCE_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/../platform/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libvbucket/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libconflate/include
-                           ${CMAKE_CURRENT_SOURCE_DIR}/../libmemcached)
+                           ${CMAKE_CURRENT_SOURCE_DIR}/../libmemcached
+                           ${CMAKE_CURRENT_BINARY_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR})
 
 IF ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
    SET(UMEM_LIBRARY -lumem)
