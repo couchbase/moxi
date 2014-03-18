@@ -1,4 +1,7 @@
 *.[ao]
+*.dll
+*.dylib
+*.so
 *.exe
 *.gcda
 *.gcno
@@ -100,3 +103,9 @@ tags
 /moxi_sizes.exe.resource.txt
 /moxi_sizes.ilk
 /moxi_sizes.pdb
+/tests_check_kvpair
+/vbucket_regression
+/vbucket_testapp
+/vbucket_testketama
+/vbucketkeygen
+/vbuckettool
