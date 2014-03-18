@@ -7,7 +7,6 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
                            ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../platform/include
-                           ${CMAKE_CURRENT_SOURCE_DIR}/../libvbucket/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libconflate/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../libmemcached
                            ${CMAKE_CURRENT_BINARY_DIR}
@@ -15,7 +14,7 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
 
 IF ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
    SET(UMEM_LIBRARY -lumem)
-   SET(PRVILEGES_SOURCES solaris_priv.c)
+   SET(PRVILEGES_SOURCES src/solaris_priv.c)
 ENDIF ("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
 
 IF (WIN32)
@@ -29,8 +28,6 @@ CHECK_FUNCTION_EXISTS(getrlimit HAVE_GETRLIMIT)
 CHECK_FUNCTION_EXISTS(mlockall HAVE_MLOCKALL)
 CHECK_FUNCTION_EXISTS(getpagesizes HAVE_GETPAGESIZES)
 
-
-
 SET(CONFLATE_DB_PATH ${CMAKE_INSTALL_PREFIX}/var/lib/moxi)
 
 EXECUTE_PROCESS(COMMAND git describe
@@ -39,21 +36,23 @@ EXECUTE_PROCESS(COMMAND git describe
                 ERROR_QUIET
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h
-                ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/src/config.cmake.h
+                ${CMAKE_CURRENT_BINARY_DIR}/src/config.h)
 
-ADD_EXECUTABLE(moxi_sizes sizes.c)
-ADD_EXECUTABLE(moxi_htgram_test htgram_test.c htgram.c)
+ADD_EXECUTABLE(moxi_sizes tests/moxi/sizes.c)
+ADD_EXECUTABLE(moxi_htgram_test tests/moxi/htgram_test.c src/htgram.c)
 
 ADD_EXECUTABLE(moxi
-               memcached.c genhash.c hash.c slabs.c items.c assoc.c
-               thread.c stats.c util.c work.c cproxy.c cproxy_config.c
-               cproxy_protocol_a.c cproxy_protocol_a2a.c
-               cproxy_protocol_a2b.c cproxy_protocol_b.c
-               cproxy_protocol_b2b.c cproxy_multiget.c cproxy_stats.c
-               cproxy_front.c matcher.c murmur_hash.c mcs.c
-               stdin_check.c log.c htgram.c agent_config.c
-               agent_ping.c agent_stats.c daemon.c cache.c strsep.c
+               src/memcached.c src/genhash.c src/hash.c src/slabs.c
+               src/items.c src/assoc.c src/thread.c src/stats.c
+               src/util.c src/work.c src/cproxy.c src/cproxy_config.c
+               src/cproxy_protocol_a.c src/cproxy_protocol_a2a.c
+               src/cproxy_protocol_a2b.c src/cproxy_protocol_b.c
+               src/cproxy_protocol_b2b.c src/cproxy_multiget.c
+               src/cproxy_stats.c src/cproxy_front.c src/matcher.c
+               src/murmur_hash.c src/mcs.c src/stdin_check.c src/log.c
+               src/htgram.c src/agent_config.c src/agent_ping.c
+               src/agent_stats.c src/daemon.c src/cache.c src/strsep.c
                ${PRVILEGES_SOURCES})
 
 TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS} ${UMEM_LIBRARY})

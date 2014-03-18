@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <htgram.h>
+#include <src/htgram.h>
 
 static void testSimple(void) {
     HTGRAM_HANDLE h0;
