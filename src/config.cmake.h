@@ -127,5 +127,20 @@ typedef long long int64_t;
 #define VERSION "${MOXI_VERSION}"
 #define CONFLATE_DB_PATH "${CONFLATE_DB_PATH}"
 
-#include "config_static.h"
+#include <event.h>
+
+#if (!defined(_EVENT_NUMERIC_VERSION) || _EVENT_NUMERIC_VERSION < 0x02000000) && !defined(WIN32)
+typedef int evutil_socket_t;
+#endif
+
+#ifndef DEFAULT_ERRORLOG
+#define DEFAULT_ERRORLOG ERRORLOG_STDERR
+#endif
+
+#if defined(WORDS_BIGENDIAN) && WORDS_BIGENDIAN > 1
+#define ENDIAN_BIG 1
+#else
+#define ENDIAN_LITTLE 1
+#endif
+
 #endif
