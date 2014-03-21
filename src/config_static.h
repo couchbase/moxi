@@ -20,7 +20,7 @@
 /* The intention of this file is to avoid cluttering the code with #ifdefs */
 #include <event.h>
 
-#if !defined(_EVENT_NUMERIC_VERSION) || _EVENT_NUMERIC_VERSION < 0x02000000
+#if (!defined(_EVENT_NUMERIC_VERSION) || _EVENT_NUMERIC_VERSION < 0x02000000) && !defined(WIN32)
 typedef int evutil_socket_t;
 #endif
 
