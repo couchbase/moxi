@@ -1,6 +1,8 @@
 PROJECT(Moxi)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
+ADD_SUBDIRECTORY(libmemcached)
+
 INCLUDE(CheckIncludeFiles)
 
 INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
@@ -8,7 +10,7 @@ INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
                            ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
                            ${CMAKE_SOURCE_DIR}/platform/include
-                           ${CMAKE_SOURCE_DIR}/libmemcached
+                           ${PROJECT_SOURCE_DIR}/libmemcached
                            ${CMAKE_CURRENT_BINARY_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR})
 
