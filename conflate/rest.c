@@ -130,17 +130,23 @@ static bool pattern_ends_with(const char *pattern, const char *target, size_t ta
     return memcmp(&target[target_size - pattern_size], pattern, pattern_size) == 0;
 }
 
-static conflate_result process_new_config(conflate_handle_t *conf_handle) {
+static conflate_result process_new_config(long http_code, conflate_handle_t *conf_handle) {
     char *values[2];
     kvpair_t *kv;
     conflate_result (*call_back)(void *, kvpair_t *);
     conflate_result r;
+    char buf[4];
 
     g_tot_process_new_configs++;
 
+    snprintf(buf, 4, "%ld", http_code),
+    values[0] = buf;
+    values[1] = NULL;
+
+    kv = mk_kvpair(HTTP_CODE_KEY, values);
+
     /* construct the new config from its components */
     values[0] = assemble_complete_response(response_buffer_head);
-    values[1] = NULL;
 
     free_response(response_buffer_head);
     response_buffer_head = NULL;
@@ -151,13 +157,13 @@ static conflate_result process_new_config(conflate_handle_t *conf_handle) {
         return CONFLATE_ERROR;
     }
 
-    kv = mk_kvpair(CONFIG_KEY, values);
+    kv->next = mk_kvpair(CONFIG_KEY, values);
 
     if (conf_handle->url != NULL) {
         char *url[2];
         url[0] = conf_handle->url;
         url[1] = NULL;
-        kv->next = mk_kvpair("url", url);
+        kv->next->next = mk_kvpair("url", url);
     }
 
     /* execute the provided call back */
@@ -180,7 +186,7 @@ static size_t handle_response(void *data, size_t s, size_t num, void *cb) {
     bool end_of_message = pattern_ends_with(END_OF_CONFIG, data, size);
     cur_response_buffer = write_data_to_buffer(cur_response_buffer, data, size);
     if (end_of_message) {
-        process_new_config(c_handle);
+        process_new_config(200, c_handle);
     }
     return size;
 }
@@ -300,10 +306,14 @@ void run_rest_conflate(void *arg) {
                              handle, handle_response);
 
                 if (curl_easy_perform(curl_handle) == 0) {
+                    long http_code = 0;
+                    if (curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &http_code) != CURLE_OK) {
+                        http_code = 0;
+                    }
                     /* We reach here if the REST server didn't provide a
                        streaming JSON response and so we need to process
                        the just-one-JSON response */
-                    conflate_result r = process_new_config(handle);
+                    conflate_result r = process_new_config(http_code, handle);
                     if (r == CONFLATE_SUCCESS ||
                         r == CONFLATE_ERROR) {
                       /* Restart at the beginning of the urls list */

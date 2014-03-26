@@ -409,22 +409,29 @@ conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
     contentsv = get_key_values(config, "contents");
     contents  = contentsv != NULL ? contentsv[0] : NULL;
 
-    if (url != NULL && contents != NULL && strlen(contents) > 0) {
-        /* Must be a REST/JSON config.  Wastefully test parse it here, */
-        /* before we asynchronously invoke the real worker who can't */
-        /* respond nicely with an error code. */
-        bool ok = false;
-        cJSON *c = cJSON_Parse(contents);
-        if (c != NULL) {
-            ok = true;
-            cJSON_Delete(c);
+    if (url != NULL) {
+        char **http_code = get_key_values(config, "http_code");
+        if (http_code != NULL && atoi(http_code[0]) == 401) {
+            moxi_log_write("ERROR: Authentication failure\n");
+            exit(EXIT_FAILURE);
         }
+        if (contents != NULL && strlen(contents) > 0) {
+            /* Must be a REST/JSON config.  Wastefully test parse it here, */
+            /* before we asynchronously invoke the real worker who can't */
+            /* respond nicely with an error code. */
+            bool ok = false;
+            cJSON *c = cJSON_Parse(contents);
+            if (c != NULL) {
+                ok = true;
+                cJSON_Delete(c);
+            }
 
-        if (!ok) {
-            moxi_log_write("ERROR: parse JSON failed, from REST server: %s, %s\n",
-                           url, contents);
+            if (!ok) {
+                moxi_log_write("ERROR: parse JSON failed, from REST server: %s, %s\n",
+                               url, contents);
 
-            return CONFLATE_ERROR_BAD_SOURCE;
+                return CONFLATE_ERROR_BAD_SOURCE;
+            }
         }
     }
 
