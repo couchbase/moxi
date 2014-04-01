@@ -5,8 +5,7 @@ ADD_SUBDIRECTORY(libmemcached)
 
 INCLUDE(CheckIncludeFiles)
 
-INCLUDE_DIRECTORIES(BEFORE ${DEPS_INCLUDE_DIR}
-                           ${LIBEVENT_INCLUDE_DIR}
+INCLUDE_DIRECTORIES(BEFORE ${LIBEVENT_INCLUDE_DIR}
                            ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
                            ${CMAKE_SOURCE_DIR}/platform/include
