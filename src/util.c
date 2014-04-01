@@ -1,4 +1,4 @@
-#include "config.h"
+#include "src/config.h"
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>

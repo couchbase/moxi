@@ -1,6 +1,6 @@
 #ifndef REDIRECTS_H
 #define REDIRECTS_H
-#include "config.h"
+#include "src/config.h"
 
 #ifdef HAVE_CONFLATE_H
 #include <conflate.h>

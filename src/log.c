@@ -5,7 +5,7 @@
  * mtaneja@zynga.com
  */
 
-#include "config.h"
+#include "src/config.h"
 #undef write
 #include <sys/types.h>
 

@@ -3,7 +3,7 @@
 #ifndef WORK_H
 #define WORK_H
 
-#include "config.h"
+#include "src/config.h"
 
 #include <sys/types.h>
 #include <stdbool.h>

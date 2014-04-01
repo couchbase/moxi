@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #undef NDEBUG
-#include "config.h"
+#include "src/config.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -19,7 +19,6 @@
 #include <netinet/in.h>
 
 #include "protocol_binary.h"
-#include "config.h"
 #include "cache.h"
 #include "util.h"
 

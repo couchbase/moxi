@@ -5,9 +5,7 @@
  * structures and function prototypes.
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include "src/config.h"
 
 #include <stdio.h>
 #include <sys/types.h>

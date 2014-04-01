@@ -36,7 +36,7 @@
 
 #ifndef WIN32
 
-#include "config.h"
+#include "src/config.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>

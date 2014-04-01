@@ -3,9 +3,7 @@
 #ifndef MCS_H
 #define MCS_H
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include "src/config.h"
 
 /* The mcs API's are a level of indirection from direct libmemcached */
 /* and libvbucket API usage. */
