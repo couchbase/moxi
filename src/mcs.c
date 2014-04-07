@@ -469,7 +469,7 @@ SOCKET mcs_connect(const char *hostname, int portnum,
         *errno_out = -1;
     }
 
-    memset(&hints, 0, sizeof(0));
+    memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_flags = AI_PASSIVE;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = AF_UNSPEC;
