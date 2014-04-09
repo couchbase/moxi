@@ -4920,20 +4920,15 @@ int main (int argc, char **argv) {
 #ifndef MAIN_CHECK
 #ifdef HAVE_GETPWNAM
     if (getuid() == 0 || geteuid() == 0) {
-        if (username == 0 || *username == '\0') {
-            moxi_log_write("can't run as root without the -u switch\n");
-            if (ml->log_mode != ERRORLOG_STDERR) {
-                fprintf(stderr, "can't run as root without the -u switch\n");
+        if (username != NULL) {
+            if ((pw = getpwnam(username)) == 0) {
+                moxi_log_write("can't find the user %s to switch to\n", username);
+                exit(EX_NOUSER);
             }
-            exit(EX_USAGE);
-        }
-        if ((pw = getpwnam(username)) == 0) {
-            moxi_log_write("can't find the user %s to switch to\n", username);
-            exit(EX_NOUSER);
-        }
-        if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-            moxi_log_write("failed to assume identity of user %s\n", username);
-            exit(EX_OSERR);
+            if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+                moxi_log_write("failed to assume identity of user %s\n", username);
+                exit(EX_OSERR);
+            }
         }
     }
 #endif
