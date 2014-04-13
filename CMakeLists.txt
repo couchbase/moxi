@@ -182,7 +182,7 @@ ADD_EXECUTABLE(moxi
 
 TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS} ${UMEM_LIBRARY})
 
-INSTALL(TARGETS moxi
+INSTALL(TARGETS moxi vbucketkeygen vbuckettool
         RUNTIME DESTINATION bin)
 
 ADD_TEST(moxi-sizes moxi_sizes)
