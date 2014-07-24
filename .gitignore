@@ -81,6 +81,7 @@ libmemcached-*/libmemcached/libmemcached_config.h
 /stamp-h2
 /tags
 /CMakeFiles/
+/CMakeCache.txt
 /CTestTestfile.cmake
 /cmake_install.cmake
 /moxi_htgram_test
