@@ -146,6 +146,15 @@ static void testWrongNumVbuckets(const char *fname) {
     vbucket_config_destroy(vb);
 }
 
+static void testZeroNumVbuckets(const char *fname) {
+    VBUCKET_CONFIG_HANDLE vb = vbucket_config_create();
+    assert(vb != NULL);
+    assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, configPath(fname)) != 0);
+    assert(strcmp(vbucket_get_error_message(vb),
+                  "No vBuckets available; service maybe still initializing") == 0);
+    vbucket_config_destroy(vb);
+}
+
 static void testWrongServerFFT(const char *fname) {
     VBUCKET_CONFIG_HANDLE vb = vbucket_config_parse_file(configPath(fname));
     int rv = 0;
@@ -311,6 +320,7 @@ int main(int argc, char **argv)
   testWrongServer("config");
   testWrongServerFFT("config-in-envelope-fft");
   testWrongNumVbuckets("config-wrong-num-vbuckets");
+  testZeroNumVbuckets("config-zero-num-vbuckets");
   testConfigDiff();
   testConfigDiffSame();
   testConfigUserPassword();

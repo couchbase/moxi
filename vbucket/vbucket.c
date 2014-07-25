@@ -398,7 +398,11 @@ static int parse_vbucket_config(VBUCKET_CONFIG_HANDLE vb, cJSON *c)
         return -1;
     }
     vb->num_vbuckets = cJSON_GetArraySize(json);
-    if (vb->num_vbuckets == 0 || (vb->num_vbuckets & (vb->num_vbuckets - 1)) != 0) {
+    if (vb->num_vbuckets == 0) {
+        vb->errmsg = strdup("No vBuckets available; service maybe still initializing");
+        return -1;
+    }
+    if ((vb->num_vbuckets & (vb->num_vbuckets - 1)) != 0) {
         vb->errmsg = strdup("Number of vBuckets must be a power of two > 0 and <= " STRINGIFY(MAX_VBUCKETS));
         return -1;
     }
