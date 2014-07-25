@@ -337,7 +337,14 @@ void run_rest_conflate(void *arg) {
         }
 
         if (start_tot_process_new_configs == g_tot_process_new_configs) {
-            fprintf(stderr, "ERROR: could not contact REST server(s): %s\n", handle->conf->host);
+            if (start_tot_process_new_configs == 0) {
+                fprintf(stderr, "WARNING: could not contact REST server(s): %s;"
+                        " perhaps they are unavailable or still initializing\n",
+                        handle->conf->host);
+            } else {
+                fprintf(stderr, "ERROR: could not contact REST server(s): %s\n",
+                        handle->conf->host);
+            }
 
             if (always_retry == false) {
               /* If we went through all our URL's and didn't see any new */
