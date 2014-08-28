@@ -1597,6 +1597,14 @@ conn *cproxy_connect_downstream_conn(downstream *d,
             c->thread = thread;
             c->cmd_start_time = start;
 
+#ifdef WIN32
+            if (err == WSAEINPROGRESS) {
+                err = EINPROGRESS;
+            } else if (err == WSAEWOULDBLOCK) {
+                err = EWOULDBLOCK;
+            }
+#endif
+
             if (err == EINPROGRESS ||
                 err == EWOULDBLOCK) {
                 if (update_event_timed(c, EV_WRITE | EV_PERSIST,
