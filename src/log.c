@@ -160,7 +160,6 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
                     const char *fmt, ...) {
     va_list ap;
     static char ts_debug_str[255];
-    int written = 0;
 
     char logbuf[MAX_LOGBUF_LEN + 10]; /* scratch buffer */
     int  logbuf_used = 0;             /* length of scratch buffer */
@@ -222,10 +221,10 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
 
     switch(mlog->log_mode) {
         case ERRORLOG_FILE:
-            written = write(mlog->fd, logbuf, logbuf_used);
+            (void)write(mlog->fd, logbuf, logbuf_used);
             break;
         case ERRORLOG_STDERR:
-            written = write(fileno(stderr), logbuf, logbuf_used);
+            (void)write(fileno(stderr), logbuf, logbuf_used);
             break;
 #ifdef HAVE_SYSLOG_H
         case ERRORLOG_SYSLOG:
