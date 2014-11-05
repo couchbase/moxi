@@ -76,4 +76,6 @@
 #define MSG_DONTWAIT 0
 #endif
 
+#cmakedefine HAVE_HTONLL ${HAVE_HTONLL}
+
 #endif

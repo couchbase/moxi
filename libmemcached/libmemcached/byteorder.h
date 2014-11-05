@@ -29,12 +29,12 @@
 #ifndef HAVE_HTONLL
 #define ntohll(a) memcached_ntohll(a)
 #define htonll(a) memcached_htonll(a)
+#endif
 
 LIBMEMCACHED_LOCAL
 uint64_t memcached_ntohll(uint64_t);
 LIBMEMCACHED_LOCAL
 uint64_t memcached_htonll(uint64_t);
-#endif
 
 #ifdef linux
 /* /usr/include/netinet/in.h defines macros from ntohs() to _bswap_nn to
