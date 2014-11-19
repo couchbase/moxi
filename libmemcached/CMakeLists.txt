@@ -1,6 +1,10 @@
 PROJECT(libmemcached)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
+IF (${CMAKE_MAJOR_VERSION} GREATER 2)
+    CMAKE_POLICY(SET CMP0042 NEW)
+ENDIF (${CMAKE_MAJOR_VERSION} GREATER 2)
+
 ADD_LIBRARY(hashkit SHARED
             libhashkit/algorithm.c
             libhashkit/behavior.c
