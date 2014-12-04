@@ -4251,6 +4251,9 @@ static void usage(char **argv) {
            "              under sh this is done with 'ulimit -S -l NUM_KB').\n"
            "-m <num>      (deprecated) max memory for items in megabytes (default: 64 MB)\n"
            "-M            (deprecated) return error on memory exhausted\n"
+           "-r            Raise the core file size limit to the maximum allowable.\n"
+           "              Also suppresses 'chdir(\"/\")' at startup when running as a daemon\n"
+           "              to allow control over core dump location.\n"
            "-f <factor>   (deprecated) chunk size growth factor (default: 1.25)\n"
            "-n <bytes>    (deprecated) minimum allocated for key+value+flags (default: 48)\n"
 #if defined(HAVE_GETPAGESIZES) && defined(HAVE_MEMCNTL)
