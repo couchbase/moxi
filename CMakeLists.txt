@@ -1,10 +1,6 @@
 PROJECT(Moxi)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-IF (${CMAKE_MAJOR_VERSION} GREATER 2)
-    CMAKE_POLICY(SET CMP0042 NEW)
-ENDIF (${CMAKE_MAJOR_VERSION} GREATER 2)
-
 ADD_SUBDIRECTORY(libmemcached)
 
 INCLUDE(CheckFunctionExists)
@@ -204,8 +200,3 @@ INSTALL(TARGETS moxi vbucketkeygen vbuckettool
 
 ADD_TEST(moxi-sizes moxi_sizes)
 ADD_TEST(moxi-htgram-test moxi_htgram_test)
-
-IF (${CMAKE_MAJOR_VERSION} LESS 3)
-   SET_TARGET_PROPERTIES(vbucket PROPERTIES INSTALL_NAME_DIR
-                         ${CMAKE_INSTALL_PREFIX}/lib)
-ENDIF (${CMAKE_MAJOR_VERSION} LESS 3)
