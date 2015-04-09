@@ -90,6 +90,10 @@ void cproxy_process_upstream_binary(conn *c) {
             cproxy_pause_upstream_for_downstream(ptd, c);
         }
     } else {
+        if (settings.verbose > 2) {
+            moxi_log_write("<%d cproxy_process_upstream_binary OOM\n",
+                           c->sfd);
+        }
         ptd->stats.stats.err_oom++;
         cproxy_close_conn(c);
     }
