@@ -47,7 +47,7 @@ int main(void) {
             snprintf(buffer, FILENAME_MAX, "%s/tests/vbucket/config/%s", root, test_cases[ff]);
             fprintf(stderr, "Running ketama test for: %s\n", test_cases[ff]);
             vb = vbucket_config_create();
-            assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, buffer) == 0);
+            cb_assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, buffer) == 0);
             /* check if it conforms to libketama results */
             snprintf(buffer, FILENAME_MAX,"%s/tests/vbucket/config/%s.md5sum", root, test_cases[ff]);
             read_checksum(buffer, expected);
@@ -63,7 +63,7 @@ int main(void) {
             hash_md5_final(ctx, checksum);
 
             for (i = 0; i < 16; i++) {
-                assert(checksum[i] == expected[i]);
+                cb_assert(checksum[i] == expected[i]);
             }
 
             vbucket_config_destroy(vb);

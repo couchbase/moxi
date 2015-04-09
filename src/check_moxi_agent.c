@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <pthread.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <check.h>
 #include <stddef.h>
 
@@ -29,7 +29,7 @@ static kvpair_t *mk_kvpairs(char *spec[]) {
   int i = 0;
   while (spec[i]) {
     if (head == NULL) {
-      assert(last == NULL);
+      cb_assert(last == NULL);
       head = last = mk_kvpair(spec[i], empty);
     } else {
       last->next = mk_kvpair(spec[i], empty);
@@ -547,7 +547,7 @@ void setup(void)
 {
   reset_redirections();
   start_main("moxi", "-t", "2", NULL);
-  assert(!is_listen_thread());
+  cb_assert(!is_listen_thread());
   proxy_behavior pbg = behavior_default_g;
 
   unlink("t/check_moxi_agent.cfg");
@@ -557,7 +557,7 @@ void setup(void)
                   NULL,
                   pbg,
                   settings.num_threads);
-  assert(pmain);
+  cb_assert(pmain);
 }
 
 static Suite* moxi_agent_suite(void)

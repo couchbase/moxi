@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -23,15 +23,15 @@ void cproxy_init_a2a() {
 }
 
 void cproxy_process_a2a_downstream(conn *c, char *line) {
-    assert(c != NULL);
-    assert(c->next == NULL);
-    assert(c->extra != NULL);
-    assert(c->cmd == -1);
-    assert(c->item == NULL);
-    assert(line != NULL);
-    assert(line == c->rcurr);
-    assert(IS_ASCII(c->protocol));
-    assert(IS_PROXY(c->protocol));
+    cb_assert(c != NULL);
+    cb_assert(c->next == NULL);
+    cb_assert(c->extra != NULL);
+    cb_assert(c->cmd == -1);
+    cb_assert(c->item == NULL);
+    cb_assert(line != NULL);
+    cb_assert(line == c->rcurr);
+    cb_assert(IS_ASCII(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
 
     if (settings.verbose > 1) {
         moxi_log_write("<%d cproxy_process_a2a_downstream %s\n",
@@ -40,9 +40,9 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
 
     downstream *d = c->extra;
 
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
 
     if (strncmp(line, "VALUE ", 6) == 0) {
         token_t      tokens[MAX_TOKENS];
@@ -125,11 +125,11 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
     } else if (strncmp(line, "STAT ", 5) == 0 ||
                strncmp(line, "ITEM ", 5) == 0 ||
                strncmp(line, "PREFIX ", 7) == 0) {
-        assert(d->merger != NULL);
+        cb_assert(d->merger != NULL);
 
         conn *uc = d->upstream_conn;
         if (uc != NULL) {
-            assert(uc->next == NULL);
+            cb_assert(uc->next == NULL);
 
             if (protocol_stats_merge_line(d->merger, line) == false) {
                 /* Forward the line as-is if we couldn't merge it. */
@@ -178,7 +178,7 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
 
         conn *uc = d->upstream_conn;
         if (uc != NULL) {
-            assert(uc->next == NULL);
+            cb_assert(uc->next == NULL);
 
             out_string(uc, line);
 
@@ -201,7 +201,7 @@ void cproxy_process_a2a_downstream(conn *c, char *line) {
  * The item is ready in c->item.
  */
 void cproxy_process_a2a_downstream_nread(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (settings.verbose > 1) {
         moxi_log_write("<%d cproxy_process_a2a_downstream_nread %d %d\n",
@@ -209,10 +209,10 @@ void cproxy_process_a2a_downstream_nread(conn *c) {
     }
 
     downstream *d = c->extra;
-    assert(d != NULL);
+    cb_assert(d != NULL);
 
     item *it = c->item;
-    assert(it != NULL);
+    cb_assert(it != NULL);
 
     /* Clear c->item because we either move it to the upstream or */
     /* item_remove() it on error. */
@@ -234,17 +234,17 @@ void cproxy_process_a2a_downstream_nread(conn *c) {
  * upstream ascii conn to its assigned ascii downstream.
  */
 bool cproxy_forward_a2a_downstream(downstream *d) {
-    assert(d != NULL);
+    cb_assert(d != NULL);
 
     conn *uc = d->upstream_conn;
 
-    assert(uc != NULL);
-    assert(uc->state == conn_pause);
-    assert(uc->cmd_start != NULL);
-    assert(uc->thread != NULL);
-    assert(uc->thread->base != NULL);
-    assert(IS_ASCII(uc->protocol));
-    assert(IS_PROXY(uc->protocol));
+    cb_assert(uc != NULL);
+    cb_assert(uc->state == conn_pause);
+    cb_assert(uc->cmd_start != NULL);
+    cb_assert(uc->thread != NULL);
+    cb_assert(uc->thread->base != NULL);
+    cb_assert(IS_ASCII(uc->protocol));
+    cb_assert(IS_PROXY(uc->protocol));
 
     int server_index = -1;
 
@@ -270,7 +270,7 @@ bool cproxy_forward_a2a_downstream(downstream *d) {
     }
 
     if (nc > 0) {
-        assert(d->downstream_conns != NULL);
+        cb_assert(d->downstream_conns != NULL);
 
         if (d->usec_start == 0 &&
             d->ptd->behavior_pool.base.time_stats) {
@@ -299,16 +299,16 @@ bool cproxy_forward_a2a_downstream(downstream *d) {
  */
 bool cproxy_forward_a2a_simple_downstream(downstream *d,
                                           char *command, conn *uc) {
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(command != NULL);
-    assert(uc != NULL);
-    assert(uc->item == NULL);
-    assert(uc->cmd_curr != (protocol_binary_command) -1);
-    assert(d->multiget == NULL);
-    assert(d->merger == NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(command != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->item == NULL);
+    cb_assert(uc->cmd_curr != (protocol_binary_command) -1);
+    cb_assert(d->multiget == NULL);
+    cb_assert(d->merger == NULL);
 
     /* Handles get and gets. */
 
@@ -327,7 +327,7 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
                                          front_cache);
     }
 
-    assert(uc->next == NULL);
+    cb_assert(uc->next == NULL);
 
     if (uc->cmd_curr == PROTOCOL_BINARY_CMD_FLUSH) {
         return cproxy_broadcast_a2a_downstream(d, command, uc,
@@ -358,7 +358,7 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
     int      key_len = tokens[KEY_TOKEN].length;
 
     if (ntokens <= 1) { /* This was checked long ago, while parsing */
-        assert(false);  /* the upstream conn. */
+        cb_assert(false);  /* the upstream conn. */
         return false;
     }
 
@@ -374,7 +374,7 @@ bool cproxy_forward_a2a_simple_downstream(downstream *d,
     if (c != NULL) {
 
         if (cproxy_prep_conn_for_write(c)) {
-            assert(c->state == conn_pause);
+            cb_assert(c->state == conn_pause);
 
             out_string(c, command);
 
@@ -445,16 +445,16 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
     int nconns;
     int i;
 
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(d->downstream_used_start == 0);
-    assert(d->downstream_used == 0);
-    assert(command != NULL);
-    assert(uc != NULL);
-    assert(uc->next == NULL);
-    assert(uc->item == NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(d->downstream_used_start == 0);
+    cb_assert(d->downstream_used == 0);
+    cb_assert(command != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->next == NULL);
+    cb_assert(uc->item == NULL);
 
     nconns = mcs_server_count(&d->mst);
     for (i = 0; i < nconns; i++) {
@@ -462,7 +462,7 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
         if (c != NULL &&
             c != NULL_CONN) {
             if (cproxy_prep_conn_for_write(c)) {
-                assert(c->state == conn_pause);
+                cb_assert(c->state == conn_pause);
 
                 out_string(c, command);
 
@@ -525,13 +525,13 @@ bool cproxy_broadcast_a2a_downstream(downstream *d,
 bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
                                         item *it, conn *uc) {
     conn *c;
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(it != NULL);
-    assert(uc != NULL);
-    assert(uc->next == NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(it != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->next == NULL);
 
     /* Assuming we're already connected to downstream. */
     c = cproxy_find_downstream_conn(d, ITEM_key(it), it->nkey, NULL);
@@ -546,10 +546,10 @@ bool cproxy_forward_a2a_item_downstream(downstream *d, short cmd,
             char *str_exptime;
             char *str_cas;
 
-            assert(c->state == conn_pause);
+            cb_assert(c->state == conn_pause);
 
             verb = nread_text(cmd);
-            assert(verb != NULL);
+            cb_assert(verb != NULL);
 
             str_flags = ITEM_suffix(it);
             str_length = strchr(str_flags + 1, ' ');

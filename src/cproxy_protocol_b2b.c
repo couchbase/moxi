@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <math.h>
 #include "memcached.h"
 #include "cproxy.h"
@@ -33,13 +33,13 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
     int server_index;
     conn *uc;
 
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(d->downstream_used == 0);
-    assert(d->multiget == NULL);
-    assert(d->merger == NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(d->downstream_used == 0);
+    cb_assert(d->multiget == NULL);
+    cb_assert(d->merger == NULL);
 
     d->downstream_used_start = 0;
 
@@ -49,15 +49,15 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
                 uc->sfd, uc->cmd);
     }
 
-    assert(uc != NULL);
-    assert(uc->state == conn_pause);
-    assert(uc->cmd >= 0);
-    assert(uc->cmd_start == NULL);
-    assert(uc->thread != NULL);
-    assert(uc->thread->base != NULL);
-    assert(uc->noreply == false);
-    assert(IS_BINARY(uc->protocol));
-    assert(IS_PROXY(uc->protocol));
+    cb_assert(uc != NULL);
+    cb_assert(uc->state == conn_pause);
+    cb_assert(uc->cmd >= 0);
+    cb_assert(uc->cmd_start == NULL);
+    cb_assert(uc->thread != NULL);
+    cb_assert(uc->thread->base != NULL);
+    cb_assert(uc->noreply == false);
+    cb_assert(IS_BINARY(uc->protocol));
+    cb_assert(IS_PROXY(uc->protocol));
 
     server_index = -1;
 
@@ -67,7 +67,7 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
         char *key;
         int key_len;
 
-        assert(it != NULL);
+        cb_assert(it != NULL);
 
         req = (protocol_binary_request_header *) ITEM_data(it);
         key = ((char *) req) + sizeof(*req) + req->request.extlen;
@@ -90,7 +90,7 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
         int i;
         int nconns;
 
-        assert(d->downstream_conns != NULL);
+        cb_assert(d->downstream_conns != NULL);
 
         if (d->usec_start == 0 &&
             d->ptd->behavior_pool.base.time_stats) {
@@ -102,8 +102,8 @@ bool cproxy_forward_b2b_downstream(downstream *d) {
             conn *c = d->downstream_conns[i];
             if (c != NULL &&
                 c != NULL_CONN) {
-                assert(c->state == conn_pause);
-                assert(c->item == NULL);
+                cb_assert(c->state == conn_pause);
+                cb_assert(c->item == NULL);
 
                 if (cproxy_prep_conn_for_write(c) == false) {
                     d->ptd->stats.stats.err_downstream_write_prep++;
@@ -149,10 +149,10 @@ bool b2b_forward_item(conn *uc, downstream *d, item *it) {
     char *key;
     int keylen;
 
-    assert(uc != NULL);
-    assert(uc->next == NULL);
-    assert(uc->noreply == false);
-    assert(it != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->next == NULL);
+    cb_assert(uc->noreply == false);
+    cb_assert(it != NULL);
 
     req = (protocol_binary_request_header *) ITEM_data(it);
     key = ((char *) req) + sizeof(*req) + req->request.extlen;
@@ -202,12 +202,12 @@ bool b2b_forward_item_vbucket(conn *uc, downstream *d, item *it,
                               conn *c, int vbucket) {
     protocol_binary_request_header *req;
 
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(uc != NULL);
-    assert(uc->next == NULL);
-    assert(uc->noreply == false);
-    assert(c != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->next == NULL);
+    cb_assert(uc->noreply == false);
+    cb_assert(c != NULL);
 
     /* Assuming we're already connected to downstream. */
 
@@ -254,13 +254,13 @@ bool cproxy_broadcast_b2b_downstream(downstream *d, conn *uc) {
     int nconns;
     int i;
 
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(uc != NULL);
-    assert(uc->next == NULL);
-    assert(uc->noreply == false);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->next == NULL);
+    cb_assert(uc->noreply == false);
 
     nconns = mcs_server_count(&d->mst);
 
@@ -338,16 +338,16 @@ void cproxy_process_b2b_downstream(conn *c) {
     int keylen;
     uint32_t bodylen;
 
-    assert(c != NULL);
-    assert(c->cmd >= 0);
-    assert(c->next == NULL);
-    assert(c->item == NULL);
-    assert(IS_BINARY(c->protocol));
-    assert(IS_PROXY(c->protocol));
-    assert(c->substate == bin_no_state);
+    cb_assert(c != NULL);
+    cb_assert(c->cmd >= 0);
+    cb_assert(c->next == NULL);
+    cb_assert(c->item == NULL);
+    cb_assert(IS_BINARY(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
+    cb_assert(c->substate == bin_no_state);
 
     d = c->extra;
-    assert(d);
+    cb_assert(d);
 
     c->cmd_curr       = -1;
     c->cmd_start      = NULL;
@@ -363,7 +363,7 @@ void cproxy_process_b2b_downstream(conn *c) {
                 c->sfd, c->cmd, extlen, keylen, bodylen);
     }
 
-    assert(bodylen >= (uint32_t) keylen + extlen);
+    cb_assert(bodylen >= (uint32_t) keylen + extlen);
 
     process_bin_noreply(c); /* Map quiet c->cmd values into non-quiet. */
 
@@ -384,7 +384,7 @@ void cproxy_process_b2b_downstream(conn *c) {
         item *it = c->item;
         void *rb = c->rcurr;
 
-        assert(it->refcount == 1);
+        cb_assert(it->refcount == 1);
 
         memcpy(ITEM_data(it), rb, sizeof(c->binary_header));
 
@@ -419,12 +419,12 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     int status;
     int opcode;
 
-    assert(c != NULL);
-    assert(c->cmd >= 0);
-    assert(c->next == NULL);
-    assert(c->cmd_start == NULL);
-    assert(IS_BINARY(c->protocol));
-    assert(IS_PROXY(c->protocol));
+    cb_assert(c != NULL);
+    cb_assert(c->cmd >= 0);
+    cb_assert(c->next == NULL);
+    cb_assert(c->cmd_start == NULL);
+    cb_assert(IS_BINARY(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
 
     header = (protocol_binary_response_header *) &c->binary_header;
     extlen = header->response.extlen;
@@ -439,9 +439,9 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
     }
 
     d = c->extra;
-    assert(d != NULL);
-    assert(d->ptd != NULL);
-    assert(d->ptd->proxy != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->ptd != NULL);
+    cb_assert(d->ptd->proxy != NULL);
 
     /* TODO: Need to handle quiet binary command error response, */
     /*       in the right order. */
@@ -455,8 +455,8 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
 
     c->item = NULL;
 
-    assert(it != NULL);
-    assert(it->refcount == 1);
+    cb_assert(it != NULL);
+    cb_assert(it->refcount == 1);
 
     if (cproxy_binary_ignore_reply(c, header, it)) {
         return;
@@ -508,7 +508,7 @@ void cproxy_process_b2b_downstream_nread(conn *c) {
                         c->sfd, header->response.opcode, uc->item != NULL);
             }
 
-            assert(uc->item != NULL);
+            cb_assert(uc->item != NULL);
 
             req = (protocol_binary_request_header *)ITEM_data((item*)uc->item);
 

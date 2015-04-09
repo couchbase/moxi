@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +15,7 @@ void run_conflate(void *);
 
 conflate_config_t* dup_conf(conflate_config_t c) {
     conflate_config_t *rv = calloc(sizeof(conflate_config_t), 1);
-    assert(rv);
+    cb_assert(rv);
 
     rv->jid = safe_strdup(c.jid);
     rv->pass = safe_strdup(c.pass);
@@ -36,7 +36,7 @@ conflate_config_t* dup_conf(conflate_config_t c) {
 
 void init_conflate(conflate_config_t *conf)
 {
-    assert(conf);
+    cb_assert(conf);
     memset(conf, 0x00, sizeof(conflate_config_t));
     conf->log = conflate_stderr_logger;
     conf->initialization_marker = (void*)INITIALIZATION_MAGIC;
@@ -48,12 +48,12 @@ bool start_conflate(conflate_config_t conf) {
 
     /* Don't start if we don't believe initialization has occurred. */
     if (conf.initialization_marker != (void*)INITIALIZATION_MAGIC) {
-        assert(conf.initialization_marker == (void*)INITIALIZATION_MAGIC);
+        cb_assert(conf.initialization_marker == (void*)INITIALIZATION_MAGIC);
         return false;
     }
 
     handle = calloc(1, sizeof(conflate_handle_t));
-    assert(handle);
+    cb_assert(handle);
 
     if (strncmp(HTTP_PREFIX, conf.host, strlen(HTTP_PREFIX))) {
         run_func = &run_rest_conflate;

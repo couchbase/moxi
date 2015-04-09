@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <string.h>
 
 #include <libconflate/conflate.h>
@@ -8,7 +8,7 @@
 char* safe_strdup(const char* in) {
     int len = strlen(in);
     char *rv = calloc(len + 1, sizeof(char));
-    assert(rv);
+    cb_assert(rv);
     memcpy(rv, in, len);
     return rv;
 }

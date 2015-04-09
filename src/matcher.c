@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "matcher.h"
 
 void matcher_add(matcher *m, char *pattern);
 
 void matcher_init(matcher *m, bool multithreaded) {
-    assert(m);
+    cb_assert(m);
 
     memset(m, 0, sizeof(matcher));
 
@@ -25,7 +25,7 @@ void matcher_init(matcher *m, bool multithreaded) {
 }
 
 void matcher_start(matcher *m, char *spec) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -55,7 +55,7 @@ void matcher_start(matcher *m, char *spec) {
 bool matcher_started(matcher *m) {
     bool rv;
 
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -71,7 +71,7 @@ bool matcher_started(matcher *m) {
 }
 
 void matcher_stop(matcher *m) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -104,15 +104,15 @@ void matcher_stop(matcher *m) {
 }
 
 matcher *matcher_clone(matcher *m, matcher *copy) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
     }
 
-    assert(m->patterns_num <= m->patterns_max);
+    cb_assert(m->patterns_num <= m->patterns_max);
 
-    assert(copy);
+    cb_assert(copy);
     matcher_init(copy, m->lock != NULL);
 
     copy->patterns_max = m->patterns_num; /* Optimize copy's array size. */
@@ -125,7 +125,7 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
         if (copy->patterns != NULL && copy->lengths != NULL && copy->hits != NULL) {
             int i;
             for (i = 0; i < copy->patterns_num; i++) {
-                assert(m->patterns[i]);
+                cb_assert(m->patterns[i]);
                 copy->patterns[i] = strdup(m->patterns[i]);
                 if (copy->patterns[i] == NULL) {
                     goto fail;
@@ -157,9 +157,9 @@ matcher *matcher_clone(matcher *m, matcher *copy) {
  */
 void matcher_add(matcher *m, char *pattern) {
     int length;
-    assert(m);
-    assert(m->patterns_num <= m->patterns_max);
-    assert(pattern);
+    cb_assert(m);
+    cb_assert(m->patterns_num <= m->patterns_max);
+    cb_assert(pattern);
 
     length = strlen(pattern);
     if (length <= 0) {
@@ -187,7 +187,7 @@ void matcher_add(matcher *m, char *pattern) {
         }
     }
 
-    assert(m->patterns_num < m->patterns_max);
+    cb_assert(m->patterns_num < m->patterns_max);
 
     m->patterns[m->patterns_num] = strdup(pattern);
     if (m->patterns[m->patterns_num] != NULL) {
@@ -199,7 +199,7 @@ void matcher_add(matcher *m, char *pattern) {
 bool matcher_check(matcher *m, char *str, int str_len,
                    bool default_when_unstarted) {
     bool found = false;
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -207,13 +207,13 @@ bool matcher_check(matcher *m, char *str, int str_len,
 
     if (m->patterns != NULL && m->patterns_num > 0) {
         int i;
-        assert(m->patterns_num <= m->patterns_max);
+        cb_assert(m->patterns_num <= m->patterns_max);
 
         for (i = 0; i < m->patterns_num; i++) {
             int n;
-            assert(m->patterns);
-            assert(m->lengths);
-            assert(m->hits);
+            cb_assert(m->patterns);
+            cb_assert(m->lengths);
+            cb_assert(m->hits);
 
             n = m->lengths[i];
             if (n <= str_len) {

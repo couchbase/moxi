@@ -3,7 +3,7 @@
  * Thread management for memcached.
  */
 #include "memcached.h"
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -348,8 +348,8 @@ void dispatch_conn_new_to_thread(int tid, SOCKET sfd, enum conn_states init_stat
     LIBEVENT_THREAD *thread;
     CQ_ITEM *cq_item;
 
-    assert(tid > 0);
-    assert(tid < settings.num_threads);
+    cb_assert(tid > 0);
+    cb_assert(tid < settings.num_threads);
 
     thread = threads + tid;
     cq_item = cqi_new();

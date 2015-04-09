@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 
 #include <libconflate/conflate.h>
 #include "conflate_internal.h"

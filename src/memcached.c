@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <limits.h>
 #include <stddef.h>
 #include <getopt.h>
@@ -225,7 +225,7 @@ static void settings_init(void) {
 int add_msghdr(conn *c) {
     struct msghdr *msg;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->msgsize == c->msgused) {
         msg = realloc(c->msglist, c->msgsize * 2 * sizeof(struct msghdr));
@@ -502,7 +502,7 @@ conn *conn_new(const SOCKET sfd, enum conn_states init_state,
 }
 
 static void conn_cleanup(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->item) {
         item_remove(c->item);
@@ -567,7 +567,7 @@ void conn_free(conn *c) {
 }
 
 static void conn_close(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     /* delete the event, the socket and the conn */
     event_del(&c->event);
@@ -601,7 +601,7 @@ static void conn_close(conn *c) {
  * buffers!
  */
 static void conn_shrink(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (IS_UDP(c->transport))
         return;
@@ -675,8 +675,8 @@ const char *state_text(enum conn_states state) {
  * happen here.
  */
 void conn_set_state(conn *c, enum conn_states state) {
-    assert(c != NULL);
-    assert(state < conn_max_state);
+    cb_assert(c != NULL);
+    cb_assert(state < conn_max_state);
 
     if (state != c->state) {
         if (c->funcs != NULL &&
@@ -705,7 +705,7 @@ void conn_set_state(conn *c, enum conn_states state) {
  * Returns 0 on success, -1 on out-of-memory.
  */
 int ensure_iov_space(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->iovused >= c->iovsize) {
         int i, iovnum;
@@ -738,8 +738,8 @@ int add_iov(conn *c, const void *buf, int len) {
     int leftover;
     bool limit_to_mtu;
 
-    assert(c != NULL);
-    assert(c->msgused > 0);
+    cb_assert(c != NULL);
+    cb_assert(c->msgused > 0);
 
     do {
         m = &c->msglist[c->msgused - 1];
@@ -791,7 +791,7 @@ static int build_udp_headers(conn *c) {
     int i;
     unsigned char *hdr;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->msgused > c->hdrsize) {
         void *new_hdrbuf;
@@ -817,7 +817,7 @@ static int build_udp_headers(conn *c) {
         *hdr++ = c->msgused % 256;
         *hdr++ = 0;
         *hdr++ = 0;
-        assert((void *) hdr == (caddr_t)c->msglist[i].msg_iov[0].iov_base + UDP_HEADER_SIZE);
+        cb_assert((void *) hdr == (caddr_t)c->msglist[i].msg_iov[0].iov_base + UDP_HEADER_SIZE);
     }
 
     return 0;
@@ -827,7 +827,7 @@ static int build_udp_headers(conn *c) {
 void out_string(conn *c, const char *str) {
     int len;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->noreply) {
         if (settings.verbose > 1)
@@ -862,7 +862,7 @@ void out_string(conn *c, const char *str) {
  * has been stored in c->cmd, and the item is ready in c->item.
  */
 void complete_nread_ascii(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     item *it = c->item;
     int comm = c->cmd;
@@ -938,7 +938,7 @@ void* binary_get_request(conn *c) {
     ret -= (sizeof(c->binary_header) + c->binary_header.request.keylen +
             c->binary_header.request.extlen);
 
-    assert(ret >= c->rbuf);
+    cb_assert(ret >= c->rbuf);
     return ret;
 }
 
@@ -952,7 +952,7 @@ char* binary_get_key(conn *c) {
 static void add_bin_header(conn *c, uint16_t err, uint8_t hdr_len, uint16_t key_len, uint32_t body_len) {
     protocol_binary_response_header* header;
 
-    assert(c);
+    cb_assert(c);
 
     c->msgcurr = 0;
     c->msgused = 0;
@@ -1036,7 +1036,7 @@ void write_bin_error(conn *c, protocol_binary_response_status err, int swallow) 
         errstr = "Temporary failure";
         break;
     default:
-        assert(false);
+        cb_assert(false);
         errstr = "UNHANDLED ERROR";
         moxi_log_write(">%d UNHANDLED ERROR: %d\n", c->sfd, err);
     }
@@ -1101,8 +1101,8 @@ static void complete_incr_bin(conn *c) {
     protocol_binary_response_incr* rsp = (protocol_binary_response_incr*)c->wbuf;
     protocol_binary_request_incr* req = binary_get_request(c);
 
-    assert(c != NULL);
-    assert(c->wsize >= (int) sizeof(*rsp));
+    cb_assert(c != NULL);
+    cb_assert(c->wsize >= (int) sizeof(*rsp));
 
     /* fix byteorder in the request */
     req->message.body.delta = mc_swap64(req->message.body.delta);
@@ -1194,7 +1194,7 @@ static void complete_incr_bin(conn *c) {
 static void complete_update_bin(conn *c) {
     protocol_binary_response_status eno = PROTOCOL_BINARY_RESPONSE_EINVAL;
     enum store_item_type ret = NOT_STORED;
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     item *it = c->item;
 
@@ -1405,7 +1405,7 @@ static bool grow_stats_buf(conn *c, size_t needed) {
     }
 
     while (needed > available) {
-        assert(nsize > 0);
+        cb_assert(nsize > 0);
         nsize = nsize << 1;
         available = nsize - c->stats.offset;
     }
@@ -1448,7 +1448,7 @@ static void append_stats(const char *key, const uint16_t klen,
         append_ascii_stats(key, klen, val, vlen, c);
     }
 
-    assert(c->stats.offset <= c->stats.size);
+    cb_assert(c->stats.offset <= c->stats.size);
 }
 
 void process_bin_proxy_stats(conn *c) {
@@ -1542,7 +1542,7 @@ static void process_bin_stat(conn *c) {
 }
 
 void bin_read_key(conn *c, enum bin_substates next_substate, int extra) {
-    assert(c);
+    cb_assert(c);
     c->substate = next_substate;
     c->rlbytes = c->keylen + extra;
 
@@ -1591,7 +1591,7 @@ void bin_read_key(conn *c, enum bin_substates next_substate, int extra) {
 }
 
 void process_bin_noreply(conn *c) {
-    assert(c);
+    cb_assert(c);
     c->noreply = true;
     switch (c->binary_header.request.opcode) {
     case PROTOCOL_BINARY_CMD_SETQ:
@@ -1751,7 +1751,7 @@ static void process_bin_update(conn *c) {
     item *it;
     protocol_binary_request_set* req = binary_get_request(c);
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     key = binary_get_key(c);
     nkey = c->binary_header.request.keylen;
@@ -1823,7 +1823,7 @@ static void process_bin_update(conn *c) {
             c->cmd = NREAD_REPLACE;
             break;
         default:
-            assert(0);
+            cb_assert(0);
     }
 
     if (ITEM_get_cas(it) != 0) {
@@ -1843,7 +1843,7 @@ static void process_bin_append_prepend(conn *c) {
     int vlen;
     item *it;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     key = binary_get_key(c);
     nkey = c->binary_header.request.keylen;
@@ -1880,7 +1880,7 @@ static void process_bin_append_prepend(conn *c) {
             c->cmd = NREAD_PREPEND;
             break;
         default:
-            assert(0);
+            cb_assert(0);
     }
 
     c->item = it;
@@ -1922,7 +1922,7 @@ static void process_bin_delete(conn *c) {
     char* key = binary_get_key(c);
     size_t nkey = c->binary_header.request.keylen;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (settings.verbose) {
         moxi_log_write("Deleting %s\n", key);
@@ -1949,8 +1949,8 @@ static void process_bin_delete(conn *c) {
 }
 
 void complete_nread_binary(conn *c) {
-    assert(c != NULL);
-    assert(c->cmd >= 0);
+    cb_assert(c != NULL);
+    cb_assert(c->cmd >= 0);
 
     switch(c->substate) {
     case bin_reading_set_header:
@@ -1981,7 +1981,7 @@ void complete_nread_binary(conn *c) {
         break;
     default:
         moxi_log_write("Not handling substate %d\n", c->substate);
-        assert(0);
+        cb_assert(0);
     }
 }
 
@@ -1999,8 +1999,8 @@ void reset_cmd_handler(conn *c) {
 }
 
 void complete_nread(conn *c) {
-    assert(c != NULL);
-    assert(c->funcs != NULL);
+    cb_assert(c != NULL);
+    cb_assert(c->funcs != NULL);
 
     if (IS_ASCII(c->protocol)) {
         c->funcs->conn_complete_nread_ascii(c);
@@ -2159,7 +2159,7 @@ size_t tokenize_command(char *command, token_t *tokens, const size_t max_tokens)
     char *s, *e;
     size_t ntokens = 0;
 
-    assert(command != NULL && tokens != NULL && max_tokens > 1);
+    cb_assert(command != NULL && tokens != NULL && max_tokens > 1);
 
     for (s = e = command; ntokens < max_tokens - 1; ++e) {
         if (*e == ' ') {
@@ -2209,7 +2209,7 @@ static void write_and_free(conn *c, char *buf, size_t bytes) {
 void set_noreply_maybe(conn *c, token_t *tokens, size_t ntokens) {
     int noreply_index = (int)ntokens - 2;
 
-    assert(noreply_index >= 0);
+    cb_assert(noreply_index >= 0);
 
     /*
       NOTE: this function is not the first place where we are going to
@@ -2230,10 +2230,10 @@ void append_stat(const char *name, ADD_STAT add_stats, void *c,
     int vlen;
     va_list ap;
 
-    assert(name);
-    assert(add_stats);
-    assert(c);
-    assert(fmt);
+    cb_assert(name);
+    cb_assert(add_stats);
+    cb_assert(c);
+    cb_assert(fmt);
 
     va_start(ap, fmt);
     vlen = vsnprintf(val_str, sizeof(val_str) - 1, fmt, ap);
@@ -2250,10 +2250,10 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
     char *val;
     va_list ap;
 
-    assert(name);
-    assert(add_stats);
-    assert(c);
-    assert(fmt);
+    cb_assert(name);
+    cb_assert(add_stats);
+    cb_assert(c);
+    cb_assert(fmt);
 
     va_start(ap, fmt);
     vlen = vsnprintf(val_str, sizeof(val_str), fmt, ap);
@@ -2286,7 +2286,7 @@ void append_prefix_stat(const char *prefix, const char *name, ADD_STAT add_stats
 }
 
 static void process_stats_detail(conn *c, const char *command) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (strcmp(command, "on") == 0) {
         settings.detail_enabled = 1;
@@ -2373,7 +2373,7 @@ void server_stats(ADD_STAT add_stats, void *c, const char *prefix) {
 }
 
 void process_stat_settings(ADD_STAT add_stats, void *c, const char *prefix) {
-    assert(add_stats);
+    cb_assert(add_stats);
     APPEND_PREFIX_STAT("maxbytes", "%u", (unsigned int)settings.maxbytes);
     APPEND_PREFIX_STAT("maxconns", "%d", settings.maxconns);
     APPEND_PREFIX_STAT("tcpport", "%d", settings.port);
@@ -2400,7 +2400,7 @@ void process_stat_settings(ADD_STAT add_stats, void *c, const char *prefix) {
 
 static void process_stat(conn *c, token_t *tokens, const size_t ntokens) {
     const char *subcommand = tokens[SUBCOMMAND_TOKEN].value;
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (ntokens < 2) {
         out_string(c, "CLIENT_ERROR bad command line");
@@ -2480,7 +2480,7 @@ static void process_get_command(conn *c, token_t *tokens, size_t ntokens, bool r
     int stats_get_cmds   = 0;
     int stats_get_misses = 0;
     int stats_get_hits[MAX_NUMBER_OF_SLAB_CLASSES];
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     memset(&stats_get_hits, 0, sizeof(stats_get_hits));
 
@@ -2659,7 +2659,7 @@ void process_update_command(conn *c, token_t *tokens, const size_t ntokens, int 
     uint64_t req_cas_id=0;
     item *it;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -2738,7 +2738,7 @@ static void process_arithmetic_command(conn *c, token_t *tokens, const size_t nt
     char *key;
     size_t nkey;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -2855,7 +2855,7 @@ static void process_delete_command(conn *c, token_t *tokens, const size_t ntoken
     size_t nkey;
     item *it;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -2894,7 +2894,7 @@ static void process_delete_command(conn *c, token_t *tokens, const size_t ntoken
 void process_verbosity_command(conn *c, token_t *tokens, const size_t ntokens) {
     unsigned int level;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
     if (c->noreply && ntokens == 3) {
@@ -2918,7 +2918,7 @@ void process_command(conn *c, char *command) {
     size_t ntokens;
     int comm;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     MEMCACHED_PROCESS_COMMAND_START(c->sfd, c->rcurr, c->rbytes);
 
@@ -3120,9 +3120,9 @@ void process_stats_proxy_command(conn *c, token_t *tokens, const size_t ntokens)
  * if we have a complete line in the buffer, process it.
  */
 int try_read_command(conn *c) {
-    assert(c != NULL);
-    assert(c->rcurr <= (c->rbuf + c->rsize));
-    assert(c->rbytes > 0);
+    cb_assert(c != NULL);
+    cb_assert(c->rcurr <= (c->rbuf + c->rsize));
+    cb_assert(c->rbytes > 0);
 
     if (IS_NEGOTIATING(c->protocol) || c->transport == udp_transport)  {
         if ((unsigned char)c->rbuf[0] == (unsigned char)PROTOCOL_BINARY_REQ) {
@@ -3209,14 +3209,14 @@ int try_read_command(conn *c) {
         }
         *el = '\0';
 
-        assert(cont <= (c->rcurr + c->rbytes));
+        cb_assert(cont <= (c->rcurr + c->rbytes));
 
         c->funcs->conn_process_ascii_command(c, c->rcurr);
 
         c->rbytes -= (int)(cont - c->rcurr);
         c->rcurr = cont;
 
-        assert(c->rcurr <= (c->rbuf + c->rsize));
+        cb_assert(c->rcurr <= (c->rbuf + c->rsize));
     }
 
     return 1;
@@ -3228,7 +3228,7 @@ int try_read_command(conn *c) {
 static enum try_read_result try_read_udp(conn *c) {
     int res;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     c->request_addr_size = sizeof(c->request_addr);
     res = recvfrom(c->sfd, c->rbuf, c->rsize,
@@ -3273,7 +3273,7 @@ static enum try_read_result try_read_network(conn *c) {
     enum try_read_result gotdata = READ_NO_DATA_RECEIVED;
     int res;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->rcurr != c->rbuf) {
         if (c->rbytes != 0) /* otherwise there's nothing to copy */
@@ -3297,7 +3297,7 @@ static enum try_read_result try_read_network(conn *c) {
         }
 
         int avail = c->rsize - c->rbytes;
-        assert(avail > 0);
+        cb_assert(avail > 0);
         res = recv(c->sfd, c->rbuf + c->rbytes, avail, 0);
         if (res > 0) {
             cb_mutex_enter(&c->thread->stats.mutex);
@@ -3332,7 +3332,7 @@ bool update_event_real(conn *c, const int new_flags, const char *update_diag) {
 }
 
 bool update_event_timed_real(conn *c, const int new_flags, struct timeval *timeout, const char *update_diag) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     struct event_base *base = c->event.ev_base;
     if (c->ev_flags == new_flags && timeout == NULL)
@@ -3395,7 +3395,7 @@ void do_accept_new_conns(const bool do_accept) {
  *   TRANSMIT_HARD_ERROR Can't write (c->state is set to conn_closing)
  */
 static enum transmit_result transmit(conn *c) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     if (c->msgcurr < c->msgused &&
             c->msglist[c->msgcurr].msg_iovlen == 0) {
@@ -3476,7 +3476,7 @@ void drive_machine(conn *c) {
     int error;
 #endif
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     while (!stop) {
         if (settings.verbose > 2) {
@@ -3602,7 +3602,7 @@ void drive_machine(conn *c) {
             break;
 
         case conn_nread:
-            assert(c->rlbytes >= 0);
+            cb_assert(c->rlbytes >= 0);
             if (c->rlbytes == 0) {
                 complete_nread(c);
                 break;
@@ -3748,7 +3748,7 @@ void drive_machine(conn *c) {
                 if (c->state == conn_mwrite) {
                     while (c->ileft > 0) {
                         item *it = *(c->icurr);
-                        assert((it->it_flags & ITEM_SLABBED) == 0);
+                        cb_assert((it->it_flags & ITEM_SLABBED) == 0);
                         item_remove(it);
                         c->icurr++;
                         c->ileft--;
@@ -3807,7 +3807,7 @@ void drive_machine(conn *c) {
             break;
 
         case conn_max_state:
-            assert(false);
+            cb_assert(false);
             break;
         }
     }
@@ -3816,7 +3816,7 @@ void drive_machine(conn *c) {
 }
 
 void add_bytes_read(conn *c, int bytes_read) {
-    assert(c != NULL);
+    cb_assert(c != NULL);
     cb_mutex_enter(&c->thread->stats.mutex);
     c->thread->stats.bytes_read += bytes_read;
     cb_mutex_exit(&c->thread->stats.mutex);
@@ -3826,7 +3826,7 @@ static void event_handler(evutil_socket_t fd, short which, void *arg) {
     conn *c;
 
     c = (conn *)arg;
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     c->which = which;
 
@@ -4109,7 +4109,7 @@ int server_socket_unix(const char *path, int access_mask) {
 
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
-    assert(strcmp(addr.sun_path, path) == 0);
+    cb_assert(strcmp(addr.sun_path, path) == 0);
     old_umask = umask( ~(access_mask&0777));
     if (bind(sfd, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
         perror("bind()");

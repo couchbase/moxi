@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "log.h"
 
 /* Forward Declarations */
@@ -207,11 +207,11 @@ item *do_item_alloc(char *key, const size_t nkey, const int flags, const rel_tim
         }
     }
 
-    assert(it->slabs_clsid == 0);
+    cb_assert(it->slabs_clsid == 0);
 
     it->slabs_clsid = id;
 
-    assert(it != heads[it->slabs_clsid]);
+    cb_assert(it != heads[it->slabs_clsid]);
 
     it->next = it->prev = it->h_next = 0;
     it->refcount = 1;     /* the caller will have a reference */
@@ -229,7 +229,7 @@ item *do_item_alloc(char *key, const size_t nkey, const int flags, const rel_tim
 
 void item_free(item *it) {
 #ifdef MOXI_ITEM_MALLOC
-    assert(it->refcount > 0);
+    cb_assert(it->refcount > 0);
     it->refcount--;
     if (it->refcount == 0) {
         free(it);
@@ -237,10 +237,10 @@ void item_free(item *it) {
 #else
     size_t ntotal = ITEM_ntotal(it);
     unsigned int clsid;
-    assert((it->it_flags & ITEM_LINKED) == 0);
-    assert(it != heads[it->slabs_clsid]);
-    assert(it != tails[it->slabs_clsid]);
-    assert(it->refcount == 0);
+    cb_assert((it->it_flags & ITEM_LINKED) == 0);
+    cb_assert(it != heads[it->slabs_clsid]);
+    cb_assert(it != tails[it->slabs_clsid]);
+    cb_assert(it->refcount == 0);
 
     /* so slab size changer can tell later if item is already free or not */
     clsid = it->slabs_clsid;
@@ -267,13 +267,13 @@ static void item_link_q(item *it) { /* item is the new head */
     (void)it;
 #ifndef MOXI_ITEM_MALLOC
     item **head, **tail;
-    /* always true, warns: assert(it->slabs_clsid <= LARGEST_ID); */
-    assert((it->it_flags & ITEM_SLABBED) == 0);
+    /* always true, warns: cb_assert(it->slabs_clsid <= LARGEST_ID); */
+    cb_assert((it->it_flags & ITEM_SLABBED) == 0);
 
     head = &heads[it->slabs_clsid];
     tail = &tails[it->slabs_clsid];
-    assert(it != *head);
-    assert((*head && *tail) || (*head == 0 && *tail == 0));
+    cb_assert(it != *head);
+    cb_assert((*head && *tail) || (*head == 0 && *tail == 0));
     it->prev = 0;
     it->next = *head;
     if (it->next) it->next->prev = it;
@@ -288,20 +288,20 @@ static void item_unlink_q(item *it) {
     (void)it;
 #ifndef MOXI_ITEM_MALLOC
     item **head, **tail;
-    /* always true, warns: assert(it->slabs_clsid <= LARGEST_ID); */
+    /* always true, warns: cb_assert(it->slabs_clsid <= LARGEST_ID); */
     head = &heads[it->slabs_clsid];
     tail = &tails[it->slabs_clsid];
 
     if (*head == it) {
-        assert(it->prev == 0);
+        cb_assert(it->prev == 0);
         *head = it->next;
     }
     if (*tail == it) {
-        assert(it->next == 0);
+        cb_assert(it->next == 0);
         *tail = it->prev;
     }
-    assert(it->next != it);
-    assert(it->prev != it);
+    cb_assert(it->next != it);
+    cb_assert(it->prev != it);
 
     if (it->next) it->next->prev = it->prev;
     if (it->prev) it->prev->next = it->next;
@@ -312,8 +312,8 @@ static void item_unlink_q(item *it) {
 
 int do_item_link(item *it) {
     MEMCACHED_ITEM_LINK(ITEM_key(it), it->nkey, it->nbytes);
-    assert((it->it_flags & (ITEM_LINKED|ITEM_SLABBED)) == 0);
-    assert(it->nbytes < (1024 * 1024));  /* 1MB max size */
+    cb_assert((it->it_flags & (ITEM_LINKED|ITEM_SLABBED)) == 0);
+    cb_assert(it->nbytes < (1024 * 1024));  /* 1MB max size */
     it->it_flags |= ITEM_LINKED;
     it->time = current_time;
     assoc_insert(it);
@@ -358,7 +358,7 @@ void do_item_remove(item *it) {
     item_free(it);
 #else
     MEMCACHED_ITEM_REMOVE(ITEM_key(it), it->nkey, it->nbytes);
-    assert((it->it_flags & ITEM_SLABBED) == 0);
+    cb_assert((it->it_flags & ITEM_SLABBED) == 0);
     if (it->refcount != 0) {
         it->refcount--;
         DEBUG_REFCNT(it, '-');
@@ -372,7 +372,7 @@ void do_item_remove(item *it) {
 void do_item_update(item *it) {
     MEMCACHED_ITEM_UPDATE(ITEM_key(it), it->nkey, it->nbytes);
     if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
-        assert((it->it_flags & ITEM_SLABBED) == 0);
+        cb_assert((it->it_flags & ITEM_SLABBED) == 0);
 
         if ((it->it_flags & ITEM_LINKED) != 0) {
             item_unlink_q(it);
@@ -385,7 +385,7 @@ void do_item_update(item *it) {
 int do_item_replace(item *it, item *new_it) {
     MEMCACHED_ITEM_REPLACE(ITEM_key(it), it->nkey, it->nbytes,
                            ITEM_key(new_it), new_it->nkey, new_it->nbytes);
-    assert((it->it_flags & ITEM_SLABBED) == 0);
+    cb_assert((it->it_flags & ITEM_SLABBED) == 0);
 
     do_item_unlink(it);
     return do_item_link(new_it);
@@ -410,7 +410,7 @@ char *do_item_cachedump(const unsigned int clsid, const unsigned int limit, unsi
     bufcurr = 0;
 
     while (it != NULL && (limit == 0 || shown < limit)) {
-        assert(it->nkey <= KEY_MAX_LENGTH);
+        cb_assert(it->nkey <= KEY_MAX_LENGTH);
         /* Copy the key since it may not be null-terminated in the struct */
         strncpy(key_temp, ITEM_key(it), it->nkey);
         key_temp[it->nkey] = 0x00; /* terminate */
@@ -487,7 +487,7 @@ void do_item_stats_sizes(ADD_STAT add_stats, void *c) {
                 char key[8];
                 int klen = 0;
                 klen = snprintf(key, sizeof(key), "%d", i * 32);
-                assert(klen < (int) sizeof(key));
+                cb_assert(klen < (int) sizeof(key));
                 APPEND_STAT(key, "%u", histogram[i]);
             }
         }

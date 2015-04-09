@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -190,8 +190,8 @@ void htgram_add(HTGRAM_HANDLE agg, HTGRAM_HANDLE x) {
 
     while (htgram_get_bin_data(agg, i, &astart, &awidth, &acount) &&
            htgram_get_bin_data(x,   i, &xstart, &xwidth, &xcount)) {
-        assert(astart == xstart);
-        assert(awidth == xwidth);
+        cb_assert(astart == xstart);
+        cb_assert(awidth == xwidth);
 
         htgram_incr(agg, astart, xcount);
 
@@ -255,17 +255,17 @@ void htgram_dump(HTGRAM_HANDLE h,
                      buf, sizeof(buf) - 1, 0, 0, 0);
 
             s0 = strchr(buf, '+');
-            assert(s0 != NULL);
+            cb_assert(s0 != NULL);
             if (max_plus < s0 - buf) {
                 max_plus = s0 - buf;
             }
             s1 = strchr(s0, '=');
-            assert(s1 != NULL);
+            cb_assert(s1 != NULL);
             if (max_equal < s1 - s0) {
                 max_equal = s1 - s0;
             }
             s2 = strchr(s1, '%');
-            assert(s2 != NULL);
+            cb_assert(s2 != NULL);
             if (max_space < s2 - s1) {
                 max_space = s2 - s1;
             }

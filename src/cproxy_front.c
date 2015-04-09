@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <math.h>
 #include "memcached.h"
 #include "cproxy.h"
@@ -41,8 +41,8 @@ mcache_funcs mcache_item_funcs = {
 
 void mcache_init(mcache *m, bool multithreaded,
                  mcache_funcs *funcs, bool key_alloc) {
-    assert(m);
-    assert(funcs);
+    cb_assert(m);
+    cb_assert(funcs);
 
     m->funcs       = funcs;
     m->key_alloc   = key_alloc;
@@ -65,7 +65,7 @@ void mcache_init(mcache *m, bool multithreaded,
 }
 
 void mcache_reset_stats(mcache *m) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -88,18 +88,18 @@ void mcache_reset_stats(mcache *m) {
 }
 
 void mcache_start(mcache *m, uint32_t max) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
     }
 
-    assert(m->funcs);
-    assert(m->map == NULL);
-    assert(m->max == 0);
-    assert(m->lru_head == NULL);
-    assert(m->lru_tail == NULL);
-    assert(m->oldest_live == 0);
+    cb_assert(m->funcs);
+    cb_assert(m->map == NULL);
+    cb_assert(m->max == 0);
+    cb_assert(m->lru_head == NULL);
+    cb_assert(m->lru_tail == NULL);
+    cb_assert(m->oldest_live == 0);
 
     struct hash_ops hops = skeyhash_ops;
     hops.freeKey = m->key_alloc ? free : noop_free;
@@ -119,7 +119,7 @@ void mcache_start(mcache *m, uint32_t max) {
 }
 
 bool mcache_started(mcache *m) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -135,7 +135,7 @@ bool mcache_started(mcache *m) {
 }
 
 void mcache_stop(mcache *m) {
-    assert(m);
+    cb_assert(m);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -163,13 +163,13 @@ void mcache_stop(mcache *m) {
 void *mcache_get(mcache *m, char *key, int key_len,
                  uint64_t curr_time) {
     (void)key_len;
-    assert(key);
+    cb_assert(key);
 
     if (m == NULL) {
         return NULL;
     }
 
-    assert(m->funcs);
+    cb_assert(m->funcs);
 
     if (m->lock) {
         cb_mutex_enter(m->lock);
@@ -231,10 +231,10 @@ void mcache_set(mcache *m, void *it,
                 uint64_t exptime,
                 bool add_only,
                 bool mod_exptime_if_exists) {
-    assert(it);
-    assert(m->funcs);
-    assert(m->funcs->item_get_next(it) == NULL);
-    assert(m->funcs->item_get_prev(it) == NULL);
+    cb_assert(it);
+    cb_assert(m->funcs);
+    cb_assert(m->funcs->item_get_next(it) == NULL);
+    cb_assert(m->funcs->item_get_prev(it) == NULL);
 
     if (m == NULL) {
         return;
@@ -342,9 +342,9 @@ void mcache_set(mcache *m, void *it,
 void mcache_delete(mcache *m, char *key, int key_len) {
     (void)key_len;
     (void)key;
-    assert(key);
-    assert(key_len > 0);
-    assert(key[key_len] == '\0' ||
+    cb_assert(key);
+    cb_assert(key_len > 0);
+    cb_assert(key[key_len] == '\0' ||
            key[key_len] == ' ');
 
     if (m == NULL) {
@@ -399,9 +399,9 @@ void mcache_flush_all(mcache *m, uint32_t msec_exp) {
 }
 
 void mcache_item_unlink(mcache *m, void *it) {
-    assert(m);
-    assert(m->funcs);
-    assert(it);
+    cb_assert(m);
+    cb_assert(m->funcs);
+    cb_assert(it);
 
     if (m->lru_head == it) {
         m->lru_head = m->funcs->item_get_next(it);
@@ -429,11 +429,11 @@ void mcache_item_unlink(mcache *m, void *it) {
  * Push the item onto the head of the lru list.
  */
 void mcache_item_touch(mcache *m, void *it) {
-    assert(m);
-    assert(m->funcs);
-    assert(m->funcs->item_get_next(it) == NULL);
-    assert(m->funcs->item_get_prev(it) == NULL);
-    assert(it);
+    cb_assert(m);
+    cb_assert(m->funcs);
+    cb_assert(m->funcs->item_get_next(it) == NULL);
+    cb_assert(m->funcs->item_get_prev(it) == NULL);
+    cb_assert(it);
 
     if (m->lru_head != NULL) {
         m->funcs->item_set_prev(m->lru_head, it);
@@ -458,7 +458,7 @@ void mcache_foreach_trampoline(const void *key, const void *value, void *_data) 
 }
 
 void mcache_foreach(mcache *m, mcache_traversal_func f, void *userdata) {
-    assert(m);
+    cb_assert(m);
     if (!m->map) {
         return;
     }
@@ -470,19 +470,19 @@ void mcache_foreach(mcache *m, mcache_traversal_func f, void *userdata) {
 
 static char *item_key(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return ITEM_key(i);
 }
 
 static int item_key_len(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return i->nkey;
 }
 
 static int item_len(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return i->nbytes;
 }
 
@@ -502,37 +502,37 @@ static void item_dec_ref(void *it) {
 
 static void *item_get_next(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return i->next;
 }
 
 static void item_set_next(void *it, void *next) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     i->next = (item *) next;
 }
 
 static void *item_get_prev(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return i->prev;
 }
 
 static void item_set_prev(void *it, void *prev) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     i->prev = (item *) prev;
 }
 
 static uint64_t item_get_exptime(void *it) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     return i->exptime;
 }
 
 static void item_set_exptime(void *it, uint64_t exptime) {
     item *i = it;
-    assert(i);
+    cb_assert(i);
     i->exptime = exptime;
 }
 

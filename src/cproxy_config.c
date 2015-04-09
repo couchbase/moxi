@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <math.h>
 #include "memcached.h"
 #include "cproxy.h"
@@ -93,7 +93,7 @@ proxy_behavior behavior_default_g = {
  */
 size_t skey_len(const char *key) {
     char *x;
-    assert(key);
+    cb_assert(key);
 
     x = (char *) key;
     while (*x != ' ' && *x != '\0')
@@ -108,7 +108,7 @@ int skey_hash(const void *v) {
     const char *key;
     size_t len;
 
-    assert(v);
+    cb_assert(v);
 
     key = v;
     len = skey_len(key);
@@ -125,8 +125,8 @@ int skey_equal(const void *v1, const void *v2) {
     size_t n1;
     size_t n2;
 
-    assert(v1);
-    assert(v2);
+    cb_assert(v1);
+    cb_assert(v2);
 
     k1 = v1;
     k2 = v2;
@@ -151,8 +151,8 @@ str_eq(const void* p1, const void*p2)
 {
     char *str1=(char *)p1;
     char *str2=(char *)p2;
-    assert(str1 != NULL);
-    assert(str2 != NULL);
+    cb_assert(str1 != NULL);
+    cb_assert(str2 != NULL);
     return strcmp(str1, str2) == 0;
 }
 
@@ -224,8 +224,8 @@ char *trimstrdup(char *s) {
 bool wordeq(char *s, char *word) {
     char *end = s;
 
-    assert(s);
-    assert(word);
+    cb_assert(s);
+    cb_assert(word);
 
     while (!isspace(*end) && *end != '\0')
         end++;
@@ -261,8 +261,8 @@ int cproxy_init(char *cfg_str,
     char *env_pwd;
     proxy_behavior behavior;
 
-    assert(nthreads > 1); /* Main + at least one worker. */
-    assert(nthreads == settings.num_threads);
+    cb_assert(nthreads > 1); /* Main + at least one worker. */
+    cb_assert(nthreads == settings.num_threads);
 
     if (cproxy_core_initted == false) {
         cproxy_core_initted = true;
@@ -615,7 +615,7 @@ proxy_behavior cproxy_parse_behavior(char          *behavior_str,
  */
 void cproxy_parse_behavior_key_val_str(char *key_val,
                                        proxy_behavior *behavior) {
-    assert(behavior != NULL);
+    cb_assert(behavior != NULL);
 
     if (key_val != NULL) {
         char *key = strsep(&key_val, "=");
@@ -633,7 +633,7 @@ void cproxy_parse_behavior_key_val(char *key,
     uint32_t x = 0;
     bool ok = false;
 
-    assert(behavior != NULL);
+    cb_assert(behavior != NULL);
 
     if (key != NULL &&
         val != NULL) {
@@ -853,8 +853,8 @@ void cproxy_dump_behavior_ex(proxy_behavior *b, char *prefix, int level,
                                           const char *buf),
                              const void *dump_opaque) {
     char vbuf[8000];
-    assert(b);
-    assert(dump);
+    cb_assert(b);
+    cb_assert(dump);
 
 
 #define vdump(key, vfmt, val) {              \
@@ -921,8 +921,8 @@ void cproxy_dump_behavior_stderr(const void *dump_opaque,
                                  const char *key,
                                  const char *val) {
     (void)dump_opaque;
-    assert(key);
-    assert(val);
+    cb_assert(key);
+    cb_assert(val);
 
     if (prefix == NULL) {
         prefix = "";

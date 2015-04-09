@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "log.h"
 
 /* powers-of-N allocation structures */
@@ -224,7 +224,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id) {
     }
 
     p = &slabclass[id];
-    assert(p->sl_curr == 0 || ((item *)p->slots[p->sl_curr - 1])->slabs_clsid == 0);
+    cb_assert(p->sl_curr == 0 || ((item *)p->slots[p->sl_curr - 1])->slabs_clsid == 0);
 
 #ifdef USE_SYSTEM_MALLOC
     if (mem_limit && mem_malloced + size > mem_limit) {
@@ -248,7 +248,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id) {
         ret = p->slots[--p->sl_curr];
     } else {
         /* if we recently allocated a whole page, return from that */
-        assert(p->end_page_ptr != NULL);
+        cb_assert(p->end_page_ptr != NULL);
         ret = p->end_page_ptr;
         if (--p->end_page_free != 0) {
             p->end_page_ptr = ((caddr_t)p->end_page_ptr) + p->size;
@@ -270,8 +270,8 @@ static void *do_slabs_alloc(const size_t size, unsigned int id) {
 static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     slabclass_t *p;
 
-    assert(((item *)ptr)->slabs_clsid == 0);
-    assert(id >= POWER_SMALLEST && id <= power_largest);
+    cb_assert(((item *)ptr)->slabs_clsid == 0);
+    cb_assert(id >= POWER_SMALLEST && id <= power_largest);
     if (id < POWER_SMALLEST || id > power_largest)
         return;
 

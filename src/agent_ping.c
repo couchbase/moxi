@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -43,19 +43,19 @@ static void load_ping_recipe(char **params,
 {
     int i;
 
-    assert(params);
-    assert(out);
+    cb_assert(params);
+    cb_assert(out);
 
     for (i = 0; params[i]; i++) {
         int value = 0;
         char *p = NULL;
 
         p = strchr(params[i], '=');
-        assert(p);
+        cb_assert(p);
 
         if (!safe_strtol(p+1, &value)) {
             moxi_log_write("Failed to parse ``%s'' as number\n", p+1);
-            assert(false);
+            cb_assert(false);
         }
 
         if (starts_with("ksize=", params[i])) {
@@ -95,7 +95,7 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
     (void)handle;
     (void)cmd;
     (void)direct;
-    assert(userdata);
+    cb_assert(userdata);
 
     /* The form key-multivalues looks roughly like... */
 
@@ -142,7 +142,7 @@ enum conflate_mgmt_cb_result on_conflate_ping_test(void *userdata,
     for (j = 0; j < nrecipes; j++) {
         snprintf(detail_key, sizeof(detail_key), "def-%s", tests[j]);
         recipes[j].name = strdup(detail_key);
-        assert(recipes[j].name);
+        cb_assert(recipes[j].name);
         load_ping_recipe(get_key_values(form, detail_key), &recipes[j]);
     }
 
@@ -190,9 +190,9 @@ static void perform_ping_test(struct ping_test_recipe recipe,
     struct timeval timing;
 
     memset(&timing, 0, sizeof(timing));
-    assert(timing_results);
-    assert(key);
-    assert(value);
+    cb_assert(timing_results);
+    cb_assert(key);
+    cb_assert(value);
 
     /* Key is all 't's...just because */
     memset(key, 't', recipe.keysize);
@@ -251,9 +251,9 @@ static void ping_server(char *server_name,
     struct timeval timing;
     char  buf[300] = { 0x00 };
 
-    assert(server_name);
-    assert(behavior);
-    assert(r);
+    cb_assert(server_name);
+    cb_assert(behavior);
+    cb_assert(r);
 
     if (strlen(behavior->host) <= 0 ||
         behavior->port <= 0)

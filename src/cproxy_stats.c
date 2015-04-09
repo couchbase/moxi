@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -79,8 +79,8 @@ bool protocol_stats_merge_line(genhash_t *merger, char *line) {
     int name_len;
 
 
-    assert(merger != NULL);
-    assert(line != NULL);
+    cb_assert(merger != NULL);
+    cb_assert(line != NULL);
 
     nline = strlen(line); /* Ex: "STATS uptime 123455" */
     if (nline <= 0 ||
@@ -125,9 +125,9 @@ bool protocol_stats_merge_name_val(genhash_t *merger,
     char *key;
     int key_len;
 
-    assert(merger);
-    assert(name);
-    assert(val);
+    cb_assert(merger);
+    cb_assert(name);
+    cb_assert(val);
 
     key = name + name_len - 1;     /* Key part for merge rule lookup. */
     while (key >= name && *key != ':') { /* Scan for last colon. */
@@ -282,7 +282,7 @@ void protocol_stats_foreach_free(const void *key,
                                  void *user_data) {
     (void)key;
     (void)user_data;
-    assert(value != NULL);
+    cb_assert(value != NULL);
     free((void*)value);
 }
 
@@ -293,8 +293,8 @@ void protocol_stats_foreach_write(const void *key,
     char *line = (char *) value;
     conn *uc = (conn *) user_data;
     int nline;
-    assert(line != NULL);
-    assert(uc != NULL);
+    cb_assert(line != NULL);
+    cb_assert(uc != NULL);
     (void)key;
 
     nline = strlen(line);
@@ -387,7 +387,7 @@ int count_dot(char *x, int len) { /* Number of '.' chars in a string. */
 void cproxy_reset_stats_td(proxy_stats_td *pstd) {
     int j;
 
-    assert(pstd);
+    cb_assert(pstd);
 
     cproxy_reset_stats(&pstd->stats);
 
@@ -400,7 +400,7 @@ void cproxy_reset_stats_td(proxy_stats_td *pstd) {
 }
 
 void cproxy_reset_stats(proxy_stats *ps) {
-    assert(ps);
+    cb_assert(ps);
 
     /* Only clear the tot_xxx stats, not the num_xxx ones. */
 
@@ -457,7 +457,7 @@ void cproxy_reset_stats(proxy_stats *ps) {
 }
 
 void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
-    assert(sc);
+    cb_assert(sc);
     memset(sc, 0, sizeof(proxy_stats_cmd));
 }
 
@@ -466,9 +466,9 @@ void cproxy_reset_stats_cmd(proxy_stats_cmd *sc) {
 key_stats *find_key_stats(proxy_td *ptd, char *key, int key_len,
                           uint64_t msec_time) {
     key_stats *ks;
-    assert(ptd);
-    assert(key);
-    assert(key_len > 0);
+    cb_assert(ptd);
+    cb_assert(key);
+    cb_assert(key_len > 0);
 
     ks = mcache_get(&ptd->key_stats, key, key_len, msec_time);
     if (ks == NULL) {
@@ -517,13 +517,13 @@ void touch_key_stats(proxy_td *ptd, char *key, int key_len,
 
 static char *key_stats_key(void *it) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     return i->key;
 }
 
 static int key_stats_key_len(void *it) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     return strlen(i->key);
 }
 
@@ -551,37 +551,37 @@ void key_stats_dec_ref(void *it) {
 
 static void *key_stats_get_next(void *it) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     return i->next;
 }
 
 static void key_stats_set_next(void *it, void *next) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     i->next = (key_stats *) next;
 }
 
 static void *key_stats_get_prev(void *it) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     return i->prev;
 }
 
 static void key_stats_set_prev(void *it, void *prev) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     i->prev = (key_stats *) prev;
 }
 
 static uint64_t key_stats_get_exptime(void *it) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     return i->exptime;
 }
 
 static void key_stats_set_exptime(void *it, uint64_t exptime) {
     key_stats *i = it;
-    assert(i);
+    cb_assert(i);
     i->exptime = exptime;
 }
 

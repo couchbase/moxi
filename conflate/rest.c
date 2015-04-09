@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -37,9 +37,9 @@ struct response_buffer *cur_response_buffer = NULL;
 static struct response_buffer *mk_response_buffer(size_t size) {
     struct response_buffer *r =
       (struct response_buffer *) calloc(1, sizeof(struct response_buffer));
-    assert(r);
+    cb_assert(r);
     r->data = malloc(size);
-    assert(r->data);
+    cb_assert(r->data);
     r->bytes_used = 0;
     r->buffer_size = size;
     r->next = NULL;
@@ -102,7 +102,7 @@ static char *assemble_complete_response(struct response_buffer *response_head) {
 
     /* create buffer */
     response = malloc(response_size + 1);
-    assert(response);
+    cb_assert(response);
 
     /* populate buffer */
     cur_buffer = response_head;
@@ -120,8 +120,8 @@ static char *assemble_complete_response(struct response_buffer *response_head) {
 
 static bool pattern_ends_with(const char *pattern, const char *target, size_t target_size) {
     size_t pattern_size;
-    assert(target);
-    assert(pattern);
+    cb_assert(target);
+    cb_assert(pattern);
 
     pattern_size = strlen(pattern);
     if (target_size < pattern_size) {
@@ -210,23 +210,23 @@ static void setup_handle(CURL *handle, char *url, char *userpass,
         CURLcode c;
 
         c = curl_easy_setopt(handle, CURLOPT_SOCKOPTFUNCTION, setup_curl_sock);
-        assert(c == CURLE_OK);
+        cb_assert(c == CURLE_OK);
         c = curl_easy_setopt(handle, CURLOPT_WRITEDATA, chandle);
-        assert(c == CURLE_OK);
+        cb_assert(c == CURLE_OK);
         c = curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, response_handler);
-        assert(c == CURLE_OK);
+        cb_assert(c == CURLE_OK);
         c = curl_easy_setopt(handle, CURLOPT_URL, url);
-        assert(c == CURLE_OK);
+        cb_assert(c == CURLE_OK);
 
         if (userpass != NULL) {
             c = curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-            assert(c == CURLE_OK);
+            cb_assert(c == CURLE_OK);
             c = curl_easy_setopt(handle, CURLOPT_USERPWD, userpass);
-            assert(c == CURLE_OK);
+            cb_assert(c == CURLE_OK);
         }
 
         c = curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
-        assert(c == CURLE_OK);
+        cb_assert(c == CURLE_OK);
     }
 }
 
@@ -270,10 +270,10 @@ void run_rest_conflate(void *arg) {
 
     /* init curl */
     c = curl_global_init(curl_init_flags);
-    assert(c == CURLE_OK);
+    cb_assert(c == CURLE_OK);
 
     curl_handle = curl_easy_init();
-    assert(curl_handle);
+    cb_assert(curl_handle);
 
     curl_easy_setopt(curl_handle, CURLOPT_ERRORBUFFER, &curl_error_string);
 
@@ -290,7 +290,7 @@ void run_rest_conflate(void *arg) {
             if (handle->conf->jid && strlen(handle->conf->jid)) {
                 size_t buff_size = strlen(handle->conf->jid) + strlen(handle->conf->pass) + 2;
                 userpass = (char *) malloc(buff_size);
-                assert(userpass);
+                cb_assert(userpass);
                 snprintf(userpass, buff_size, "%s:%s", handle->conf->jid, handle->conf->pass);
                 userpass[buff_size - 1] = '\0';
             }

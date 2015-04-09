@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 
 /*
  * Stats are tracked on the basis of key prefixes. This is a simple
@@ -70,7 +70,7 @@ static PREFIX_STATS *stats_prefix_find(const char *key, const size_t nkey) {
     size_t length;
     bool bailout = true;
 
-    assert(key != NULL);
+    cb_assert(key != NULL);
 
     for (length = 0; length < nkey && key[length] != '\0'; length++) {
         if (key[length] == settings.prefix_delimiter) {
@@ -198,7 +198,7 @@ char *stats_prefix_dump(int *length) {
                            pfs->num_sets, pfs->num_deletes);
             pos += (int)written;
             total_written += written;
-            assert(total_written < size);
+            cb_assert(total_written < size);
         }
     }
 
