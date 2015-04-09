@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <libvbucket/vbucket.h>
+#include <platform/cbassert.h>
 
 #include "macros.h"
 
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
        sprintf(buffer, "%s/tests/vbucket/config/%s", root, test_cases[ff]);
        fprintf(stderr, "Running regression test for: %s\n", test_cases[ff]);
        h = vbucket_config_create();
-       assert(vbucket_config_parse(h, LIBVBUCKET_SOURCE_FILE, buffer) == 0);
+       cb_assert(vbucket_config_parse(h, LIBVBUCKET_SOURCE_FILE, buffer) == 0);
 
        fprintf(stderr, "Testing a key can be hashed.");
        v = vbucket_get_vbucket_by_key(h, key1, strlen(key1));

@@ -17,7 +17,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 
 #include "log.h"
 #ifdef HAVE_VALGRIND_VALGRIND_H
@@ -43,7 +43,7 @@ extern volatile uint64_t msec_current_time;
  * if the open failed, report to the user and die
  */
 int log_error_open(moxi_log *mlog) {
-    assert(mlog);
+    cb_assert(mlog);
 
     if (mlog->log_mode == ERRORLOG_FILE) {
         const char *logfile = mlog->log_file;
@@ -146,7 +146,7 @@ void mappend_log(char *logbuf, int *logbuf_used, const char *str) {
     }
     memcpy(logbuf + used, str, str_len);
     *logbuf_used = used + str_len;
-    assert(*logbuf_used < MAX_LOGBUF_LEN);
+    cb_assert(*logbuf_used < MAX_LOGBUF_LEN);
 }
 
 static
@@ -199,7 +199,7 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
     mappend_log_int(logbuf, &logbuf_used, line);
     mappend_log(logbuf, &logbuf_used, ") ");
 
-    assert(logbuf_used < MAX_LOGBUF_LEN);
+    cb_assert(logbuf_used < MAX_LOGBUF_LEN);
 
     va_start(ap, fmt);
     logbuf_used +=
@@ -216,7 +216,7 @@ int log_error_write(moxi_log *mlog, const char *filename, unsigned int line,
         logbuf[logbuf_used - 1] = '\n';
     }
 
-    assert(logbuf_used < MAX_LOGBUF_LEN);
+    cb_assert(logbuf_used < MAX_LOGBUF_LEN);
     logbuf[logbuf_used] = '\0';
 
     switch(mlog->log_mode) {

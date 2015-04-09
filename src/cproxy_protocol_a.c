@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -18,15 +18,15 @@
 #define MAX_PORT_LEN     8
 
 void cproxy_process_upstream_ascii(conn *c, char *line) {
-    assert(c != NULL);
-    assert(c->next == NULL);
-    assert(c->extra != NULL);
-    assert(c->cmd == -1);
-    assert(c->item == NULL);
-    assert(line != NULL);
-    assert(line == c->rcurr);
-    assert(IS_ASCII(c->protocol));
-    assert(IS_PROXY(c->protocol));
+    cb_assert(c != NULL);
+    cb_assert(c->next == NULL);
+    cb_assert(c->extra != NULL);
+    cb_assert(c->cmd == -1);
+    cb_assert(c->item == NULL);
+    cb_assert(line != NULL);
+    cb_assert(line == c->rcurr);
+    cb_assert(IS_ASCII(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_upstream_ascii %s\n",
@@ -41,7 +41,7 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
     c->cmd_retries    = 0;
 
     proxy_td *ptd = c->extra;
-    assert(ptd != NULL);
+    cb_assert(ptd != NULL);
 
     /* For commands set/add/replace, we build an item and read the data
      * directly into it, then continue in nread_complete().
@@ -174,7 +174,7 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
                  (comm = NREAD_APPEND) &&
                  (cmdx = STATS_CMD_APPEND) &&
                  (c->cmd_curr = PROTOCOL_BINARY_CMD_APPEND)))) {
-        assert(c->item == NULL);
+        cb_assert(c->item == NULL);
         c->item = NULL;
 
         process_update_command(c, tokens, ntokens, comm, false);
@@ -194,7 +194,7 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
                (strncmp(cmd, "cas", 3) == 0 &&
                 (comm = NREAD_CAS) &&
                 (c->cmd_curr = PROTOCOL_BINARY_CMD_SET))) {
-        assert(c->item == NULL);
+        cb_assert(c->item == NULL);
         c->item = NULL;
 
         process_update_command(c, tokens, ntokens, comm, true);
@@ -325,12 +325,12 @@ void cproxy_process_upstream_ascii(conn *c, char *line) {
  * the item is ready in c->item.
  */
 void cproxy_process_upstream_ascii_nread(conn *c) {
-    assert(c != NULL);
-    assert(c->next == NULL);
+    cb_assert(c != NULL);
+    cb_assert(c->next == NULL);
 
     item *it = c->item;
 
-    assert(it != NULL);
+    cb_assert(it != NULL);
 
     /* pthread_mutex_lock(&c->thread->stats.mutex); */
     /* c->thread->stats.slab_stats[it->slabs_clsid].set_cmds++; */
@@ -339,7 +339,7 @@ void cproxy_process_upstream_ascii_nread(conn *c) {
     if (strncmp(ITEM_data(it) + it->nbytes - 2, "\r\n", 2) == 0) {
         proxy_td *ptd = c->extra;
 
-        assert(ptd != NULL);
+        cb_assert(ptd != NULL);
 
         cproxy_pause_upstream_for_downstream(ptd, c);
     } else {
@@ -354,16 +354,16 @@ void cproxy_process_upstream_ascii_nread(conn *c) {
  */
 void cproxy_upstream_ascii_item_response(item *it, conn *uc,
                                          int cas_emit) {
-    assert(it != NULL);
-    assert(uc != NULL);
-    assert(uc->state == conn_pause);
-    assert(uc->funcs != NULL);
-    assert(IS_ASCII(uc->protocol));
-    assert(IS_PROXY(uc->protocol));
+    cb_assert(it != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->state == conn_pause);
+    cb_assert(uc->funcs != NULL);
+    cb_assert(IS_ASCII(uc->protocol));
+    cb_assert(IS_PROXY(uc->protocol));
 
     if (settings.verbose > 2) {
         char key[KEY_MAX_LENGTH + 10];
-        assert(it->nkey <= KEY_MAX_LENGTH);
+        cb_assert(it->nkey <= KEY_MAX_LENGTH);
         memcpy(key, ITEM_key(it), it->nkey);
         key[it->nkey] = '\0';
 
@@ -428,10 +428,10 @@ void cproxy_upstream_ascii_item_response(item *it, conn *uc,
 void cproxy_del_front_cache_key_ascii_response(downstream *d,
                                                char *response,
                                                char *command) {
-    assert(d);
-    assert(d->ptd);
-    assert(d->ptd->proxy);
-    assert(response);
+    cb_assert(d);
+    cb_assert(d->ptd);
+    cb_assert(d->ptd->proxy);
+    cb_assert(response);
 
     if (!mcache_started(&d->ptd->proxy->front_cache)) {
         return;
@@ -455,9 +455,9 @@ void cproxy_del_front_cache_key_ascii_response(downstream *d,
 
 void cproxy_del_front_cache_key_ascii(downstream *d,
                                       char *command) {
-    assert(d);
-    assert(d->ptd);
-    assert(d->ptd->proxy);
+    cb_assert(d);
+    cb_assert(d->ptd);
+    cb_assert(d->ptd->proxy);
 
     if (d->ptd->behavior_pool.base.front_cache_lifespan == 0) {
         return;
@@ -482,11 +482,11 @@ void cproxy_del_front_cache_key_ascii(downstream *d,
  */
 bool cproxy_optimize_set_ascii(downstream *d, conn *uc,
                                char *key, int key_len) {
-    assert(d);
-    assert(d->ptd);
-    assert(d->ptd->proxy);
-    assert(uc);
-    assert(uc->next == NULL);
+    cb_assert(d);
+    cb_assert(d->ptd);
+    cb_assert(d->ptd->proxy);
+    cb_assert(uc);
+    cb_assert(uc->next == NULL);
 
     if (d->ptd->behavior_pool.base.optimize_set[0] == '\0') {
         return false;
@@ -520,25 +520,25 @@ bool cproxy_optimize_set_ascii(downstream *d, conn *uc,
 
 void cproxy_process_downstream_ascii(conn *c, char *line) {
     downstream *d = c->extra;
-    assert(d != NULL);
-    assert(d->upstream_conn != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->upstream_conn != NULL);
 
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2a_downstream(c, line);
     } else {
-        assert(false); /* TODO: b2a. */
+        cb_assert(false); /* TODO: b2a. */
     }
 }
 
 void cproxy_process_downstream_ascii_nread(conn *c) {
     downstream *d = c->extra;
-    assert(d != NULL);
-    assert(d->upstream_conn != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->upstream_conn != NULL);
 
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2a_downstream_nread(c);
     } else {
-        assert(false); /* TODO: b2a. */
+        cb_assert(false); /* TODO: b2a. */
     }
 }
 

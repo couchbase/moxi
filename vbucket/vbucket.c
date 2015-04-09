@@ -14,7 +14,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -675,7 +675,7 @@ int vbucket_map(VBUCKET_CONFIG_HANDLE vb, const void *key, size_t nkey,
     struct continuum_item_st *beginp, *endp, *midp, *highp, *lowp;
 
     if (vb->distribution == VBUCKET_DISTRIBUTION_KETAMA) {
-        assert(vb->continuum);
+        cb_assert(vb->continuum);
         if (vbucket_id) {
             *vbucket_id = 0;
         }
@@ -823,7 +823,7 @@ static void compute_vb_list_diff(VBUCKET_CONFIG_HANDLE from,
         }
         if (!found) {
             out[offset] = strdup(sn);
-            assert(out[offset]);
+            cb_assert(out[offset]);
             ++offset;
         }
     }
@@ -834,7 +834,7 @@ VBUCKET_CONFIG_DIFF* vbucket_compare(VBUCKET_CONFIG_HANDLE from,
     VBUCKET_CONFIG_DIFF *rv = calloc(1, sizeof(VBUCKET_CONFIG_DIFF));
     int num_servers = (from->num_servers > to->num_servers
                        ? from->num_servers : to->num_servers) + 1;
-    assert(rv);
+    cb_assert(rv);
     rv->servers_added = calloc(num_servers, sizeof(char*));
     rv->servers_removed = calloc(num_servers, sizeof(char*));
 
@@ -891,7 +891,7 @@ static void free_array_helper(char **l) {
 }
 
 void vbucket_free_diff(VBUCKET_CONFIG_DIFF *diff) {
-    assert(diff);
+    cb_assert(diff);
     free_array_helper(diff->servers_added);
     free_array_helper(diff->servers_removed);
     free(diff);

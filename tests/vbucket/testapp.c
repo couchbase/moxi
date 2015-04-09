@@ -6,6 +6,7 @@
 #include <strings.h>
 
 #include <libvbucket/vbucket.h>
+#include <platform/cbassert.h>
 
 #include "macros.h"
 
@@ -91,21 +92,21 @@ static void testConfig(const char *fname) {
         abort();
     }
 
-    assert(vbucket_config_get_num_servers(vb) == 3 || vbucket_config_get_num_servers(vb) == 4);
-    assert(vbucket_config_get_num_replicas(vb) == 2);
+    cb_assert(vbucket_config_get_num_servers(vb) == 3 || vbucket_config_get_num_servers(vb) == 4);
+    cb_assert(vbucket_config_get_num_replicas(vb) == 2);
 
     for (i = 0; i < 3; ++i) {
-        assert(strcmp(vbucket_config_get_server(vb, i), servers[i]) == 0);
+        cb_assert(strcmp(vbucket_config_get_server(vb, i), servers[i]) == 0);
     }
 
     for (i = 0; i < 4; ++i) {
-        assert(vbucket_get_master(vb, i) == vbuckets[i].master);
-        assert(vbucket_get_replica(vb, i, 0) == vbuckets[i].replicas[0]);
-        assert(vbucket_get_replica(vb, i, 1) == vbuckets[i].replicas[1]);
+        cb_assert(vbucket_get_master(vb, i) == vbuckets[i].master);
+        cb_assert(vbucket_get_replica(vb, i, 0) == vbuckets[i].replicas[0]);
+        cb_assert(vbucket_get_replica(vb, i, 1) == vbuckets[i].replicas[1]);
     }
 
-    assert(vbucket_config_get_user(vb) == NULL);
-    assert(vbucket_config_get_password(vb) == NULL);
+    cb_assert(vbucket_config_get_user(vb) == NULL);
+    cb_assert(vbucket_config_get_password(vb) == NULL);
 
     vbucket_config_destroy(vb);
 }
@@ -120,37 +121,37 @@ static void testWrongServer(const char *fname) {
     }
 
     /* Starts at 0 */
-    assert(vbucket_get_master(vb, 0) == 0);
+    cb_assert(vbucket_get_master(vb, 0) == 0);
     /* Does not change when I told it I found the wrong thing */
-    assert(vbucket_found_incorrect_master(vb, 0, 1) == 0);
-    assert(vbucket_get_master(vb, 0) == 0);
+    cb_assert(vbucket_found_incorrect_master(vb, 0, 1) == 0);
+    cb_assert(vbucket_get_master(vb, 0) == 0);
     /* Does change if I tell it I got the right thing and it was wrong. */
-    assert(vbucket_found_incorrect_master(vb, 0, 0) == 1);
-    assert(vbucket_get_master(vb, 0) == 1);
+    cb_assert(vbucket_found_incorrect_master(vb, 0, 0) == 1);
+    cb_assert(vbucket_get_master(vb, 0) == 1);
     /* ...and again */
-    assert(vbucket_found_incorrect_master(vb, 0, 1) == 2);
-    assert(vbucket_get_master(vb, 0) == 2);
+    cb_assert(vbucket_found_incorrect_master(vb, 0, 1) == 2);
+    cb_assert(vbucket_get_master(vb, 0) == 2);
     /* ...and then wraps */
-    assert(vbucket_found_incorrect_master(vb, 0, 2) == 0);
-    assert(vbucket_get_master(vb, 0) == 0);
+    cb_assert(vbucket_found_incorrect_master(vb, 0, 2) == 0);
+    cb_assert(vbucket_get_master(vb, 0) == 0);
 
     vbucket_config_destroy(vb);
 }
 
 static void testWrongNumVbuckets(const char *fname) {
     VBUCKET_CONFIG_HANDLE vb = vbucket_config_create();
-    assert(vb != NULL);
-    assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, configPath(fname)) != 0);
-    assert(strcmp(vbucket_get_error_message(vb),
+    cb_assert(vb != NULL);
+    cb_assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, configPath(fname)) != 0);
+    cb_assert(strcmp(vbucket_get_error_message(vb),
                   "Number of vBuckets must be a power of two > 0 and <= 65536") == 0);
     vbucket_config_destroy(vb);
 }
 
 static void testZeroNumVbuckets(const char *fname) {
     VBUCKET_CONFIG_HANDLE vb = vbucket_config_create();
-    assert(vb != NULL);
-    assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, configPath(fname)) != 0);
-    assert(strcmp(vbucket_get_error_message(vb),
+    cb_assert(vb != NULL);
+    cb_assert(vbucket_config_parse(vb, LIBVBUCKET_SOURCE_FILE, configPath(fname)) != 0);
+    cb_assert(strcmp(vbucket_get_error_message(vb),
                   "No vBuckets available; service maybe still initializing") == 0);
     vbucket_config_destroy(vb);
 }
@@ -171,7 +172,7 @@ static void testWrongServerFFT(const char *fname) {
     nvb = vbucket_config_get_num_vbuckets(vb);
     for (i = 0; i < nvb; i++) {
         rv = vbucket_get_master(vb, i);
-        assert(rv != vbucket_found_incorrect_master(vb, i, rv));
+        cb_assert(rv != vbucket_found_incorrect_master(vb, i, rv));
     }
     /* the ideal test case should be that we check that the vbucket */
     /* and the fvbucket map are identical at this point. TODO untill */
@@ -183,48 +184,48 @@ static void testConfigDiff(void) {
     VBUCKET_CONFIG_HANDLE vb1 = vbucket_config_parse_file(configPath("config-diff1"));
     VBUCKET_CONFIG_HANDLE vb2 = vbucket_config_parse_file(configPath("config-diff2"));
     VBUCKET_CONFIG_DIFF *diff;
-    assert(vb2);
+    cb_assert(vb2);
 
     diff = vbucket_compare(vb1, vb2);
-    assert(vb1);
-    assert(diff);
+    cb_assert(vb1);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed);
-    assert(diff->n_vb_changes == 1);
-    assert(strcmp(diff->servers_added[0], "server4:11211") == 0);
-    assert(diff->servers_added[1] == NULL);
-    assert(strcmp(diff->servers_removed[0], "server3:11211") == 0);
-    assert(diff->servers_removed[1] == NULL);
+    cb_assert(diff->sequence_changed);
+    cb_assert(diff->n_vb_changes == 1);
+    cb_assert(strcmp(diff->servers_added[0], "server4:11211") == 0);
+    cb_assert(diff->servers_added[1] == NULL);
+    cb_assert(strcmp(diff->servers_removed[0], "server3:11211") == 0);
+    cb_assert(diff->servers_removed[1] == NULL);
 
     vbucket_free_diff(diff);
     vbucket_config_destroy(vb2);
 
     vb2 = vbucket_config_parse_file(configPath("config-diff3"));
-    assert(vb2);
+    cb_assert(vb2);
 
     diff = vbucket_compare(vb1, vb2);
-    assert(diff);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed);
-    assert(diff->n_vb_changes == -1);
-    assert(diff->servers_added[0] == NULL);
-    assert(strcmp(diff->servers_removed[0], "server3:11211") == 0);
-    assert(diff->servers_removed[1] == NULL);
+    cb_assert(diff->sequence_changed);
+    cb_assert(diff->n_vb_changes == -1);
+    cb_assert(diff->servers_added[0] == NULL);
+    cb_assert(strcmp(diff->servers_removed[0], "server3:11211") == 0);
+    cb_assert(diff->servers_removed[1] == NULL);
 }
 
 static void testConfigDiffSame(void) {
     VBUCKET_CONFIG_HANDLE vb1 = vbucket_config_parse_file(configPath("config"));
     VBUCKET_CONFIG_HANDLE vb2 = vbucket_config_parse_file(configPath("config"));
     VBUCKET_CONFIG_DIFF *diff;
-    assert(vb1);
-    assert(vb2);
+    cb_assert(vb1);
+    cb_assert(vb2);
     diff = vbucket_compare(vb1, vb2);
-    assert(diff);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed == 0);
-    assert(diff->n_vb_changes == 0);
-    assert(diff->servers_added[0] == NULL);
-    assert(diff->servers_removed[0] == NULL);
+    cb_assert(diff->sequence_changed == 0);
+    cb_assert(diff->n_vb_changes == 0);
+    cb_assert(diff->servers_added[0] == NULL);
+    cb_assert(diff->servers_removed[0] == NULL);
 
     vbucket_free_diff(diff);
     vbucket_config_destroy(vb1);
@@ -235,15 +236,15 @@ static void testConfigDiffKetamaSame(void) {
     VBUCKET_CONFIG_HANDLE vb1 = vbucket_config_parse_file(configPath("ketama-eight-nodes"));
     VBUCKET_CONFIG_HANDLE vb2 = vbucket_config_parse_file(configPath("ketama-ordered-eight-nodes"));
     VBUCKET_CONFIG_DIFF *diff;
-    assert(vb1);
-    assert(vb2);
+    cb_assert(vb1);
+    cb_assert(vb2);
     diff = vbucket_compare(vb1, vb2);
-    assert(diff);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed == 0);
-    assert(diff->n_vb_changes == 0);
-    assert(diff->servers_added[0] == NULL);
-    assert(diff->servers_removed[0] == NULL);
+    cb_assert(diff->sequence_changed == 0);
+    cb_assert(diff->n_vb_changes == 0);
+    cb_assert(diff->servers_added[0] == NULL);
+    cb_assert(diff->servers_removed[0] == NULL);
 
     vbucket_free_diff(diff);
     vbucket_config_destroy(vb1);
@@ -256,32 +257,32 @@ static void testConfigUserPassword(void) {
     VBUCKET_CONFIG_DIFF *diff;
 
     vb1 = vbucket_config_parse_file(configPath("config-user-password1"));
-    assert(vb1);
-    assert(strcmp(vbucket_config_get_user(vb1), "theUser") == 0);
-    assert(strcmp(vbucket_config_get_password(vb1), "thePassword") == 0);
+    cb_assert(vb1);
+    cb_assert(strcmp(vbucket_config_get_user(vb1), "theUser") == 0);
+    cb_assert(strcmp(vbucket_config_get_password(vb1), "thePassword") == 0);
 
     vb2 = vbucket_config_parse_file(configPath("config-user-password2"));
-    assert(vb2);
-    assert(strcmp(vbucket_config_get_user(vb2), "theUserIsDifferent") == 0);
-    assert(strcmp(vbucket_config_get_password(vb2), "thePasswordIsDifferent") == 0);
+    cb_assert(vb2);
+    cb_assert(strcmp(vbucket_config_get_user(vb2), "theUserIsDifferent") == 0);
+    cb_assert(strcmp(vbucket_config_get_password(vb2), "thePasswordIsDifferent") == 0);
 
     diff = vbucket_compare(vb1, vb2);
-    assert(diff);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed);
-    assert(diff->n_vb_changes == 0);
-    assert(diff->servers_added[0] == NULL);
-    assert(diff->servers_removed[0] == NULL);
+    cb_assert(diff->sequence_changed);
+    cb_assert(diff->n_vb_changes == 0);
+    cb_assert(diff->servers_added[0] == NULL);
+    cb_assert(diff->servers_removed[0] == NULL);
 
     vbucket_free_diff(diff);
 
     diff = vbucket_compare(vb1, vb1);
-    assert(diff);
+    cb_assert(diff);
 
-    assert(diff->sequence_changed == 0);
-    assert(diff->n_vb_changes == 0);
-    assert(diff->servers_added[0] == NULL);
-    assert(diff->servers_removed[0] == NULL);
+    cb_assert(diff->sequence_changed == 0);
+    cb_assert(diff->n_vb_changes == 0);
+    cb_assert(diff->servers_added[0] == NULL);
+    cb_assert(diff->servers_removed[0] == NULL);
 
     vbucket_free_diff(diff);
 
@@ -292,16 +293,16 @@ static void testConfigUserPassword(void) {
 static void testConfigCouchApiBase(void)
 {
     VBUCKET_CONFIG_HANDLE vb = vbucket_config_parse_file(configPath("config-couch-api-base"));
-    assert(vb);
-    assert(strcmp(vbucket_config_get_couch_api_base(vb, 0), "http://192.168.2.123:9500/default") == 0);
-    assert(strcmp(vbucket_config_get_couch_api_base(vb, 1), "http://192.168.2.123:9501/default") == 0);
-    assert(strcmp(vbucket_config_get_couch_api_base(vb, 2), "http://192.168.2.123:9502/default") == 0);
-    assert(strcmp(vbucket_config_get_rest_api_server(vb, 0), "192.168.2.123:9000") == 0);
-    assert(strcmp(vbucket_config_get_rest_api_server(vb, 1), "192.168.2.123:9001") == 0);
-    assert(strcmp(vbucket_config_get_rest_api_server(vb, 2), "192.168.2.123:9002") == 0);
-    assert(strcmp(vbucket_config_get_server(vb, 0), "192.168.2.123:12000") == 0);
-    assert(strcmp(vbucket_config_get_server(vb, 1), "192.168.2.123:12002") == 0);
-    assert(strcmp(vbucket_config_get_server(vb, 2), "192.168.2.123:12004") == 0);
+    cb_assert(vb);
+    cb_assert(strcmp(vbucket_config_get_couch_api_base(vb, 0), "http://192.168.2.123:9500/default") == 0);
+    cb_assert(strcmp(vbucket_config_get_couch_api_base(vb, 1), "http://192.168.2.123:9501/default") == 0);
+    cb_assert(strcmp(vbucket_config_get_couch_api_base(vb, 2), "http://192.168.2.123:9502/default") == 0);
+    cb_assert(strcmp(vbucket_config_get_rest_api_server(vb, 0), "192.168.2.123:9000") == 0);
+    cb_assert(strcmp(vbucket_config_get_rest_api_server(vb, 1), "192.168.2.123:9001") == 0);
+    cb_assert(strcmp(vbucket_config_get_rest_api_server(vb, 2), "192.168.2.123:9002") == 0);
+    cb_assert(strcmp(vbucket_config_get_server(vb, 0), "192.168.2.123:12000") == 0);
+    cb_assert(strcmp(vbucket_config_get_server(vb, 1), "192.168.2.123:12002") == 0);
+    cb_assert(strcmp(vbucket_config_get_server(vb, 2), "192.168.2.123:12004") == 0);
 }
 
 int main(int argc, char **argv)

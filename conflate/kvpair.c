@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 
 #include <libconflate/conflate.h>
 
 kvpair_t* mk_kvpair(const char* k, char** v)
 {
     kvpair_t* rv = calloc(1, sizeof(kvpair_t));
-    assert(rv);
+    cb_assert(rv);
 
     rv->key = safe_strdup(k);
     if (v) {
@@ -19,7 +19,7 @@ kvpair_t* mk_kvpair(const char* k, char** v)
     } else {
         rv->allocated_values = 4;
         rv->values = calloc(4, sizeof(char*));
-        assert(rv->values);
+        cb_assert(rv->values);
     }
 
     return rv;
@@ -27,8 +27,8 @@ kvpair_t* mk_kvpair(const char* k, char** v)
 
 void add_kvpair_value(kvpair_t* pair, const char* value)
 {
-    assert(pair);
-    assert(value);
+    cb_assert(pair);
+    cb_assert(value);
 
     /* The last item in the values list must be null as it acts a sentinal */
     if (pair->allocated_values == 0 ||
@@ -40,7 +40,7 @@ void add_kvpair_value(kvpair_t* pair, const char* value)
 
         pair->values = realloc(pair->values,
                                sizeof(char*) * pair->allocated_values);
-        assert(pair->values);
+        cb_assert(pair->values);
     }
 
     pair->values[pair->used_values++] = safe_strdup(value);
@@ -70,7 +70,7 @@ void walk_kvpair(kvpair_t *pair, void *opaque, kvpair_visitor_t visitor)
 
 kvpair_t* find_kvpair(kvpair_t* pair, const char* key)
 {
-    assert(key);
+    cb_assert(key);
 
     while (pair && strcmp(pair->key, key) != 0) {
         pair = pair->next;
@@ -83,7 +83,7 @@ char *get_simple_kvpair_val(kvpair_t *pair, const char *key)
 {
     char *rv = NULL;
     kvpair_t *found;
-    assert(key);
+    cb_assert(key);
     found = find_kvpair(pair, key);
 
     if (found) {
@@ -96,7 +96,7 @@ char *get_simple_kvpair_val(kvpair_t *pair, const char *key)
 kvpair_t *dup_kvpair(kvpair_t *pair)
 {
     kvpair_t *copy;
-    assert(pair);
+    cb_assert(pair);
     copy = mk_kvpair(pair->key, pair->values);
     if (pair->next) {
         copy->next = dup_kvpair(pair->next);

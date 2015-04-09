@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #ifndef WIN32
 #include <poll.h>
 #include <limits.h>
@@ -160,7 +160,7 @@ mcs_st *lvb_create(mcs_st *ptr, const char *config,
     VBUCKET_CONFIG_HANDLE vch;
     (void) opts;
 
-    assert(ptr);
+    cb_assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBVBUCKET;
 
@@ -238,7 +238,7 @@ mcs_st *lvb_create(mcs_st *ptr, const char *config,
 }
 
 void lvb_free_data(mcs_st *ptr) {
-    assert(ptr->kind == MCS_KIND_LIBVBUCKET);
+    cb_assert(ptr->kind == MCS_KIND_LIBVBUCKET);
 
     if (ptr->data != NULL) {
         vbucket_config_destroy((VBUCKET_CONFIG_HANDLE) ptr->data);
@@ -260,10 +260,10 @@ bool lvb_stable_update(mcs_st *curr_version, mcs_st *next_version) {
     bool rv = false;
     VBUCKET_CONFIG_DIFF *diff;
 
-    assert(curr_version->kind == MCS_KIND_LIBVBUCKET);
-    assert(curr_version->data != NULL);
-    assert(next_version->kind == MCS_KIND_LIBVBUCKET);
-    assert(next_version->data != NULL);
+    cb_assert(curr_version->kind == MCS_KIND_LIBVBUCKET);
+    cb_assert(curr_version->data != NULL);
+    cb_assert(next_version->kind == MCS_KIND_LIBVBUCKET);
+    cb_assert(next_version->data != NULL);
 
     diff = vbucket_compare((VBUCKET_CONFIG_HANDLE) curr_version->data,
                            (VBUCKET_CONFIG_HANDLE) next_version->data);
@@ -287,8 +287,8 @@ uint32_t lvb_key_hash(mcs_st *ptr, const char *key, size_t key_length,
     VBUCKET_CONFIG_HANDLE vch;
     int v;
 
-    assert(ptr->kind == MCS_KIND_LIBVBUCKET);
-    assert(ptr->data != NULL);
+    cb_assert(ptr->kind == MCS_KIND_LIBVBUCKET);
+    cb_assert(ptr->data != NULL);
 
     vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
 
@@ -304,8 +304,8 @@ void lvb_server_invalid_vbucket(mcs_st *ptr, int server_index,
                                 int vbucket) {
     VBUCKET_CONFIG_HANDLE vch;
 
-    assert(ptr->kind == MCS_KIND_LIBVBUCKET);
-    assert(ptr->data != NULL);
+    cb_assert(ptr->kind == MCS_KIND_LIBVBUCKET);
+    cb_assert(ptr->data != NULL);
 
     vch = (VBUCKET_CONFIG_HANDLE) ptr->data;
 
@@ -321,7 +321,7 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
                    const char *opts) {
     memcached_st *mst;
 
-    assert(ptr);
+    cb_assert(ptr);
     memset(ptr, 0, sizeof(*ptr));
     ptr->kind = MCS_KIND_LIBMEMCACHED;
 
@@ -402,7 +402,7 @@ mcs_st *lmc_create(mcs_st *ptr, const char *config,
 }
 
 void lmc_free_data(mcs_st *ptr) {
-    assert(ptr->kind == MCS_KIND_LIBMEMCACHED);
+    cb_assert(ptr->kind == MCS_KIND_LIBMEMCACHED);
 
     if (ptr->data != NULL) {
         memcached_free((memcached_st *) ptr->data);
@@ -412,8 +412,8 @@ void lmc_free_data(mcs_st *ptr) {
 }
 
 uint32_t lmc_key_hash(mcs_st *ptr, const char *key, size_t key_length, int *vbucket) {
-    assert(ptr->kind == MCS_KIND_LIBMEMCACHED);
-    assert(ptr->data != NULL);
+    cb_assert(ptr->kind == MCS_KIND_LIBMEMCACHED);
+    cb_assert(ptr->data != NULL);
 
     if (vbucket != NULL) {
         *vbucket = -1;
@@ -617,7 +617,7 @@ mcs_return mcs_set_sock_opt(SOCKET sock) {
 }
 
 ssize_t mcs_io_write(SOCKET fd, const void *buffer, size_t length) {
-    assert(fd != -1);
+    cb_assert(fd != -1);
 
     return send(fd, buffer, (int)length, 0);
 }
@@ -770,7 +770,7 @@ const char *mcs_server_st_pwd(mcs_server_st *ptr) {
 
 char *mcs_server_st_ident(mcs_server_st *msst, bool is_ascii) {
     char *buf;
-    assert(msst != NULL);
+    cb_assert(msst != NULL);
 
     buf = is_ascii ? msst->ident_a : msst->ident_b;
     if (buf[0] == '\0') {

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "log.h"
@@ -22,10 +22,10 @@ void multiget_foreach_free(const void *key,
 
     (void)key;
     d = user_data;
-    assert(d);
+    cb_assert(d);
 
     ptd = d->ptd;
-    assert(ptd);
+    cb_assert(ptd);
 
     psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
     entry = (multiget_entry*)value;
@@ -60,10 +60,10 @@ void multiget_remove_upstream(const void *key,
 
     (void)key;
     entry = (multiget_entry *) value;
-    assert(entry != NULL);
+    cb_assert(entry != NULL);
 
     uc = user_data;
-    assert(uc != NULL);
+    cb_assert(uc != NULL);
 
     while (entry != NULL) {
         /* Just clear the slots, because glib hash table API */
@@ -93,13 +93,13 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
     int   uc_num = 0;
     conn *uc_cur;
 
-    assert(d != NULL);
-    assert(d->downstream_conns != NULL);
-    assert(uc != NULL);
-    assert(uc->noreply == false);
+    cb_assert(d != NULL);
+    cb_assert(d->downstream_conns != NULL);
+    cb_assert(uc != NULL);
+    cb_assert(uc->noreply == false);
 
     ptd = d->ptd;
-    assert(ptd != NULL);
+    cb_assert(ptd != NULL);
 
     psc_get = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET];
     psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
@@ -125,24 +125,24 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
         int cmd_len;
         int cas_emit;
 
-        assert(uc_cur->cmd == -1);
-        assert(uc_cur->item == NULL);
-        assert(uc_cur->state == conn_pause);
-        assert(IS_ASCII(uc_cur->protocol));
-        assert(IS_PROXY(uc_cur->protocol));
+        cb_assert(uc_cur->cmd == -1);
+        cb_assert(uc_cur->item == NULL);
+        cb_assert(uc_cur->state == conn_pause);
+        cb_assert(IS_ASCII(uc_cur->protocol));
+        cb_assert(IS_PROXY(uc_cur->protocol));
 
         command = uc_cur->cmd_start;
-        assert(command != NULL);
+        cb_assert(command != NULL);
 
         while (*command != '\0' && *command == ' ') {
             command++;
         }
 
         space = strchr(command, ' ');
-        assert(space > command);
+        cb_assert(space > command);
 
         cmd_len = space - command;
-        assert(cmd_len == 3 || cmd_len == 4); /* Either get or gets. */
+        cb_assert(cmd_len == 3 || cmd_len == 4); /* Either get or gets. */
 
         cas_emit = (command[3] == 's');
 
@@ -212,8 +212,8 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                     }
 
                     if (it != NULL) {
-                        assert(it->nkey == key_len);
-                        assert(strncmp(ITEM_key(it), key, it->nkey) == 0);
+                        cb_assert(it->nkey == key_len);
+                        cb_assert(strncmp(ITEM_key(it), key, it->nkey) == 0);
 
                         cproxy_upstream_ascii_item_response(it, uc_cur, 0);
 
@@ -266,7 +266,7 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                         multiget_entry *entry;
                         if (settings.verbose > 2) {
                             char key_buf[KEY_MAX_LENGTH + 10];
-                            assert(key_len <= KEY_MAX_LENGTH);
+                            cb_assert(key_len <= KEY_MAX_LENGTH);
                             memcpy(key_buf, key, key_len);
                             key_buf[key_len] = '\0';
 
@@ -294,11 +294,11 @@ bool multiget_ascii_downstream(downstream *d, conn *uc,
                     }
 
                     if (first_request) {
-                        assert(c->item == NULL);
-                        assert(c->state == conn_pause);
-                        assert(IS_PROXY(c->protocol));
-                        assert(c->ilist != NULL);
-                        assert(c->isize > 0);
+                        cb_assert(c->item == NULL);
+                        cb_assert(c->state == conn_pause);
+                        cb_assert(IS_PROXY(c->protocol));
+                        cb_assert(c->ilist != NULL);
+                        cb_assert(c->isize > 0);
 
                         if (c->msgused <= 1 &&
                             c->msgbytes <= 0) {
@@ -388,18 +388,18 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
     proxy_stats_cmd *psc_get_key;
     proxy *p;
 
-    assert(d);
-    assert(it);
-    assert(it->nkey > 0);
-    assert(ITEM_key(it) != NULL);
+    cb_assert(d);
+    cb_assert(it);
+    cb_assert(it->nkey > 0);
+    cb_assert(ITEM_key(it) != NULL);
 
     ptd = d->ptd;
-    assert(ptd);
+    cb_assert(ptd);
 
     psc_get_key = &ptd->stats.stats_cmd[STATS_CMD_TYPE_REGULAR][STATS_CMD_GET_KEY];
 
     p = ptd->proxy;
-    assert(p);
+    cb_assert(p);
 
     if (cproxy_front_cache_key(ptd, ITEM_key(it), it->nkey) == true) {
         uint32_t front_cache_lifespan =
@@ -415,7 +415,7 @@ void multiget_ascii_downstream_response(downstream *d, item *it) {
         multiget_entry *entry_first;
         char key_buf[KEY_MAX_LENGTH + 10];
 
-        assert(it->nkey <= KEY_MAX_LENGTH);
+        cb_assert(it->nkey <= KEY_MAX_LENGTH);
         memcpy(key_buf, ITEM_key(it), it->nkey);
         key_buf[it->nkey] = '\0';
         entry_first = genhash_find(d->multiget, key_buf);

@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "log.h"
 
 static cb_cond_t maintenance_cond;
@@ -134,7 +134,7 @@ int assoc_insert(item *it) {
     uint32_t hv;
     unsigned int oldbucket;
 
-    assert(assoc_find(ITEM_key(it), it->nkey) == 0);  /* shouldn't have duplicately named things defined */
+    cb_assert(assoc_find(ITEM_key(it), it->nkey) == 0);  /* shouldn't have duplicately named things defined */
 
     hv = hash(ITEM_key(it), it->nkey, 0);
     if (expanding &&
@@ -173,7 +173,7 @@ void assoc_delete(const char *key, const size_t nkey) {
     }
     /* Note:  we never actually get here.  the callers don't delete things
        they can't find. */
-    assert(*before != 0);
+    cb_assert(*before != 0);
 }
 
 

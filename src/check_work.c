@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <pthread.h>
-#include <assert.h>
 #include <check.h>
 
 #include "memcached.h"

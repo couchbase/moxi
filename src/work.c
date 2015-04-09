@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <unistd.h>
 #include <event.h>
 #include "work.h"
@@ -54,7 +54,7 @@ static bool create_notification_pipe(work_queue *me) {
  *  Returns true on success.
  */
 bool work_queue_init(work_queue *m, struct event_base *event_base) {
-    assert(m != NULL);
+    cb_assert(m != NULL);
 
     memset(m, 0, sizeof(work_queue));
 
@@ -68,7 +68,7 @@ bool work_queue_init(work_queue *m, struct event_base *event_base) {
     m->tot_recvs = 0;
 
     m->event_base = event_base;
-    assert(m->event_base != NULL);
+    cb_assert(m->event_base != NULL);
 
     if (!create_notification_pipe(m)) {
         return false;
@@ -109,11 +109,11 @@ bool work_queue_init(work_queue *m, struct event_base *event_base) {
 bool work_send(work_queue *m,
                void (*func)(void *data0, void *data1),
                void *data0, void *data1) {
-    assert(m != NULL);
-    assert(m->recv_fd >= 0);
-    assert(m->send_fd >= 0);
-    assert(m->event_base != NULL);
-    assert(func != NULL);
+    cb_assert(m != NULL);
+    cb_assert(m->recv_fd >= 0);
+    cb_assert(m->send_fd >= 0);
+    cb_assert(m->event_base != NULL);
+    cb_assert(func != NULL);
 
     bool rv = false;
 
@@ -162,13 +162,13 @@ bool work_send(work_queue *m,
  *  there is work for the receiving thread to handle.
  */
 void work_recv(evutil_socket_t fd, short which, void *arg) {
-    assert(which & EV_READ);
+    cb_assert(which & EV_READ);
 
     work_queue *m = arg;
-    assert(m != NULL);
-    assert(m->recv_fd == fd);
-    assert(m->send_fd >= 0);
-    assert(m->event_base != NULL);
+    cb_assert(m != NULL);
+    cb_assert(m->recv_fd == fd);
+    cb_assert(m->send_fd >= 0);
+    cb_assert(m->event_base != NULL);
 
     work_item *curr = NULL;
     work_item *next = NULL;
@@ -181,7 +181,7 @@ void work_recv(evutil_socket_t fd, short which, void *arg) {
     cb_mutex_enter(&m->work_lock);
 
     int readrv = recv(fd, buf, 1, 0);
-    assert(readrv == 1);
+    cb_assert(readrv == 1);
     if (readrv != 1) {
 #ifdef WORK_DEBUG
         /* Perhaps libevent called us in incorrect way. */
@@ -242,7 +242,7 @@ void work_recv(evutil_socket_t fd, short which, void *arg) {
  *  main caller.
  */
 int work_collect_init(work_collect *c, int count, void *data) {
-    assert(c);
+    cb_assert(c);
 
     memset(c, 0, sizeof(work_collect));
 
@@ -278,7 +278,7 @@ int work_collect_count(work_collect *c, int count) {
 int work_collect_one(work_collect *c) {
     int rv = 0;
     cb_mutex_enter(&c->collect_lock);
-    assert(c->count >= 1);
+    cb_assert(c->count >= 1);
     c->count--;
     if (c->count <= 0) {
         cb_cond_signal(&c->collect_cond);

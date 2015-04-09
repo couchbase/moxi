@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 
 #include <libconflate/conflate.h>
 #include "conflate_internal.h"
@@ -66,7 +66,7 @@ static enum conflate_mgmt_cb_result process_set_private(void *opaque,
     (void)r;
 
     /* Only direct stat requests are handled. */
-    assert(direct);
+    cb_assert(direct);
 
     if (key && value) {
         if (conflate_save_private(handle, key, value,
@@ -93,7 +93,7 @@ static enum conflate_mgmt_cb_result process_get_private(void *opaque,
     (void)cmd;
 
     /* Only direct stat requests are handled. */
-    assert(direct);
+    cb_assert(direct);
 
     if (key) {
         /* Initialize the form so there's always one there */
@@ -127,7 +127,7 @@ static enum conflate_mgmt_cb_result process_delete_private(void *opaque,
     (void)r;
 
     /* Only direct stat requests are handled. */
-    assert(direct);
+    cb_assert(direct);
 
     if (key) {
         if (conflate_delete_private(handle, key, handle->conf->save_path)) {

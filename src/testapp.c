@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <string.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -30,7 +30,7 @@ static enum test_return cache_create_test(void)
 {
     cache_t *cache = cache_create("test", sizeof(uint32_t), sizeof(char*),
                                   NULL, NULL);
-    assert(cache != NULL);
+    cb_assert(cache != NULL);
     cache_destroy(cache);
     return TEST_PASS;
 }
@@ -53,7 +53,7 @@ static enum test_return cache_constructor_test(void)
     uint64_t pattern;
     cache_t *cache = cache_create("test", sizeof(uint64_t), sizeof(uint64_t),
                                   cache_constructor, NULL);
-    assert(cache != NULL);
+    cb_assert(cache != NULL);
     ptr = cache_alloc(cache);
     pattern = *ptr;
     cache_free(cache, ptr);
@@ -76,7 +76,7 @@ static enum test_return cache_fail_constructor_test(void)
                                   cache_fail_constructor, NULL);
     uint64_t *ptr;
 
-    assert(cache != NULL);
+    cb_assert(cache != NULL);
     ptr = cache_alloc(cache);
     if (ptr != NULL) {
         ret = TEST_FAIL;
@@ -98,7 +98,7 @@ static enum test_return cache_destructor_test(void)
                                   NULL, cache_destructor);
     char *ptr;
 
-    assert(cache != NULL);
+    cb_assert(cache != NULL);
     ptr = cache_alloc(cache);
     cache_free(cache, ptr);
     cache_destroy(cache);
@@ -115,7 +115,7 @@ static enum test_return cache_reuse_test(void)
     cache_free(cache, ptr);
     for (ii = 0; ii < 100; ++ii) {
         char *p = cache_alloc(cache);
-        assert(p == ptr);
+        cb_assert(p == ptr);
         cache_free(cache, ptr);
     }
     cache_destroy(cache);
@@ -144,12 +144,12 @@ static enum test_return cache_redzone_test(void)
     old = *(p - 1);
     *(p - 1) = 0;
     cache_free(cache, p);
-    assert(cache_error == -1);
+    cb_assert(cache_error == -1);
     *(p - 1) = old;
 
     p[sizeof(uint32_t)] = 0;
     cache_free(cache, p);
-    assert(cache_error == 1);
+    cb_assert(cache_error == 1);
 
     /* restore signal handler */
     sigaction(SIGABRT, &old_action, NULL);
@@ -164,98 +164,98 @@ static enum test_return cache_redzone_test(void)
 
 static enum test_return test_safe_strtoul(void) {
     uint32_t val;
-    assert(safe_strtoul("123", &val));
-    assert(val == 123);
-    assert(safe_strtoul("+123", &val));
-    assert(val == 123);
-    assert(!safe_strtoul("", &val));  /* empty */
-    assert(!safe_strtoul("123BOGUS", &val));  /* non-numeric */
+    cb_assert(safe_strtoul("123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtoul("+123", &val));
+    cb_assert(val == 123);
+    cb_assert(!safe_strtoul("", &val));  /* empty */
+    cb_assert(!safe_strtoul("123BOGUS", &val));  /* non-numeric */
     /* Not sure what it does, but this works with ICC :/
-       assert(!safe_strtoul("92837498237498237498029383", &val)); // out of range
+       cb_assert(!safe_strtoul("92837498237498237498029383", &val)); // out of range
     */
 
     /* extremes: */
-    assert(safe_strtoul("4294967295", &val)); /* 2**32 - 1 */
-    assert(val == 4294967295L);
+    cb_assert(safe_strtoul("4294967295", &val)); /* 2**32 - 1 */
+    cb_assert(val == 4294967295L);
     /* This actually works on 64-bit ubuntu
-       assert(!safe_strtoul("4294967296", &val)); // 2**32
+       cb_assert(!safe_strtoul("4294967296", &val)); // 2**32
     */
-    assert(!safe_strtoul("-1", &val));  /* negative */
+    cb_assert(!safe_strtoul("-1", &val));  /* negative */
     return TEST_PASS;
 }
 
 
 static enum test_return test_safe_strtoull(void) {
     uint64_t val;
-    assert(safe_strtoull("123", &val));
-    assert(val == 123);
-    assert(safe_strtoull("+123", &val));
-    assert(val == 123);
-    assert(!safe_strtoull("", &val));  /* empty */
-    assert(!safe_strtoull("123BOGUS", &val));  /* non-numeric */
-    assert(!safe_strtoull("92837498237498237498029383", &val)); /* out of range */
+    cb_assert(safe_strtoull("123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtoull("+123", &val));
+    cb_assert(val == 123);
+    cb_assert(!safe_strtoull("", &val));  /* empty */
+    cb_assert(!safe_strtoull("123BOGUS", &val));  /* non-numeric */
+    cb_assert(!safe_strtoull("92837498237498237498029383", &val)); /* out of range */
 
     /* extremes: */
-    assert(safe_strtoull("18446744073709551615", &val)); /* 2**64 - 1 */
-    assert(val == 18446744073709551615ULL);
-    assert(!safe_strtoull("18446744073709551616", &val)); /* 2**64 */
-    assert(!safe_strtoull("-1", &val));  /* negative */
+    cb_assert(safe_strtoull("18446744073709551615", &val)); /* 2**64 - 1 */
+    cb_assert(val == 18446744073709551615ULL);
+    cb_assert(!safe_strtoull("18446744073709551616", &val)); /* 2**64 */
+    cb_assert(!safe_strtoull("-1", &val));  /* negative */
     return TEST_PASS;
 }
 
 static enum test_return test_safe_strtoll(void) {
     int64_t val;
-    assert(safe_strtoll("123", &val));
-    assert(val == 123);
-    assert(safe_strtoll("+123", &val));
-    assert(val == 123);
-    assert(safe_strtoll("-123", &val));
-    assert(val == -123);
-    assert(!safe_strtoll("", &val));  /* empty */
-    assert(!safe_strtoll("123BOGUS", &val));  /* non-numeric */
-    assert(!safe_strtoll("92837498237498237498029383", &val)); /* out of range */
+    cb_assert(safe_strtoll("123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtoll("+123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtoll("-123", &val));
+    cb_assert(val == -123);
+    cb_assert(!safe_strtoll("", &val));  /* empty */
+    cb_assert(!safe_strtoll("123BOGUS", &val));  /* non-numeric */
+    cb_assert(!safe_strtoll("92837498237498237498029383", &val)); /* out of range */
 
     /* extremes: */
-    assert(!safe_strtoll("18446744073709551615", &val)); /* 2**64 - 1 */
-    assert(safe_strtoll("9223372036854775807", &val)); /* 2**63 - 1 */
-    assert(val == 9223372036854775807LL);
+    cb_assert(!safe_strtoll("18446744073709551615", &val)); /* 2**64 - 1 */
+    cb_assert(safe_strtoll("9223372036854775807", &val)); /* 2**63 - 1 */
+    cb_assert(val == 9223372036854775807LL);
     /*
-      assert(safe_strtoll("-9223372036854775808", &val)); // -2**63
-      assert(val == -9223372036854775808LL);
+      cb_assert(safe_strtoll("-9223372036854775808", &val)); // -2**63
+      cb_assert(val == -9223372036854775808LL);
     */
-    assert(!safe_strtoll("-9223372036854775809", &val)); /* -2**63 - 1 */
+    cb_assert(!safe_strtoll("-9223372036854775809", &val)); /* -2**63 - 1 */
 
     /* We'll allow space to terminate the string.  And leading space. */
-    assert(safe_strtoll(" 123 foo", &val));
-    assert(val == 123);
+    cb_assert(safe_strtoll(" 123 foo", &val));
+    cb_assert(val == 123);
     return TEST_PASS;
 }
 
 static enum test_return test_safe_strtol(void) {
     int32_t val;
-    assert(safe_strtol("123", &val));
-    assert(val == 123);
-    assert(safe_strtol("+123", &val));
-    assert(val == 123);
-    assert(safe_strtol("-123", &val));
-    assert(val == -123);
-    assert(!safe_strtol("", &val));  /* empty */
-    assert(!safe_strtol("123BOGUS", &val));  /* non-numeric */
-    assert(!safe_strtol("92837498237498237498029383", &val)); /* out of range */
+    cb_assert(safe_strtol("123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtol("+123", &val));
+    cb_assert(val == 123);
+    cb_assert(safe_strtol("-123", &val));
+    cb_assert(val == -123);
+    cb_assert(!safe_strtol("", &val));  /* empty */
+    cb_assert(!safe_strtol("123BOGUS", &val));  /* non-numeric */
+    cb_assert(!safe_strtol("92837498237498237498029383", &val)); /* out of range */
 
     /* extremes: */
     /* This actually works on 64-bit ubuntu
-       assert(!safe_strtol("2147483648", &val)); // (expt 2.0 31.0)
+       cb_assert(!safe_strtol("2147483648", &val)); // (expt 2.0 31.0)
     */
-    assert(safe_strtol("2147483647", &val)); /* (- (expt 2.0 31) 1) */
-    assert(val == 2147483647L);
+    cb_assert(safe_strtol("2147483647", &val)); /* (- (expt 2.0 31) 1) */
+    cb_assert(val == 2147483647L);
     /* This actually works on 64-bit ubuntu
-       assert(!safe_strtol("-2147483649", &val)); // (- (expt -2.0 31) 1)
+       cb_assert(!safe_strtol("-2147483649", &val)); // (- (expt -2.0 31) 1)
     */
 
     /* We'll allow space to terminate the string.  And leading space. */
-    assert(safe_strtol(" 123 foo", &val));
-    assert(val == 123);
+    cb_assert(safe_strtol(" 123 foo", &val));
+    cb_assert(val == 123);
     return TEST_PASS;
 }
 
@@ -285,7 +285,7 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
     remove(pid_file);
 
     pid = fork();
-    assert(pid != -1);
+    cb_assert(pid != -1);
 
     if (pid == 0) {
         /* Child */
@@ -317,7 +317,7 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
             argv[arg++] = pid_file;
         }
         argv[arg++] = NULL;
-        assert(execv(argv[0], argv) != -1);
+        cb_assert(execv(argv[0], argv) != -1);
     }
 
     /* Yeah just let us "busy-wait" for the file to be created ;-) */
@@ -329,20 +329,20 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
     if (fp == NULL) {
         fprintf(stderr, "Failed to open the file containing port numbers: %s\n",
                 strerror(errno));
-        assert(false);
+        cb_assert(false);
     }
 
     *port_out = (in_port_t)-1;
     while ((fgets(buffer, sizeof(buffer), fp)) != NULL) {
         if (strncmp(buffer, "TCP INET: ", 10) == 0) {
             int32_t val;
-            assert(safe_strtol(buffer + 10, &val));
+            cb_assert(safe_strtol(buffer + 10, &val));
             *port_out = (in_port_t)val;
         }
     }
 
     fclose(fp);
-    assert(remove(filename) == 0);
+    cb_assert(remove(filename) == 0);
 
     if (is_daemon) {
         int32_t val;
@@ -358,12 +358,12 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
         if (fp == NULL) {
             fprintf(stderr, "Failed to open pid file: %s\n",
                     strerror(errno));
-            assert(false);
+            cb_assert(false);
         }
-        assert(fgets(buffer, sizeof(buffer), fp) != NULL);
+        cb_assert(fgets(buffer, sizeof(buffer), fp) != NULL);
         fclose(fp);
 
-        assert(safe_strtol(buffer, &val));
+        cb_assert(safe_strtol(buffer, &val));
         pid = (pid_t)val;
     }
 
@@ -373,9 +373,9 @@ static pid_t start_server(in_port_t *port_out, bool is_daemon) {
 static enum test_return test_issue_44(void) {
     in_port_t port;
     pid_t pid = start_server(&port, true);
-    assert(kill(pid, SIGHUP) == 0);
+    cb_assert(kill(pid, SIGHUP) == 0);
     sleep(1);
-    assert(kill(pid, SIGTERM) == 0);
+    cb_assert(kill(pid, SIGTERM) == 0);
 
     return TEST_PASS;
 }
@@ -440,25 +440,25 @@ static enum test_return test_vperror(void) {
     strncpy(tmpl, TMP_TEMPLATE, sizeof(TMP_TEMPLATE)+1);
 
     newfile = mkstemp(tmpl);
-    assert(newfile > 0);
+    cb_assert(newfile > 0);
     rv = dup2(newfile, STDERR_FILENO);
-    assert(rv == STDERR_FILENO);
+    cb_assert(rv == STDERR_FILENO);
     rv = close(newfile);
-    assert(rv == 0);
+    cb_assert(rv == 0);
 
     errno = EIO;
     vperror("Old McDonald had a farm.  %s", "EI EIO");
 
     /* Restore stderr */
     rv = dup2(oldstderr, STDERR_FILENO);
-    assert(rv == STDERR_FILENO);
+    cb_assert(rv == STDERR_FILENO);
 
 
     /* Go read the file */
     efile = fopen(tmpl, "r");
-    assert(efile);
+    cb_assert(efile);
     prv = fgets(buf, sizeof(buf), efile);
-    assert(prv);
+    cb_assert(prv);
     fclose(efile);
 
     unlink(tmpl);

@@ -1,6 +1,6 @@
 #include "src/config.h"
 #include <stdio.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
@@ -14,7 +14,7 @@ bool safe_strtoull(const char *str, uint64_t *out) {
     char *endptr;
     unsigned long long ull;
 
-    assert(out != NULL);
+    cb_assert(out != NULL);
     errno = 0;
     *out = 0;
     ull = strtoull(str, &endptr, 10);
@@ -39,7 +39,7 @@ bool safe_strtoll(const char *str, int64_t *out) {
     char *endptr;
     long long ll;
 
-    assert(out != NULL);
+    cb_assert(out != NULL);
     errno = 0;
     *out = 0;
     ll = strtoll(str, &endptr, 10);
@@ -55,8 +55,8 @@ bool safe_strtoll(const char *str, int64_t *out) {
 bool safe_strtoul(const char *str, uint32_t *out) {
     char *endptr = NULL;
     unsigned long l = 0;
-    assert(out);
-    assert(str);
+    cb_assert(out);
+    cb_assert(str);
     *out = 0;
     errno = 0;
 
@@ -84,7 +84,7 @@ bool safe_strtoul(const char *str, uint32_t *out) {
 bool safe_strtol(const char *str, int32_t *out) {
     char *endptr;
     long l;
-    assert(out != NULL);
+    cb_assert(out != NULL);
     errno = 0;
     *out = 0;
     l = strtol(str, &endptr, 10);
@@ -138,9 +138,9 @@ void compute_stats(struct moxi_stats *out, double *vals, int num_vals)
     double sum = 0;
     int i;
 
-    assert(out);
-    assert(vals);
-    assert(num_vals > 0);
+    cb_assert(out);
+    cb_assert(vals);
+    cb_assert(num_vals > 0);
 
     out->min = vals[0];
     out->max = vals[0];

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -13,15 +13,15 @@
 static void cproxy_sasl_plain_auth(conn *c, char *req_bytes);
 
 void cproxy_process_upstream_binary(conn *c) {
-    assert(c != NULL);
-    assert(c->cmd >= 0);
-    assert(c->next == NULL);
-    assert(c->item == NULL);
-    assert(IS_BINARY(c->protocol));
-    assert(IS_PROXY(c->protocol));
+    cb_assert(c != NULL);
+    cb_assert(c->cmd >= 0);
+    cb_assert(c->next == NULL);
+    cb_assert(c->item == NULL);
+    cb_assert(IS_BINARY(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
 
     proxy_td *ptd = c->extra;
-    assert(ptd != NULL);
+    cb_assert(ptd != NULL);
 
     if (!cproxy_prep_conn_for_write(c)) {
         ptd->stats.stats.err_upstream_write_prep++;
@@ -38,7 +38,7 @@ void cproxy_process_upstream_binary(conn *c) {
     int      keylen  = c->binary_header.request.keylen;
     uint32_t bodylen = c->binary_header.request.bodylen;
 
-    assert(bodylen >= (uint32_t) keylen + extlen);
+    cb_assert(bodylen >= (uint32_t) keylen + extlen);
 
     if (settings.verbose > 2) {
         moxi_log_write("<%d cproxy_process_upstream_binary %x %d %d %u\n",
@@ -66,7 +66,7 @@ void cproxy_process_upstream_binary(conn *c) {
         item *it = c->item;
         void *rb = c->rcurr;
 
-        assert(it->refcount == 1);
+        cb_assert(it->refcount == 1);
 
         memcpy(ITEM_data(it), rb, sizeof(c->binary_header));
 
@@ -90,6 +90,10 @@ void cproxy_process_upstream_binary(conn *c) {
             cproxy_pause_upstream_for_downstream(ptd, c);
         }
     } else {
+        if (settings.verbose > 2) {
+            moxi_log_write("<%d cproxy_process_upstream_binary OOM\n",
+                           c->sfd);
+        }
         ptd->stats.stats.err_oom++;
         cproxy_close_conn(c);
     }
@@ -98,12 +102,12 @@ void cproxy_process_upstream_binary(conn *c) {
 /* We get here after reading the header+body into an item.
  */
 void cproxy_process_upstream_binary_nread(conn *c) {
-    assert(c != NULL);
-    assert(c->cmd >= 0);
-    assert(c->next == NULL);
-    assert(c->cmd_start == NULL);
-    assert(IS_BINARY(c->protocol));
-    assert(IS_PROXY(c->protocol));
+    cb_assert(c != NULL);
+    cb_assert(c->cmd >= 0);
+    cb_assert(c->next == NULL);
+    cb_assert(c->cmd_start == NULL);
+    cb_assert(IS_BINARY(c->protocol));
+    cb_assert(IS_PROXY(c->protocol));
 
     protocol_binary_request_header *header =
         (protocol_binary_request_header *) &c->binary_header;
@@ -122,11 +126,11 @@ void cproxy_process_upstream_binary_nread(conn *c) {
     /* pthread_mutex_unlock(&c->thread->stats.mutex); */
 
     proxy_td *ptd = c->extra;
-    assert(ptd != NULL);
+    cb_assert(ptd != NULL);
 
     if (header->request.opcode == PROTOCOL_BINARY_CMD_SASL_AUTH) {
         item *it = c->item;
-        assert(it);
+        cb_assert(it);
 
         cproxy_sasl_plain_auth(c, (char *) ITEM_data(it));
         return;
@@ -182,14 +186,14 @@ void cproxy_process_upstream_binary_nread(conn *c) {
         return;
     }
 
-    assert(c->item == NULL || ((item *) c->item)->refcount == 1);
+    cb_assert(c->item == NULL || ((item *) c->item)->refcount == 1);
 
     cproxy_pause_upstream_for_downstream(ptd, c);
 }
 
 static int bin_cmd_append(bin_cmd **head, bin_cmd *bc) {
-    assert(head != NULL);
-    assert(bc != NULL);
+    cb_assert(head != NULL);
+    cb_assert(bc != NULL);
 
     bin_cmd *tail = *head;
 
@@ -212,8 +216,8 @@ static int bin_cmd_append(bin_cmd **head, bin_cmd *bc) {
 bool cproxy_binary_cork_cmd(conn *c) {
     /* Save the quiet binary command for later uncorking. */
 
-    assert(c != NULL);
-    assert(c->item != NULL);
+    cb_assert(c != NULL);
+    cb_assert(c->item != NULL);
 
     bin_cmd *bc = calloc(1, sizeof(bin_cmd));
     if (bc != NULL) {
@@ -241,8 +245,8 @@ bool cproxy_binary_cork_cmd(conn *c) {
 }
 
 void cproxy_binary_uncork_cmds(downstream *d, conn *uc) {
-    assert(d != NULL);
-    assert(uc != NULL);
+    cb_assert(d != NULL);
+    cb_assert(uc != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("%d: cproxy_binary_uncork_cmds\n",
@@ -280,8 +284,8 @@ void cproxy_binary_uncork_cmds(downstream *d, conn *uc) {
 
 void cproxy_process_downstream_binary(conn *c) {
     downstream *d = c->extra;
-    assert(d != NULL);
-    assert(d->upstream_conn != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->upstream_conn != NULL);
 
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2b_downstream(c);
@@ -292,8 +296,8 @@ void cproxy_process_downstream_binary(conn *c) {
 
 void cproxy_process_downstream_binary_nread(conn *c) {
     downstream *d = c->extra;
-    assert(d != NULL);
-    assert(d->upstream_conn != NULL);
+    cb_assert(d != NULL);
+    cb_assert(d->upstream_conn != NULL);
 
     if (IS_ASCII(d->upstream_conn->protocol)) {
         cproxy_process_a2b_downstream_nread(c);
@@ -365,9 +369,9 @@ static void cproxy_sasl_plain_auth(conn *c, char *req_bytes) {
     unsigned int clientinlen;
 
     proxy_td *ptd = c->extra;
-    assert(ptd != NULL);
-    assert(ptd->proxy != NULL);
-    assert(ptd->proxy->main != NULL);
+    cb_assert(ptd != NULL);
+    cb_assert(ptd->proxy != NULL);
+    cb_assert(ptd->proxy->main != NULL);
 
     /* Authenticate an upstream connection. */
 

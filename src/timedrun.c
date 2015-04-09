@@ -5,7 +5,7 @@
 #include <sys/wait.h>
 #include <sysexits.h>
 
-#include <assert.h>
+#include <platform/cbassert.h>
 
 static int caught = 0;
 
@@ -69,7 +69,7 @@ static int spawn_and_wait(int argc, char **argv)
     int rv = EX_SOFTWARE;
     pid_t pid = fork();
 
-    assert(argc > 1);
+    cb_assert(argc > 1);
 
     switch (pid) {
     case -1:
@@ -90,10 +90,10 @@ static int spawn_and_wait(int argc, char **argv)
 int main(int argc, char **argv)
 {
     int naptime = 0;
-    assert(argc > 2);
+    cb_assert(argc > 2);
 
     naptime = atoi(argv[1]);
-    assert(naptime > 0 && naptime < 1800);
+    cb_assert(naptime > 0 && naptime < 1800);
 
     alarm(naptime);
 

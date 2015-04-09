@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include "memcached.h"
 #include "cproxy.h"
 #include "work.h"
@@ -285,7 +285,7 @@ proxy_main *cproxy_init_agent_start(char *jid,
                                     proxy_behavior behavior,
                                     int nthreads) {
     proxy_main *m;
-    assert(dbpath);
+    cb_assert(dbpath);
 
     if (settings.verbose > 2) {
         moxi_log_write("cproxy_init_agent_start\n");;
@@ -394,11 +394,11 @@ conflate_result on_conflate_new_config(void *userdata, kvpair_t *config) {
     kvpair_t *copy;
     LIBEVENT_THREAD *mthread;
     proxy_main *m = userdata;
-    assert(m != NULL);
-    assert(config != NULL);
+    cb_assert(m != NULL);
+    cb_assert(config != NULL);
 
     mthread = thread_by_index(0);
-    assert(mthread != NULL);
+    cb_assert(mthread != NULL);
 
     if (settings.verbose > 0) {
         moxi_log_write("configuration received\n");
@@ -552,9 +552,9 @@ bool cproxy_on_config_json_one(proxy_main *m, uint32_t new_config_ver,
                                char *config, char *name,
                                char *src) {
     bool rv = false;
-    assert(m != NULL);
-    assert(config != NULL);
-    assert(name != NULL);
+    cb_assert(m != NULL);
+    cb_assert(config != NULL);
+    cb_assert(name != NULL);
 
     /* Handle reconfiguration of a single proxy. */
 
@@ -626,7 +626,7 @@ bool cproxy_on_config_json_one_vbucket(proxy_main *m, uint32_t new_config_ver,
                                        char *src) {
     bool rv = false;
     VBUCKET_CONFIG_HANDLE vch;
-    assert(m != NULL);
+    cb_assert(m != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("parsing config nodeLocator:vbucket\n");
@@ -741,7 +741,7 @@ bool cproxy_on_config_json_one_ketama(proxy_main *m, uint32_t new_config_ver,
     cJSON *jArr;
     cJSON *jVBSM;
 
-    assert(m != NULL);
+    cb_assert(m != NULL);
 
     if (settings.verbose > 2) {
         moxi_log_write("parsing config nodeLocator:ketama\n");
@@ -1025,9 +1025,9 @@ void cproxy_on_config(void *data0, void *data1) {
     char **contents;
 
 
-    assert(m);
-    assert(kvs);
-    assert(is_listen_thread());
+    cb_assert(m);
+    cb_assert(kvs);
+    cb_assert(is_listen_thread());
 
     m->stat_configs++;
 
@@ -1118,8 +1118,8 @@ void close_outdated_proxies(proxy_main *m, uint32_t new_config_ver) {
         if (p->config_ver != new_config_ver) {
             down = true;
 
-            assert(p->port > 0);
-            assert(p->name != NULL);
+            cb_assert(p->port > 0);
+            cb_assert(p->name != NULL);
 
             port = p->port;
             name = strdup(p->name);
@@ -1165,10 +1165,10 @@ void cproxy_on_config_pool(proxy_main *m,
     bool found = false;
     proxy *p;
 
-    assert(m);
-    assert(name != NULL);
-    assert(port >= 0);
-    assert(is_listen_thread());
+    cb_assert(m);
+    cb_assert(name != NULL);
+    cb_assert(port >= 0);
+    cb_assert(is_listen_thread());
 
     /* See if we've already got a proxy running with that name and port, */
     /* and create one if needed. */
@@ -1180,8 +1180,8 @@ void cproxy_on_config_pool(proxy_main *m,
     while (p != NULL && !found) {
         cb_mutex_enter(&p->proxy_lock);
 
-        assert(p->port > 0);
-        assert(p->name != NULL);
+        cb_assert(p->port > 0);
+        cb_assert(p->name != NULL);
 
         found = ((p->port == port) &&
                  (strcmp(p->name, name) == 0));
@@ -1292,7 +1292,7 @@ void cproxy_on_config_pool(proxy_main *m,
             shutdown_flag = true;
         }
 
-        assert(config_ver != p->config_ver);
+        cb_assert(config_ver != p->config_ver);
 
         p->config_ver = config_ver;
 
@@ -1335,8 +1335,8 @@ void cproxy_on_config_pool(proxy_main *m,
             LIBEVENT_THREAD *t = thread_by_index(i);
             proxy_td *ptd;
 
-            assert(t);
-            assert(t->work_queue);
+            cb_assert(t);
+            cb_assert(t->work_queue);
 
             ptd = &p->thread_data[i];
             if (t &&
@@ -1366,12 +1366,12 @@ static void update_ptd_config(void *data0, void *data1) {
     (void)data1;
 
     ptd = data0;
-    assert(ptd);
+    cb_assert(ptd);
 
     p = ptd->proxy;
-    assert(p);
+    cb_assert(p);
 
-    assert(is_listen_thread() == false); /* Expecting a worker thread. */
+    cb_assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     cb_mutex_enter(&p->proxy_lock);
 
@@ -1511,12 +1511,12 @@ char *parse_kvs_servers(char *prefix,
     char *config_str;
     int j;
 
-    assert(prefix);
-    assert(pool_name);
-    assert(kvs);
-    assert(servers);
-    assert(behavior_pool);
-    assert(behavior_pool->arr);
+    cb_assert(prefix);
+    cb_assert(pool_name);
+    cb_assert(kvs);
+    cb_assert(servers);
+    cb_assert(behavior_pool);
+    cb_assert(behavior_pool->arr);
 
     if (behavior_pool->num <= 0) {
         return NULL;
@@ -1531,7 +1531,7 @@ char *parse_kvs_servers(char *prefix,
         int x;
         char *config_end;
 
-        assert(j < behavior_pool->num);
+        cb_assert(j < behavior_pool->num);
 
         /* Inherit default behavior. */
 
@@ -1599,10 +1599,10 @@ char **parse_kvs_behavior(kvpair_t *kvs,
     char **props;
     int k;
 
-    assert(kvs);
-    assert(prefix);
-    assert(name);
-    assert(behavior);
+    cb_assert(kvs);
+    cb_assert(prefix);
+    cb_assert(name);
+    cb_assert(behavior);
 
 
     snprintf(key, sizeof(key), "%s-%s", prefix, name);

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <assert.h>
+#include <platform/cbassert.h>
 #include <math.h>
 #include <limits.h>
 #include <libconflate/conflate.h>
@@ -225,15 +225,15 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
     (void)cmd;
     (void)direct;
 
-    assert(STATS_CMD_last      == sizeof(cmd_names) / sizeof(char *));
-    assert(STATS_CMD_TYPE_last == sizeof(cmd_type_names) / sizeof(char *));
+    cb_assert(STATS_CMD_last      == sizeof(cmd_names) / sizeof(char *));
+    cb_assert(STATS_CMD_TYPE_last == sizeof(cmd_type_names) / sizeof(char *));
 
-    assert(m);
-    assert(m->nthreads > 1);
+    cb_assert(m);
+    cb_assert(m->nthreads > 1);
 
     mthread = thread_by_index(0);
-    assert(mthread);
-    assert(mthread->work_queue);
+    cb_assert(mthread);
+    cb_assert(mthread->work_queue);
 
     type = get_simple_kvpair_val(form, "-subtype-");
     do_all = (type == NULL ||
@@ -342,7 +342,7 @@ enum conflate_mgmt_cb_result on_conflate_get_stats(void *userdata,
                 work_collect_wait(&ca[i]);
             }
 
-            assert(m->nthreads > 0);
+            cb_assert(m->nthreads > 0);
 
             if (msci.do_stats) {
                 struct stats_gathering_pair *end_pair = ca[1].data;
@@ -431,8 +431,8 @@ void map_key_stats_foreach_free(const void *key,
                                 void *user_data) {
     genhash_t *map_key_stats;
     (void)user_data;
-    assert(key);
-    assert(value);
+    cb_assert(key);
+    cb_assert(value);
 
     free((void *)key);
 
@@ -549,7 +549,7 @@ static void proxy_stats_dump_frontcache(ADD_STAT add_stats, conn *c,
 static void proxy_stats_dump_pstd_stats(ADD_STAT add_stats,
                                         conn *c, const char *prefix,
                                         proxy_stats *pstats) {
-    assert(pstats != NULL);
+    cb_assert(pstats != NULL);
 
     APPEND_PREFIX_STAT("num_upstream",
               "%"PRIu64, (uint64_t) pstats->num_upstream);
@@ -729,11 +729,11 @@ static void map_key_stats_foreach_dump(const void *key, const void *value,
     conn *c;
     char prefix[200+KEY_MAX_LENGTH];
 
-    assert(name != NULL);
-    assert(kstats != NULL);
-    assert(state != NULL);
+    cb_assert(name != NULL);
+    cb_assert(kstats != NULL);
+    cb_assert(state != NULL);
 
-    assert(strcmp(name, kstats->key) == 0);
+    cb_assert(strcmp(name, kstats->key) == 0);
 
     add_stats = state->add_stats;
     c = state->conn;
@@ -755,7 +755,7 @@ void proxy_stats_dump_proxy_main(ADD_STAT add_stats, conn *c,
     proxy_td *ptd;
     proxy_main *pm;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     ptd = c->extra;
     if (ptd == NULL ||
@@ -823,7 +823,7 @@ void proxy_stats_dump_proxies(ADD_STAT add_stats, conn *c,
     char prefix[200];
     proxy *p;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     ptd = c->extra;
     if (ptd == NULL ||
@@ -993,17 +993,17 @@ static void main_stats_collect(void *data0, void *data1) {
     int i;
     proxy *p;
 
-    assert(msci);
-    assert(msci->result);
+    cb_assert(msci);
+    cb_assert(msci->result);
 
     m = msci->m;
-    assert(m);
-    assert(m->nthreads > 1);
+    cb_assert(m);
+    cb_assert(m->nthreads > 1);
 
     ca = data1;
-    assert(ca);
+    cb_assert(ca);
 
-    assert(is_listen_thread());
+    cb_assert(is_listen_thread());
 
     ase = *msci;
     ase.prefix = "";
@@ -1116,8 +1116,8 @@ static void main_stats_collect(void *data0, void *data1) {
 
         if (nproxy > 0) {
             LIBEVENT_THREAD *t = thread_by_index(i);
-            assert(t);
-            assert(t->work_queue);
+            cb_assert(t);
+            cb_assert(t->work_queue);
 
             cb_mutex_enter(&m->proxy_main_lock);
 
@@ -1179,19 +1179,19 @@ static void work_stats_collect(void *data0, void *data1) {
     genhash_t *map_pstd;
     bool locked = true;
 
-    assert(ptd);
+    cb_assert(ptd);
 
     p = ptd->proxy;
-    assert(p);
+    cb_assert(p);
 
     c = data1;
-    assert(c);
+    cb_assert(c);
 
-    assert(is_listen_thread() == false); /* Expecting a worker thread. */
+    cb_assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     pair = c->data;
     map_pstd = pair->map_pstd;
-    assert(map_pstd != NULL);
+    cb_assert(map_pstd != NULL);
 
     cb_mutex_enter(&p->proxy_lock);
 
@@ -1257,8 +1257,8 @@ static void work_stats_collect(void *data0, void *data1) {
 static void add_proxy_stats_td(proxy_stats_td *agg, proxy_stats_td *x) {
     int j;
 
-    assert(agg);
-    assert(x);
+    cb_assert(agg);
+    cb_assert(x);
 
     add_proxy_stats(&agg->stats, &x->stats);
 
@@ -1272,8 +1272,8 @@ static void add_proxy_stats_td(proxy_stats_td *agg, proxy_stats_td *x) {
 }
 
 static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
-    assert(agg);
-    assert(x);
+    cb_assert(agg);
+    cb_assert(x);
 
     agg->num_upstream += x->num_upstream;
     agg->tot_upstream += x->tot_upstream;
@@ -1349,8 +1349,8 @@ static void add_proxy_stats(proxy_stats *agg, proxy_stats *x) {
 
 static void add_stats_cmd(proxy_stats_cmd *agg,
                           proxy_stats_cmd *x) {
-    assert(agg);
-    assert(x);
+    cb_assert(agg);
+    cb_assert(x);
 
     agg->seen        += x->seen;
     agg->hits        += x->hits;
@@ -1364,8 +1364,8 @@ static void add_stats_cmd_with_rescale(proxy_stats_cmd *agg,
                                        const proxy_stats_cmd *x,
                                        float rescale_agg,
                                        float rescale_x) {
-    assert(agg);
-    assert(x);
+    cb_assert(agg);
+    cb_assert(x);
 
 #define AGG(field) do {agg->field = llrintf(agg->field * rescale_agg + x->field * rescale_x);} while (0)
 
@@ -1404,8 +1404,8 @@ static void add_key_stats_inner(const void *data, void *userdata) {
         dest_stats->added_at = kstats->added_at;
     }
 
-    assert(rescale_factor_dest >= 1.0);
-    assert(rescale_factor_src >= 1.0);
+    cb_assert(rescale_factor_dest >= 1.0);
+    cb_assert(rescale_factor_src >= 1.0);
 
     for (j = 0; j < STATS_CMD_TYPE_last; j++) {
         int k;
@@ -1420,8 +1420,8 @@ static void add_key_stats_inner(const void *data, void *userdata) {
 
 static void add_raw_key_stats(genhash_t *key_stats_map,
                               mcache *kstats) {
-    assert(key_stats_map);
-    assert(kstats);
+    cb_assert(key_stats_map);
+    cb_assert(kstats);
 
     mcache_foreach(kstats, add_key_stats_inner, key_stats_map);
 }
@@ -1433,8 +1433,8 @@ static void add_processed_key_stats_inner(const void *key, const void* val, void
 
 static void add_processed_key_stats(genhash_t *dest_map,
                                     genhash_t *src_map) {
-    assert(dest_map);
-    assert(src_map);
+    cb_assert(dest_map);
+    cb_assert(src_map);
 
     genhash_iter(src_map, add_processed_key_stats_inner, dest_map);
 }
@@ -1443,10 +1443,10 @@ void genhash_free_entry(const void *key,
                         const void *value,
                         void *user_data) {
     (void)user_data;
-    assert(key != NULL);
+    cb_assert(key != NULL);
     free((void*)key);
 
-    assert(value != NULL);
+    cb_assert(value != NULL);
     free((void*)value);
 }
 
@@ -1460,7 +1460,7 @@ static void emit_proxy_stats_cmd(conflate_form_result *result,
     char buf_val[100];
     int j;
     char *buf = buf_key+prefix_len;
-    assert(buf_key != NULL);
+    cb_assert(buf_key != NULL);
     memcpy(buf_key, prefix, prefix_len);
 
 
@@ -1510,10 +1510,10 @@ void map_pstd_foreach_emit(const void *k,
     proxy_stats_td *pstd = (proxy_stats_td *) value;
     const struct main_stats_collect_info *emit = user_data;
 
-    assert(name != NULL);
-    assert(pstd != NULL);
-    assert(emit != NULL);
-    assert(emit->result);
+    cb_assert(name != NULL);
+    cb_assert(pstd != NULL);
+    cb_assert(emit != NULL);
+    cb_assert(emit->result);
 
 
 #define more_stat(key, val)                             \
@@ -1655,7 +1655,7 @@ static void map_key_stats_foreach_emit_inner(const void *_key,
     struct key_stats *kstats = (struct key_stats *) value;
     char buf[200+KEY_MAX_LENGTH];
 
-    assert(strcmp(key, kstats->key) == 0);
+    cb_assert(strcmp(key, kstats->key) == 0);
 
     snprintf(buf, sizeof(buf), "%s:keys_stats:%s:", state->name, key);
     emit_proxy_stats_cmd(state->emit->result, buf, "%s_%s_%s",
@@ -1679,10 +1679,10 @@ void map_key_stats_foreach_emit(const void *k,
     const char *name = (const char *) k;
     genhash_t *map_key_stats = (genhash_t *) value;
     const struct main_stats_collect_info *emit = user_data;
-    assert(name != NULL);
-    assert(map_key_stats != NULL);
-    assert(emit != NULL);
-    assert(emit->result);
+    cb_assert(name != NULL);
+    cb_assert(map_key_stats != NULL);
+    cb_assert(emit != NULL);
+    cb_assert(emit->result);
 
     state.name = name;
     state.emit = emit;
@@ -1711,8 +1711,8 @@ enum conflate_mgmt_cb_result on_conflate_reset_stats(void *userdata,
     (void)form;
     (void)r;
 
-    assert(m);
-    assert(m->nthreads > 1);
+    cb_assert(m);
+    cb_assert(m->nthreads > 1);
 
     proxy_stats_reset(m);
 
@@ -1721,8 +1721,8 @@ enum conflate_mgmt_cb_result on_conflate_reset_stats(void *userdata,
 
 void proxy_stats_reset(proxy_main *m) {
     LIBEVENT_THREAD *mthread = thread_by_index(0);
-    assert(mthread);
-    assert(mthread->work_queue);
+    cb_assert(mthread);
+    cb_assert(mthread->work_queue);
 
     work_send(mthread->work_queue, main_stats_reset, m, NULL);
 }
@@ -1738,10 +1738,10 @@ static void main_stats_reset(void *data0, void *data1) {
     int nproxy = 0;
 
     (void) data1;
-    assert(m);
-    assert(m->nthreads > 1);
+    cb_assert(m);
+    cb_assert(m->nthreads > 1);
 
-    assert(is_listen_thread());
+    cb_assert(is_listen_thread());
 
     m->stat_configs = 0;
     m->stat_config_fails = 0;
@@ -1778,8 +1778,8 @@ static void main_stats_reset(void *data0, void *data1) {
                 work_collect_init(c, nproxy, NULL);
 
                 t = thread_by_index(i);
-                assert(t);
-                assert(t->work_queue);
+                cb_assert(t);
+                cb_assert(t->work_queue);
 
                 cb_mutex_enter(&m->proxy_main_lock);
 
@@ -1818,10 +1818,10 @@ static void main_stats_reset(void *data0, void *data1) {
 static void work_stats_reset(void *data0, void *data1) {
     proxy_td *ptd = data0;
     work_collect *c = data1;
-    assert(ptd);
-    assert(c);
+    cb_assert(ptd);
+    cb_assert(c);
 
-    assert(is_listen_thread() == false); /* Expecting a worker thread. */
+    cb_assert(is_listen_thread() == false); /* Expecting a worker thread. */
 
     cproxy_reset_stats_td(&ptd->stats);
 
@@ -1844,7 +1844,7 @@ static void add_stat_prefix(const void *dump_opaque,
                             const char *val) {
     char buf[2000];
     const struct main_stats_collect_info *ase = dump_opaque;
-    assert(ase);
+    cb_assert(ase);
 
     snprintf(buf, sizeof(buf), "%s_%s", prefix, key);
 
@@ -1855,7 +1855,7 @@ static void add_stat_prefix_ase(const char *key, const uint16_t klen,
                                 const char *val, const uint32_t vlen,
                                 const void *cookie) {
     const struct main_stats_collect_info *ase = cookie;
-    assert(ase);
+    cb_assert(ase);
 
     add_stat_prefix(cookie, ase->prefix, key, val);
     (void)klen;
@@ -1883,7 +1883,7 @@ void proxy_stats_dump_timings(ADD_STAT add_stats, conn *c) {
     proxy_main *pm;
     proxy *p;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     ptd = c->extra;
     if (ptd == NULL ||
@@ -1945,7 +1945,7 @@ void proxy_stats_dump_config(ADD_STAT add_stats, conn *c) {
     proxy_main *pm;
     proxy *p;
 
-    assert(c != NULL);
+    cb_assert(c != NULL);
 
     ptd = c->extra;
     if (ptd == NULL ||
