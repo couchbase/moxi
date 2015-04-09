@@ -564,7 +564,11 @@ void cproxy_on_close_upstream_conn(conn *c) {
     }
 
     ptd = c->extra;
-    cb_assert(ptd != NULL);
+    if (c->extra == NULL) {
+        moxi_log_write("<%d cproxy_on_close_upstream_conn already closed\n",
+                       c->sfd);
+        return;
+    }
     c->extra = NULL;
 
     if (ptd->stats.stats.num_upstream > 0) {
