@@ -10,6 +10,9 @@ ADD_SUBDIRECTORY(libmemcached)
 INCLUDE(CheckFunctionExists)
 INCLUDE(CheckIncludeFiles)
 
+ADD_DEFINITIONS(-DMOXI_ITEM_MALLOC=1)
+
+
 INCLUDE_DIRECTORIES(BEFORE ${LIBEVENT_INCLUDE_DIR}
                            ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
