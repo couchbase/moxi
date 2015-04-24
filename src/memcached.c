@@ -29,6 +29,8 @@
 #include <limits.h>
 #include <stddef.h>
 #include <getopt.h>
+// MB-14649 log() crash on windows on some CPU's
+#include <math.h>
 
 #include "cproxy.h"
 #include "agent.h"
@@ -4625,6 +4627,11 @@ int main (int argc, char **argv) {
 
     /* udp socket */
     static int *u_socket = NULL;
+
+    // MB-14649 log() crash on windows on some CPU's
+#ifdef _WIN64
+    _set_FMA3_enable (0);
+#endif
 
     /* handle SIGINT */
     signal(SIGINT, sig_handler);
