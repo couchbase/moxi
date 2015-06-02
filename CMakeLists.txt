@@ -91,9 +91,9 @@ SET_TARGET_PROPERTIES(vbucket PROPERTIES
                       COMPILE_FLAGS -DBUILDING_LIBVBUCKET=1)
 
 IF (WIN32)
-    TARGET_LINK_LIBRARIES(vbucket cJSON)
+    TARGET_LINK_LIBRARIES(vbucket cJSON platform)
 ELSE (WIN32)
-    TARGET_LINK_LIBRARIES(vbucket cJSON m)
+    TARGET_LINK_LIBRARIES(vbucket cJSON m platform)
 ENDIF (WIN32)
 
 IF (INSTALL_HEADER_FILES)
@@ -186,6 +186,7 @@ CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/src/config.cmake.h
 
 ADD_EXECUTABLE(moxi_sizes tests/moxi/sizes.c)
 ADD_EXECUTABLE(moxi_htgram_test tests/moxi/htgram_test.c src/htgram.c)
+TARGET_LINK_LIBRARIES(moxi_htgram_test platform)
 
 ADD_EXECUTABLE(moxi
                src/memcached.c src/genhash.c src/hash.c src/slabs.c
