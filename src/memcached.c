@@ -3178,6 +3178,31 @@ int try_read_command(conn *c) {
                 return -1;
             }
 
+            /*
+             * disconnect the client if it tries to send illegal packets
+             * or packets that's too big. The max limit is 20Mb, so
+             * disconnect the client if it sends > 21.
+             */
+            if (c->binary_header.request.bodylen > (21 * 1024 * 1024)) {
+                if (settings.verbose) {
+                    moxi_log_write("Packet too big: 0x%x\n",
+                            c->binary_header.request.bodylen);
+                }
+                conn_set_state(c, conn_closing);
+                return -1;
+            }
+
+            uint32_t body = c->binary_header.request.keylen;
+            body += c->binary_header.request.extlen;
+            if (body > c->binary_header.request.bodylen) {
+                if (settings.verbose) {
+                    moxi_log_write("Content of packet bigger than encoded body: 0x%x > 0x%x\n",
+                                   body, c->binary_header.request.bodylen);
+                }
+                conn_set_state(c, conn_closing);
+                return -1;
+            }
+
             c->msgcurr = 0;
             c->msgused = 0;
             c->iovused = 0;
