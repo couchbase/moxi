@@ -24,7 +24,9 @@
 #undef malloc
 #undef realloc
 
+#if _MSC_VER < 1900
 #define snprintf _snprintf
+#endif
 #define PRIu64 "I64u"
 
 #define poll(a,b,c) WSAPoll(a,b,c)
