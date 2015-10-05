@@ -205,8 +205,18 @@ ADD_EXECUTABLE(moxi
 
 TARGET_LINK_LIBRARIES(moxi conflate vbucket platform mcd ${LIBEVENT_LIBRARIES} ${COUCHBASE_NETWORK_LIBS} ${UMEM_LIBRARY})
 
-INSTALL(TARGETS moxi vbucketkeygen vbuckettool
+INSTALL(TARGETS moxi
         RUNTIME DESTINATION bin)
+
+INSTALL(TARGETS vbucketkeygen vbuckettool
+        RUNTIME DESTINATION bin/tools)
+
+IF (APPLE)
+   # Tools are installed in bin/tools/; need to map from there to lib/
+   SET_TARGET_PROPERTIES(vbucketkeygen vbuckettool
+                         PROPERTIES
+                         INSTALL_RPATH "@executable_path/../../lib")
+ENDIF ()
 
 ADD_TEST(moxi-sizes moxi_sizes)
 ADD_TEST(moxi-htgram-test moxi_htgram_test)
