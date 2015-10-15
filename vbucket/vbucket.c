@@ -169,7 +169,6 @@ static int populate_servers(struct vbucket_config_st *vb, cJSON *c) {
 
     vb->servers = calloc(vb->num_servers, sizeof(struct server_st));
     if (vb->servers == NULL) {
-        vbucket_config_destroy(vb);
         vb->errmsg = strdup("Failed to allocate servers array");
         return -1;
     }
