@@ -124,7 +124,7 @@ typedef long long int64_t;
 #define SASL_ENABLED
 
 #define PACKAGE "moxi"
-#define VERSION "${MOXI_VERSION}"
+#define VERSION "${PRODUCT_VERSION}"
 #define CONFLATE_DB_PATH "${CONFLATE_DB_PATH}"
 
 #include <event.h>
