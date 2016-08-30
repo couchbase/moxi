@@ -538,7 +538,7 @@ bool cproxy_on_config_json_buckets(proxy_main *m, uint32_t new_config_ver,
                 if (jBucketStr != NULL) {
                     rv = cproxy_on_config_json_one(m, new_config_ver,
                                                    jBucketStr, name, src) || rv;
-                    free(jBucketStr);
+                    cJSON_Free(jBucketStr);
                 }
             }
         }
