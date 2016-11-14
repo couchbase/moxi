@@ -1644,6 +1644,18 @@ void dispatch_bin_command(conn *c) {
     uint32_t keylen = c->binary_header.request.keylen;
     uint32_t bodylen = c->binary_header.request.bodylen;
 
+    if ((extlen + keylen) > bodylen) {
+        /* Just write an error message and disconnect the client */
+        write_bin_error(c, PROTOCOL_BINARY_RESPONSE_EINVAL, 0);
+        if (settings.verbose) {
+            moxi_log_write("Protocol error (opcode %02x), close connection %d\n",
+                           c->binary_header.request.opcode,
+                           c->sfd);
+        }
+        c->write_and_go = conn_closing;
+        return;
+    }
+
     MEMCACHED_PROCESS_COMMAND_START(c->sfd, c->rcurr, c->rbytes);
 
     process_bin_noreply(c);
