@@ -524,7 +524,20 @@ conn *conn_new(const SOCKET sfd, const enum conn_states init_state,
                enum network_transport transport,
                struct event_base *base,
                conn_funcs *funcs, void *extra);
-void conn_set_state(conn *c, enum conn_states state);
+
+#define conn_set_state(c, state)                              \
+    do {                                                      \
+        if (state == conn_pause && c->rbytes > 0) {           \
+            moxi_log_write("%s:%s: cmd: 0x%02X rbytes: %u\n", \
+                           __FILE__,                          \
+                           __LINE__,                          \
+                           c->cmd,                            \
+                           c->rbytes);                        \
+        }                                                     \
+        do_conn_set_state(c, state);                          \
+    } while (0)
+
+void do_conn_set_state(conn* c, enum conn_states state);
 void add_bytes_read(conn *c, int bytes_read);
 void out_string(conn *c, const char *str);
 

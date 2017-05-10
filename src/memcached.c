@@ -676,7 +676,7 @@ const char *state_text(enum conn_states state) {
  * processing that needs to happen on certain state transitions can
  * happen here.
  */
-void conn_set_state(conn *c, enum conn_states state) {
+void do_conn_set_state(conn* c, enum conn_states state) {
     cb_assert(c != NULL);
     cb_assert(state < conn_max_state);
 
