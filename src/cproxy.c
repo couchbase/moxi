@@ -2228,12 +2228,12 @@ void cproxy_on_pause_downstream_conn(conn *c) {
             bool found = false;
             conns->dc = conn_list_remove(conns->dc, NULL, c, &found);
             if (!found) {
-                moxi_log_write("<%d: %s:%s Not able to find connection"
+                moxi_log_write("<%d: %s:%d Not able to find connection"
                                " in zstore conns\n",
                                c->sfd, __FILE__, __LINE__);
             }
         } else {
-            moxi_log_write("<%d %s:%s Not able to find zstore conns\n",
+            moxi_log_write("<%d %s:%d Not able to find zstore conns\n",
                            c->sfd, __FILE__, __LINE__);
         }
         cproxy_close_conn(c);

@@ -528,7 +528,7 @@ conn *conn_new(const SOCKET sfd, const enum conn_states init_state,
 #define conn_set_state(c, state)                              \
     do {                                                      \
         if (state == conn_pause && c->rbytes > 0) {           \
-            moxi_log_write("%s:%s: cmd: 0x%02X rbytes: %u\n", \
+            moxi_log_write("%s:%d: cmd: 0x%02X rbytes: %u\n", \
                            __FILE__,                          \
                            __LINE__,                          \
                            c->cmd,                            \
