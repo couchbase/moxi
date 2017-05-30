@@ -3787,6 +3787,10 @@ void drive_machine(conn *c) {
             switch (transmit(c)) {
             case TRANSMIT_COMPLETE:
                 if (c->state == conn_mwrite) {
+                    if (IS_DOWNSTREAM(c->protocol) && c->item != NULL){
+                        do_item_remove(c->item);
+                        c->item = NULL;
+                    }
                     while (c->ileft > 0) {
                         item *it = *(c->icurr);
                         cb_assert((it->it_flags & ITEM_SLABBED) == 0);

@@ -1723,6 +1723,14 @@ bool cproxy_forward_a2b_item_downstream(downstream *d, short cmd,
                     req->request.bodylen =
                         htonl(it->nkey + (it->nbytes - 2) + extlen);
 
+                    /* MB-24509: Prevent item being free'd until we are done
+                     * with it. Will be free'd when we have finished sending it
+                     * or when we close. If we finish before the upstream, the
+                     * upstream will free it when calling conn_cleanup.
+                     */
+                    it->refcount++;
+                    c->item = it;
+
                     if (add_iov(c, ITEM_data(it_hdr), hdrlen) == 0 &&
                         add_iov(c, ITEM_key(it),  it->nkey) == 0 &&
                         add_iov(c, ITEM_data(it), it->nbytes - 2) == 0) {
