@@ -3489,8 +3489,10 @@ static enum transmit_result transmit(conn *c) {
         }
         /* if res == 0 or res == -1 and error is not EAGAIN or EWOULDBLOCK,
            we have a real error, on which we close the connection */
-        if (settings.verbose > 0)
-            perror("Failed to write, and not due to blocking");
+        if (settings.verbose > 0) {
+            moxi_log_write("%u: Failed to write, and not due to blocking: %s\n",
+                           c->sfd, strerror(error));
+        }
 
         if (IS_UDP(c->transport))
             conn_set_state(c, conn_read);
