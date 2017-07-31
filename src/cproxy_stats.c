@@ -17,7 +17,7 @@
 
 char *protocol_stats_keys_first =
     "pid version libevent "
-    "ep_version ep_dbname ep_storage_type ep_flusher_state ep_warmup_thread ";
+    "ep_dbname ep_storage_type ep_flusher_state ep_warmup_thread ";
 
 char *protocol_stats_keys_smallest =
     "uptime "
