@@ -84,16 +84,16 @@ Developing
 
 Dependencies:
 
-   -- libevent, http://www.monkey.org/~provos/libevent/ (libevent-dev)
+   -- libevent, http://libevent.org/ (libevent-dev)
 
-   -- libconflate, http://github.com/northscale/libconflate
+   -- libconflate, https://github.com/membase/libconflate
 
-   -- libvbucket, http://github.com/northscale/libvbucket
+   -- libvbucket, https://github.com/membase/libvbucket
 
 As a backwards-compatible (ketama/consistent-hashing) alternative to
 libvbucket, you may instead use libmemcached instead of libvbucket...
 
-   -- libmemcached, http://tangent.org/552/libmemcached.html
+   -- libmemcached, http://libmemcached.org/libMemcached.html
 
 To use moxi against membase, however, you'll want libvbucket.
 
